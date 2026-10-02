@@ -44,6 +44,8 @@
 (include "engine/setup.rktl")          ; setup.ss (without setup, enable-resizing)
 (include "engine/coderack.rktl")       ; coderack.ss
 (include "engine/descriptions.rktl")   ; descriptions.ss
+(include "engine/slipnet.rktl")        ; slipnet.ss
+(include "engine/images.rktl")         ; images.ss
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
 ;; (set-global! 'name value): set! one of the engine's global variables from
@@ -69,5 +71,8 @@
     %workspace-graphics% %slipnet-graphics% %coderack-graphics%
     %codelet-count-graphics% %highlight-last-codelet% %nice-graphics%
     *repl-thread*
+    ;; slipnet.ss
+    *top-down-slipnodes*
     ;; not ported yet (engine/pending.rktl)
-    *workspace* *themespace* *trace* *top-down-slipnodes* *display-mode?*))
+    *workspace* *themespace* *trace* *display-mode?*
+    monitor-slipnode-activation-change temp-adjusted-probability))

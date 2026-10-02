@@ -39,11 +39,11 @@ port (`tests/golden/`).
 - `diff-eval.ss FILE ...` evaluates differential batteries with the
   original loaded: each FILE in turn, normally `tests/diff/helpers.scm` (the
   shared helpers) and then a battery such as `tests/diff/utilities-battery.scm`
-  or `tests/diff/coderack-battery.scm`. It prints one canonical result per
+  or `tests/diff/coderack-battery.scm` or `tests/diff/slipnet-battery.scm`. It prints one canonical result per
   `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
   for batteries that set the original's globals. The Racket side is
   `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`
-  (compat.rkt + utilities.rkt) and `coderack-diff-test.rkt` (+ engine.rkt).
+  (compat.rkt + utilities.rkt) and `coderack-diff-test.rkt` and `slipnet-diff-test.rkt` (+ engine.rkt).
 
       scheme --script chez_scheme/oracle/diff-eval.ss tests/diff/helpers.scm tests/diff/utilities-battery.scm
 - `tests/` holds Chez checks; `tests/run-tests.sh` runs each one with

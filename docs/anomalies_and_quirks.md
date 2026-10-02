@@ -37,6 +37,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** open. The golden set uses seed 4 instead. Nobody knows whether it happened
   under 1999-era Chez, where argument evaluation order may have differed.
 
+### A string image's `new-alpha-position-category` sends `new-start-letter`
+- **Seen:** iteration 6 (item 05), reading images.ss and checking it under Chez.
+- **What:** `make-string-image` answers `new-alpha-position-category` by sending each
+  sub-image `new-start-letter` with the same argument (a copy-paste of the
+  `new-start-letter` clause just above it). A letter image takes a non-relation argument
+  as its new letter, so applying "alphabetic position → first" to a whole string makes
+  every letter image's start letter the node `AlphaPos:first` itself:
+  `abc` generates `(plato-alphabetic-first plato-alphabetic-first plato-alphabetic-first)`.
+  `transform-image` (rules.ss:1384) sends this message for
+  `plato-alphabetic-position-category` transforms, so a rule whose clause changes a whole
+  string's alphabetic position would reach it.
+- **Evidence:** in `tests/diff/slipnet-battery.scm`, apply
+  `(tell si 'new-alpha-position-category plato-alphabetic-first fail)` to a string image
+  of `abc`; the battery's `string-image-operations` test covers the message with a
+  relation argument.
+- **Status:** open (suspected bug, faithfully ported). Whether any golden run reaches it is
+  not known yet; rules.ss (item 06) will tell.
+
+### Latent errors: `relationship-between` of fewer than two nodes; printing a group image without a direction
+- **Seen:** iteration 6 (item 05), differential battery.
+- **What:** `(relationship-between (list plato-a))` takes `(1st '())` (adjacency-map gives
+  no relations, and `all-same?` of `'()` is true); `(relationship-between '())` takes
+  `(rest '())`. Both are Chez errors. Separately, `'print` on a group image whose direction
+  is `#f` (a sameness group) sends `get-lowercase-name` to `#f`.
+- **Evidence:** tests `relationship-between-one`, `relationship-between-none` in
+  `tests/diff/slipnet-battery.scm` print `ERROR` under Chez and Racket alike.
+- **Status:** won't fix. images.ss only calls `relationship-between` on two or more
+  sub-images, and `print` is a debugging aid.
+
 ## 🌀 Anomalies
 
 ### Most documented demo seeds replay exactly; a few don't
@@ -58,6 +87,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** open. Chez's global `random` has evidently been the same 32-bit LCG for
   decades. Why the few misses? It could be the evaluation-order changes below, a different
   original version, or a lost setting.
+
+### A string image's `reset` forgets its original direction
+- **Seen:** iteration 6 (item 05).
+- **What:** `make-string-image` takes a direction, but `reset` always sets it to
+  `plato-right`, so a string image made with `plato-left` generates its letters reversed
+  until the first reset, and in order afterwards.
+- **Evidence:** battery test `string-image-left` (and `string-image-operations`).
+- **Status:** not a bug. The only caller, workspace-strings.ss:30, makes every string
+  image with `plato-right`.
+
 
 ## ⚙️ Chez / Racket quirks
 

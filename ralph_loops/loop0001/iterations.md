@@ -54,7 +54,7 @@
     reasoning in `porting-notes.md`. Tests: the coderack's bins, urgencies and selection
     match the oracle for the same posted codelets and seed.
 
-- [ ] **05 Slipnet and images.** Port `slipnet.ss` and `images.ss`. Tests: the initial
+- [x] **05 Slipnet and images.** Port `slipnet.ss` and `images.ss`. Tests: the initial
     slipnet (nodes, links, lengths, conceptual depths) dumped from Racket equals the
     oracle's dump; activation spreading and decay over 20 updates from a fixed state
     match to the last bit.

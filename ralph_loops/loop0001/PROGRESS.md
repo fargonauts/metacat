@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 5/18 SOLVED
+- **Current**: 6/18 SOLVED
 
 ---
 
@@ -390,3 +390,105 @@ Item 04 (Constants, setup, coderack, descriptions): **SOLVED**.
     on `#f`;
   - new differential batteries can reuse `diff-runner.rkt` with fakes for
     the parts not ported yet, as coderack-battery.scm does.
+
+---
+
+## Iteration 6 — 2026-10-02 22:10
+Item 05 (Slipnet and images): **SOLVED**.
+
+### Completed
+- Ported `slipnet.ss` → `racket/engine/slipnet.rktl` and `images.ss` →
+  `racket/engine/images.rktl`, included by `racket/engine.rkt` after
+  descriptions.rktl, in load order. The only change: `slipnet-node-list*`
+  becomes the module-level `define-slipnet-node-list*` (compat.rkt already
+  had it), so each `plato-...` node is a module variable as well as a
+  top-level value. images.ss is unchanged. GPL headers kept, "Ported to
+  Racket" lines added.
+- `engine/pending.rktl`: removed the slipnet.ss stand-ins; added
+  `%update-cycle-length%` (run.ss's constant 15, used by slipnode `reset`),
+  `make-letter`, `make-group`, `make-group-pexp`,
+  `monitor-slipnode-activation-change`. `set-global!` now also lists
+  `monitor-slipnode-activation-change` and `temp-adjusted-probability`, so
+  that tests can replace them in both runners.
+- Tests:
+  - `tests/diff/slipnet-battery.scm` (48 tests) +
+    `racket/tests/slipnet-diff-test.rkt`, on the shared `diff-runner.rkt`.
+    Chez (original loaded) and Racket (engine) give identical output, about
+    1.1 MB.
+    - **Initial slipnet dump**: all 59 nodes (names, conceptual depth,
+      activation, intrinsic/shrunk link lengths, category/instances) and
+      every link list of every node (type, ends, label, length, intrinsic and
+      current degree of association; 202 links), plus nodes and links as
+      top-level values.
+    - **Activation**: 20 `update-slipnet-activations` from 8 fixed states
+      (clamped nodes, unfreezing after 10 updates, fake themes spreading
+      activation). Every update records all activations, frozen flags, the
+      generator state and every `monitor-slipnode-activation-change` call.
+      Also 15 more seeds and the start-of-run state. All exact, so equality
+      is to the last bit.
+    - Also: decay and spread from each node alone; every activation message;
+      relations over all node pairs; descriptor predicates on fake objects;
+      similar property links, `apply-slippages` with coattail slippages and
+      top-down codelet posting over several seeds.
+    - **Images**: 8 letter/group images × 29 operations, each followed by
+      copy, walks, state and reset; string images over a fake string × 13
+      operations; `change-length-first?`; `enumerate-letter`.
+  - `racket/tests/engine-test.rkt` (+4 checks): node count, nodes and links
+    as module variables and top-level values.
+- Tests-first: the battery was written and run under Chez before any port
+  code. Two battery bugs showed up there: a fake Workspace lacked messages
+  that top-down posting sends, and a `replace-all` test used lists of
+  unequal length. With the item-04 engine, the Racket test failed at once
+  (`plato-identity: undefined`). After the port, all 48 tests agreed on the
+  first run, with no change to the ported code.
+- Mutation checks, each restored afterwards:
+
+  | Mutation | Tests failed |
+  | --- | --- |
+  | decay `round`→`floor` | 10 |
+  | jump probability cube→square | 9 |
+  | reverse order of the jump draws | 9 |
+  | spread from above-threshold instead of fully active nodes | 9 |
+  | no `min` cap on flush | 10 |
+  | outgoing-link order | 1 |
+  | shrunk length 40%→80% | 3 |
+  | reverse-medium start letter | 2 |
+  | `enumerate-letter` order | 3 |
+
+  A left-to-right `for-each` in images' `replace-all` first failed nothing.
+  I then added a `replace-all-fail` case (a middle image fails), and it now
+  fails 1. So Chez's `map` order matters when an image operation escapes
+  midway.
+- Docs:
+  - porting-notes.md has a new item 05 section: changes, stand-ins, where
+    the draws are, exact arithmetic, map order in images, tests.
+  - anomalies_and_quirks.md has three new entries:
+    1. A string image answers `new-alpha-position-category` by sending
+       `new-start-letter`. This is a suspected copy-paste bug: under Chez,
+       `abc` becomes three `AlphaPos:first` nodes. rules.ss's
+       `transform-image` can reach it.
+    2. `relationship-between` of fewer than two nodes errors, and printing
+       a direction-less group image errors. Both are latent.
+    3. A string image's `reset` forces direction right. Not a bug, since the
+       only caller uses right.
+  - chez_scheme/oracle/README.md mentions the new battery.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  341 tests). `chez_scheme/original/` untouched.
+
+### Blockers
+- None. These need the Workspace and are left to the golden traces once
+  their files are ported:
+  - the real `monitor-slipnode-activation-change` (trace.ss);
+  - `temp-adjusted-probability` (formulas.ss);
+  - `instantiate-as-letter`/`instantiate-as-group` (workspace-objects.ss,
+    groups.ss).
+
+### Next
+- Item 06 in iterations.md. Notes:
+  - rules.ss calls `transform-image`, which reaches the suspected
+    `new-alpha-position-category` bug; port it faithfully.
+  - Remove the pending stand-ins of each file as it is ported, including
+    `%update-cycle-length%` when run.ss comes; it is a real value in
+    pending.rktl, not `#f`.
+  - The fakes in slipnet-battery.scm (fake string, fake slippage and
+    sliplog, fake themes) can be reused.

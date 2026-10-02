@@ -369,3 +369,64 @@ with fake Workspace, Themespace, Trace and top-down slipnodes; the threshold
 distributions; the setup.ss commands; `descriptions-equal?` and
 `description-member?`. The battery helpers moved to `tests/diff/helpers.scm`,
 which both runners load first.
+
+## The Slipnet and images (item 05)
+
+- **slipnet.ss**: unchanged except that `(define *slipnet-nodes*
+  (slipnet-node-list* ...))` becomes `(define-slipnet-node-list*
+  *slipnet-nodes* ...)`, which also defines each `plato-...` node as a
+  module-level variable, in the same order of `make-slipnode` calls. The
+  link macros (`lateral-link*`, ...) name each new link only as a top-level
+  value (`a-b-link`, via `establish-link`'s `define-top-level-value`) and
+  message it with `(top-level-value 'a-b-link)`; no other file refers to a
+  link by its name. The module-level code (top-down codelet types, intrinsic
+  link lengths, descriptor predicates, the 202 links) runs at load time as in
+  the original, after coderack.rktl has defined the codelet types.
+- **images.ss**: unchanged.
+- **Stand-ins** (engine/pending.rktl) that these files need until their
+  files are ported: `%update-cycle-length%` (run.ss's constant 15, which
+  slipnode `reset` uses for the decay rate; it is a value, not `#f`),
+  `make-letter` (workspace-objects.ss), `make-group` (groups.ss),
+  `make-group-pexp` (group-graphics.ss), `monitor-slipnode-activation-change`
+  (trace.ss). `monitor-slipnode-activation-change` and
+  `temp-adjusted-probability` are in `set-global!`'s list so that the battery
+  can replace them by logging fakes in both runners (Chez:
+  `set-top-level-value!`, as the original refers to them as top-level
+  variables). `*top-down-slipnodes*` is now defined by slipnet.rktl and stays
+  settable.
+- **Random draws and order.** The Slipnet draws in
+  `update-slipnet-activations` (one `stochastic-if*` per partially active
+  node, in `*slipnet-nodes*` order: a jump to full activation with
+  probability (a/100)^3), in `get-similar-property-links` (one `prob?` per
+  property link), in `apply-slippages` (coattail slippages) and in
+  `attempt-to-post-top-down-codelets` (`stochastic-if*` per codelet type).
+  No call has two effectful arguments. Activation arithmetic is exact
+  (`rate-of-decay` = 1 − depth/100, spread = round(assoc/100 × activation)
+  with utilities.ss's exact `round`), so "the last bit" is exact equality.
+- **Order in images.** `replace-all` and `tell-all` use `map` with side
+  effects, and an operation can escape midway through its `fail`
+  continuation, leaving the images it already changed changed. Which ones
+  depends on the order in which `map` applies its procedure, so compat.rkt's
+  Chez-order `map` matters here. The battery's `replace-all-fail` case
+  catches it (a left-to-right `for-each` in `replace-all` fails it).
+
+**Tests** (`racket/tests/slipnet-diff-test.rkt`, battery
+`tests/diff/slipnet-battery.scm`, 48 tests, run by Chez and Racket with
+identical output, about 1.1 MB): the initial slipnet as loaded (every node's
+names, depth, activation, link lengths, category/instance relations; every
+link list of every node with type, ends, label, length and degrees of
+association; 202 links; nodes and links as top-level values; printing);
+`get-label`, `linked?`, `related?`, `slip-linked?` over all 59 × 59 pairs;
+`relationship-between`, `get-related-node` for 8 relations, `inverse`, the
+platonic predicates and numbers; descriptor predicates over fake workspace
+objects; reset; every activation message, with the monitor calls; decay and
+spread from each node alone; **20 calls of `update-slipnet-activations`**
+from 8 fixed states (with/without clamped nodes, unfrozen after 10 updates,
+with fake themes spreading activation) recording all activations, frozen
+flags and the generator state after every update, plus 15 seeds and the
+start-of-run state; similar property links, `apply-slippages` (coattail
+slippages, also with Opposite fully active) and top-down codelet posting over
+several seeds; and images: 8 letter/group images × 29 operations (each
+followed by copy, leaf walk, postorder walk, state, reset), swapped
+image/state round trip, printing, string images over a fake string × 13
+operations, `change-length-first?`, `enumerate-letter`.

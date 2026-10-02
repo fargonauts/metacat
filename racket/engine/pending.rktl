@@ -18,21 +18,22 @@
   (begin (define name #f) ...))
 ;; run.ss
 (pending-variables *display-mode?* *step-mode?* %step-cycles%)
+(define %update-cycle-length% 15)       ; run.ss's constant (slipnode 'reset)
 ;; workspace.ss
 (pending-variables *workspace* %proposed% %evaluated% %built%)
+;; workspace-objects.ss
+(pending-procedures make-letter)
 ;; workspace-structures.ss
 (pending-procedures make-workspace-structure)
 ;; groups.ss
-(pending-procedures contains?)
+(pending-procedures contains? make-group)
 ;; formulas.ss
 (pending-procedures temp-adjusted-probability)
-;; slipnet.ss
-(pending-variables *top-down-slipnodes* plato-bond-category plato-bond-facet)
-(pending-procedures fully-active?)
 ;; themes.ss
 (pending-variables *themespace*)
 ;; trace.ss
 (pending-variables *trace*)
+(pending-procedures monitor-slipnode-activation-change)
 ;; memory.ss
 (pending-variables *memory*)
 
@@ -44,6 +45,8 @@
                    %very-high-urgency-color% %extremely-high-urgency-color%)
 ;; general-graphics.ss
 (pending-procedures solid-box)
+;; group-graphics.ss
+(pending-procedures make-group-pexp)
 ;; coderack-graphics.ss
 (pending-variables %coderack-codelet-count-font%)
 ;; gui.ss
