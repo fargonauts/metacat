@@ -256,3 +256,116 @@ by a logging test or by the goldens.
   `report-error-and-halt` into infinite recursion, in both.
 - Chez reads `0+1.0i` as `0.0+1.0i`; Racket keeps an exact zero real part.
   Only the graphics use complex numbers (`coord`).
+
+## The engine's module structure (item 04)
+**Decision: one engine module, `racket/engine.rkt`, that `include`s the
+ported files, `racket/engine/*.rktl`, in the load order of `metacat.ss`.**
+compat.rkt (syntactic-sugar.ss and Chez built-ins) and utilities.rkt
+(utilities.ss) stay separate modules that the engine requires, since they
+need nothing from later files.
+
+Why, against the alternative of one module per file plus a shared-state
+module:
+- The original's 44 files are loaded into one global top level. Definitions
+  refer to each other across files in both directions (coderack.ss names
+  the codelet procedures of eleven later files; descriptions.ss calls
+  `make-workspace-structure`, `contains?`, `temp-adjusted-probability`, ...;
+  those files call `*coderack*` back). Racket forbids cyclic module
+  dependencies, so per-file modules would need every forward reference
+  rewritten as an indirection (parameters, boxes, late-bound hooks): about
+  4,000 `tell` call sites are fine, but hundreds of direct calls would change.
+- Files `set!` each other's globals (`*temperature*`, `*codelet-count*`, the
+  mode switches, the window globals, `*workspace*`, ...). An importer cannot
+  `set!` a module variable; a shared-state module would turn each into a
+  getter/setter pair, changing code all over the model.
+- Inside one module, the semantics are those of Chez's top level loaded in
+  order: any procedure body may refer to any definition, module-level
+  expressions run in load order, and a reference to a not-yet-defined
+  variable at load time fails in both. Each `.rktl` stays a line-for-line
+  copy of its `.ss` file, which keeps diffs against the original small.
+- Cost: compiling the engine compiles all included files together (under
+  a second now; `raco make` caches it), and the files are not separately
+  testable modules. The differential batteries test them through the
+  engine's exports instead.
+
+Mechanics:
+- **`racket/engine-lang.rkt`** is the engine's module language: racket/base
+  whose `#%module-begin` partially expands each form and wraps expressions
+  (not definitions, requires, provides) in `void`, so that values such as the
+  `'done` of `define-codelet-procedure*` are discarded as at Chez's top
+  level instead of printed. `include` splices through `begin`, which it
+  handles form by form.
+- **`racket/engine/pending.rktl`** defines stand-ins for names that the
+  ported files refer to but whose files are not ported yet (procedures that
+  raise "not ported yet"; variables holding `#f`), grouped by original file,
+  including the graphics constants coderack.ss refers to. Each later item
+  deletes the names of the files it ports; forgetting to is a duplicate
+  definition, which Racket rejects at compile time. Nothing there is used at
+  load time.
+- **`set-global!`** (exported by engine.rkt) is how anything outside the
+  engine (tests, the future CLI and GUI) sets an engine global:
+  `(set-global! '*temperature* 50)`. It is a `case` over an explicit list of
+  names; each item adds the globals of the files it ports that are set from
+  outside. Reading works through the normal exports
+  (`(provide (all-defined-out))`), which see the current value of a mutated
+  variable. Listing a variable there also makes it mutable, so Racket does
+  not inline it as a constant.
+- Note for tests: a fresh namespace instantiates its own copy of the engine,
+  so the battery runner takes `set-global!` from inside the battery's
+  namespace (`racket/tests/diff-runner.rkt`).
+
+Per-file notes:
+- **constants.ss**: only the probability distributions
+  (`make-probability-distribution` and the five
+  `%...-translation-temperature-threshold-distribution%`) are model
+  constants; the window sizes, colours, fonts and titles wait for the GUI
+  items. The colours and fonts coderack.ss refers to (`urgency-color`, the
+  codelet-type graphics methods) are stand-ins in pending.rktl.
+- **setup.ss**: the globals and the user commands are ported unchanged;
+  `setup` and `enable-resizing` create and arrange the windows, so they move
+  to the GUI layer (racket/gui/), which will install its windows with
+  `set-global!`.
+- **coderack.ss**: unchanged except that `(define *codelet-types*
+  (codelet-type-list* ...))` becomes `(define-codelet-type-list*
+  *codelet-types* ...)`, which also defines each codelet type as a
+  module-level variable (`breaker`, `rule-scout`, ...) in the same order of
+  `make-codelet-type` calls. The coderack draws only through
+  `stochastic-pick-by-method` (bin choice weighted by urgency sums; deletion
+  weighted by `get-removal-weight`), `random` (codelet within a bin) and
+  `random-pick` (excess deferred codelets); no call has two effectful
+  arguments, so evaluation order does not matter here.
+- **descriptions.ss**: unchanged. `make-description`'s two-binding `let`
+  is evaluated right to left by Chez (make-workspace-structure first) and
+  left to right by Racket; both bindings are free of side effects (to be
+  confirmed when workspace-structures.ss is ported). The description codelets
+  need the Workspace and Slipnet; they are checked by the golden traces once
+  those are ported.
+- **Chez `case`**: Chez accepts a single datum as a clause key,
+  `(case x (rule-scout ...))`, meaning `((rule-scout) ...)`; coderack.ss
+  uses this. compat.rkt now exports a `case` that wraps such keys. Chez
+  compares keys with `eqv?`, Racket with `equal?`; the model's keys are
+  symbols and numbers, where they agree.
+- **Codelet types and the Coderack window.** As in the oracle, a codelet's
+  `run` tells its type's private `coderack-window` `set-last-codelet-type`
+  whatever the graphics switches say; that window is `#f` until
+  `set-graphics-parameters`. The headless driver (item for run.ss/cli.rkt)
+  must install a null window in every codelet type, as
+  `install-headless-windows!` does in the oracle prelude.
+
+**Tests** (`racket/tests/coderack-diff-test.rkt`, battery
+`tests/diff/coderack-battery.scm`, 43 tests): the setup.ss defaults; the
+urgency table (7 bins × 101 temperatures); `urgency-name` and bin selection
+for integer, rational and flonum urgencies; bin urgencies at every
+temperature; codelet-type lists and graphics labels; posting with time
+stamps, bin indices and codelet order; `choose-codelet` over 8 seeds × 7
+temperatures with the generator state after every choice; emptying the
+coderack; overflow deletion (with and without proposed structures, which
+are reported to the Workspace); removal weights; deferred posting below,
+at and above the size limit; clamp/unclamp, adjust/set/reset urgencies and
+choosing while clamped; codelet accessors, `run` and `fizzle`; printing;
+`post-codelet-probability`, `num-of-codelets-to-post`,
+`bottom-up-urgency`, `add-bottom-up-codelets` and `add-top-down-codelets`
+with fake Workspace, Themespace, Trace and top-down slipnodes; the threshold
+distributions; the setup.ss commands; `descriptions-equal?` and
+`description-member?`. The battery helpers moved to `tests/diff/helpers.scm`,
+which both runners load first.

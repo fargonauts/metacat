@@ -36,13 +36,16 @@ port (`tests/golden/`).
       scheme --script chez_scheme/oracle/make-golden.ss --check    # compare only
 
 - `validate-trace.py FILE... [--require ev,...]` checks trace structure.
-- `diff-eval.ss BATTERY` evaluates a differential battery (e.g.
-  `tests/diff/utilities-battery.scm`) with the original loaded and prints
-  one canonical result per `(test NAME EXPR)` form;
-  `racket/tests/utilities-diff-test.rkt` evaluates the same battery against
-  `racket/compat.rkt` and `racket/utilities.rkt` and compares.
+- `diff-eval.ss FILE ...` evaluates differential batteries with the
+  original loaded: each FILE in turn, normally `tests/diff/helpers.scm` (the
+  shared helpers) and then a battery such as `tests/diff/utilities-battery.scm`
+  or `tests/diff/coderack-battery.scm`. It prints one canonical result per
+  `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
+  for batteries that set the original's globals. The Racket side is
+  `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`
+  (compat.rkt + utilities.rkt) and `coderack-diff-test.rkt` (+ engine.rkt).
 
-      scheme --script chez_scheme/oracle/diff-eval.ss tests/diff/utilities-battery.scm
+      scheme --script chez_scheme/oracle/diff-eval.ss tests/diff/helpers.scm tests/diff/utilities-battery.scm
 - `tests/` holds Chez checks; `tests/run-tests.sh` runs each one with
   `scheme --script` from the repository root, and a check fails by exiting
   non-zero: `reader-check.ss`, `rng-check.ss` (the RNG specification),

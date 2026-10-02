@@ -2,13 +2,14 @@
 ;;;
 ;;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 ;;;
-;;;   scheme --script chez_scheme/oracle/diff-eval.ss BATTERY
+;;;   scheme --script chez_scheme/oracle/diff-eval.ss FILE ...
 ;;;
 ;;; Loads chez_scheme/original/ unmodified through prelude.ss, then reads
-;;; BATTERY form by form: (test NAME EXPR) prints "NAME => <canonical value>"
+;;; each FILE in turn (tests/diff/helpers.scm, then a battery) form by form: (test NAME EXPR) prints "NAME => <canonical value>"
 ;;; (or "NAME => ERROR"), any other form is evaluated.  The Racket side of
 ;;; the comparison is racket/tests/utilities-diff-test.rkt, which evaluates
-;;; the same battery against racket/compat.rkt and racket/utilities.rkt.
+;;; the same battery against racket/compat.rkt and racket/utilities.rkt;
+;;; racket/tests/coderack-diff-test.rkt does the same for the engine.
 ;;; The format of a battery is described in tests/diff/utilities-battery.scm.
 
 (define $oracle-directory
@@ -33,6 +34,10 @@
         (set! $stdout saved)
         (get)))))
 
+;; The battery's way to set a global of the original (the Racket runner
+;; uses the engine's set-global!).
+(define b:set-global! set-top-level-value!)
+
 (define $out (current-output-port))
 
 (define run-battery
@@ -55,5 +60,5 @@
                   (eval form (interaction-environment)))
               (loop))))))))
 
-(run-battery (cadr (command-line)))
+(for-each run-battery (cdr (command-line)))
 (flush-output-port $out)

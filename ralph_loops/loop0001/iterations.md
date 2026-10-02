@@ -46,7 +46,7 @@
     (`prob?`, `random-pick`, `weighted-pick`, `weighted-select`,
     `bounded-random-partition`), producing the same values for the same seed.
 
-- [ ] **04 Constants, setup, coderack, descriptions.** Port `constants.ss` (minus
+- [x] **04 Constants, setup, coderack, descriptions.** Port `constants.ss` (minus
     graphics constants, which wait for the GUI items), `setup.ss`, `coderack.ss` and
     `descriptions.ss`. Decide here how the engine is organised as Racket modules given
     the original's global, mutually recursive top-level definitions (one module that

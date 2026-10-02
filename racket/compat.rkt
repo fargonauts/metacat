@@ -36,7 +36,7 @@
          (prefix-in rkt: racket/base))
 
 (provide random random-seed
-         (rename-out [chez-if if] [chez-map map] [chez-for-each for-each]) sort remq remv remove 1+ -1+
+         (rename-out [chez-if if] [chez-case case] [chez-map map] [chez-for-each for-each]) sort remq remv remove 1+ -1+
          define-top-level-value set-top-level-value! top-level-value top-level-bound?
          number->string display write format fprintf printf newline error
          record-case reset reset-handler (struct-out metacat-reset) collect real-time
@@ -107,6 +107,24 @@
   (syntax-rules ()
     [(_ test then) (if test then (void))]
     [(_ test then else) (if test then else)]))
+
+;; Chez's case also accepts a single datum as a clause key, (case x (a e)),
+;; meaning ((a) e); coderack.ss writes (rule-scout ...) and the like.
+;; Keys are compared with eqv? in Chez and equal? in Racket; the model's
+;; keys are symbols and numbers, for which the two agree.
+(define-syntax (chez-case stx)
+  (syntax-case stx ()
+    [(_ e clause ...)
+     (with-syntax ([(clause ...)
+                    (map (lambda (c)
+                           (syntax-case c ()
+                             [(k body ...)
+                              (and (not (syntax->list #'k))
+                                   (not (and (identifier? #'k) (eq? (syntax-e #'k) 'else))))
+                              #'((k) body ...)]
+                             [_ c]))
+                         (syntax->list #'(clause ...)))])
+       #'(case e clause ...))]))
 
 ;; Chez's map applies the procedure in a fixed but unusual order (Chez
 ;; library entries map1/map2, s/library.ss): for one or two lists, pairs of

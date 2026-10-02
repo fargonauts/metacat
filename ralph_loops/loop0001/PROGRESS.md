@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 4/18 SOLVED
+- **Current**: 5/18 SOLVED
 
 ---
 
@@ -298,3 +298,95 @@ Item 03 (The compatibility layer): **SOLVED**.
     checked against the goldens;
   - slipnet.ss should use `define-slipnet-node-list*`, and rules.ss must
     register `format-slipnode` as a top-level value.
+
+---
+
+## Iteration 5 — 2026-10-02 21:58
+Item 04 (Constants, setup, coderack, descriptions): **SOLVED**.
+
+### Completed
+- **Engine organisation, decided and written up** (porting-notes.md, "The
+  engine's module structure"): one module, `racket/engine.rkt`, that
+  `include`s the ported files `racket/engine/*.rktl` in metacat.ss's load
+  order, after requiring compat.rkt and utilities.rkt. Reasons: the original's
+  files refer to each other in both directions and `set!` each other's
+  globals; Racket forbids module cycles and `set!` on imports, and one module
+  gives exactly the semantics of Chez's top level loaded in order while each
+  `.rktl` stays a line-for-line copy of its `.ss`.
+  - `racket/engine-lang.rkt`: the engine's module language, racket/base
+    whose `#%module-begin` wraps module-level expressions in `void` (Chez's
+    top level drops their values; racket/base would print them).
+  - `racket/engine/pending.rktl`: stand-ins, grouped by original file, for
+    names whose files are not ported yet (procedures raise "not ported yet",
+    variables are `#f`), including the graphics constants coderack.ss names.
+    Later items delete their names there; a leftover is a duplicate
+    definition and fails to compile.
+  - `set-global!` (exported): sets a listed engine global from outside
+    (tests, future CLI and GUI), since importers cannot `set!`.
+- Ported: `constants.ss` (only the probability distributions; colours, fonts,
+  window sizes and titles wait for the GUI items), `setup.ss` (globals and
+  user commands; `setup`/`enable-resizing` create windows and move to the
+  GUI layer), `coderack.ss` (unchanged but for `define-codelet-type-list*`),
+  `descriptions.ss` (unchanged). GPL headers kept, "Ported to Racket" lines
+  added.
+- compat.rkt: Chez's `case`, which accepts a single datum as a clause key
+  (`(rule-scout ...)` in coderack.ss); Racket rejected it at compile time.
+  Covered by a new differential test in utilities-battery.scm (now 197).
+- Tests:
+  - `tests/diff/coderack-battery.scm` (43 tests) +
+    `racket/tests/coderack-diff-test.rkt`: the same battery under Chez with
+    the original loaded and under Racket with the engine; outputs must agree
+    line for line (about 0.9 MB of output). Covers the urgency table, bin
+    selection for integer/rational/flonum urgencies, bin urgencies at every
+    temperature, posting (time stamps, bin indices, list order),
+    `choose-codelet` over 8 seeds × 7 temperatures with the RNG state after
+    every choice, overflow deletion (incl. proposed structures reported to
+    the Workspace), removal weights, deferred posting below/at/above the
+    limit, clamping and urgency adjustment, codelet `run`/`fizzle`, printing,
+    `post-codelet-probability`/`num-of-codelets-to-post`/`bottom-up-urgency`,
+    `add-bottom-up-codelets` and `add-top-down-codelets` with fake
+    Workspace/Themespace/Trace/slipnodes, the threshold distributions, the
+    setup.ss commands, and the description helpers.
+  - `racket/tests/engine-test.rkt` (11 checks, written after the code):
+    loading prints nothing, `set-global!` works and rejects unlisted names,
+    codelet types are module variables and top-level values, pending
+    stand-ins raise, and loading the engine declares no racket/gui or
+    racket/draw module.
+  - Infrastructure: the battery helpers moved to `tests/diff/helpers.scm`;
+    `diff-eval.ss` takes several files and defines `b:set-global!`; the
+    Racket runner is now `racket/tests/diff-runner.rkt`, shared by both
+    differential tests.
+- Tests-first, honestly: the battery was written and run under Chez before
+  any engine code existed (one battery bug found there: a codelet argument
+  must be an object). Before the engine compiled, the Racket test could not
+  run at all (Racket rejected Chez's single-datum `case` clause). The first
+  Racket run after porting failed most checks, because the battery's
+  namespace had its own engine instance, so `set-global!` changed another
+  copy (a runner bug). Once that was fixed, one test still failed because of
+  a battery bug: `map` over a literal `(list ...)`, which Chez's cp0 inlines
+  in its own order. Both were fixed, and then all 43 tests agreed with no change
+  to the ported model code. Mutation checks on coderack.rktl, each restored:
+  reversing the in-bin pick fails 3 tests, changing the urgency exponent 17,
+  the removal weight 1, the deferred-excess pick 1, the bin's list order 12.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED. `chez_scheme/original/`
+  untouched.
+
+### Blockers
+- None. The description codelets (`bottom-up-description-scout`, …,
+  `propose-description`, `build-description`) and `make-description` need
+  the Workspace, workspace structures, formulas and Slipnet, so only the
+  helpers `descriptions-equal?`/`description-member?` are tested now. The rest
+  will be checked by the golden traces once those files are ported.
+
+### Next
+- Item 05 in iterations.md. Notes:
+  - add each ported file as an `include` in engine.rkt, in load order, and
+    delete its names from `engine/pending.rktl`;
+  - add globals that are set from outside to `set-global!`'s list;
+  - single-datum `case` clauses now work; other Chez-isms may still appear
+    at compile time;
+  - the headless driver must give every codelet type a null Coderack window
+    (`set-graphics-parameters`), as the oracle prelude does, or `run` fails
+    on `#f`;
+  - new differential batteries can reuse `diff-runner.rkt` with fakes for
+    the parts not ported yet, as coderack-battery.scm does.

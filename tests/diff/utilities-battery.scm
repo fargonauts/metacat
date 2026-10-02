@@ -3,7 +3,7 @@
 ;;;
 ;;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 ;;;
-;;; Read form by form by two runners:
+;;; Read form by form, after tests/diff/helpers.scm, by two runners:
 ;;;   chez_scheme/oracle/diff-eval.ss   (Chez, with the whole original loaded)
 ;;;   racket/tests/utilities-diff-test.rkt (Racket: racket/base + compat + utilities)
 ;;; A form (test NAME EXPR) prints "NAME => " and the canonical form of EXPR's
@@ -16,68 +16,8 @@
 ;;; sequence with let*, begin or b:repeat instead.  Lists handed to `map'
 ;;; come from b:iota or b:copy, never quoted constants, because Chez's cp0
 ;;; inlines map over short constant lists with a different order.
-;;; Each runner defines (b:capture thunk) -> the string printed by thunk.
+;;; The shared helpers (b:canon, b:seeded, ...) are in helpers.scm.
 
-;;;---------------------------------------------------------------------------
-;;; Shared helpers
-
-(define b:num
-  (lambda (x)
-    (cond
-      ((not (real? x)) (string-append "C" (b:num (real-part x)) "," (b:num (imag-part x))))
-      ((exact? x) (number->string x))
-      ((not (= x x)) "F+nan")
-      ((and (not (= x 0)) (= x (* 2 x))) (if (> x 0) "F+inf" "F-inf"))
-      ((eqv? x -0.0) "F-0")
-      (else (string-append "F" (number->string (inexact->exact x)))))))
-
-(define b:canon
-  (lambda (x)
-    (cond
-      ((null? x) "()")
-      ((eq? x #t) "#t")
-      ((eq? x #f) "#f")
-      ((symbol? x) (string-append "'" (symbol->string x)))
-      ((string? x) (string-append "\"" x "\""))
-      ((char? x) (string-append "#\\" (number->string (char->integer x))))
-      ((number? x) (b:num x))
-      ((pair? x) (string-append "(" (b:canon (car x)) " . " (b:canon (cdr x)) ")"))
-      ((vector? x) (string-append "#" (b:canon (vector->list x))))
-      ((procedure? x) "#<procedure>")
-      ((eq? x (void)) "#<void>")
-      (else "#<other>"))))
-
-(define b:log '())
-(define log! (lambda (x) (set! b:log (cons x b:log)) x))
-(define with-log
-  (lambda (thunk)
-    (set! b:log '())
-    (let* ((r (thunk)) (l (reverse b:log)))
-      (list r l))))
-
-(define b:iota
-  (lambda (n)
-    (let loop ((i n) (acc '()))
-      (if (= i 0) acc (loop (- i 1) (cons i acc))))))
-
-(define b:copy (lambda (l) (if (null? l) '() (cons (car l) (b:copy (cdr l))))))
-
-(define b:repeat
-  (lambda (n thunk)
-    (let loop ((i 0) (acc '()))
-      (if (= i n)
-          (reverse acc)
-          (let* ((v (thunk))) (loop (+ i 1) (cons v acc)))))))
-
-;; run thunk after seeding; return its value and the generator state after
-(define b:seeded
-  (lambda (seed thunk)
-    (random-seed seed)
-    (let* ((r (thunk)) (s (random-seed)))
-      (list r s))))
-
-(define b:seeds (list 1 2 3 7 42 1000 65535 65536 123456789 2147483647
-                      2147483648 4294967295 3141592653 2718281828 99))
 
 ;; a fake object answering messages, logging the ones it is told
 (define make-fake
@@ -582,6 +522,10 @@
        (list (list 'one) (list 'two 2) (list 'deux 3) (list 'rest-args 1 2 3) (list 'all-args 4 5)
              (list 'zz))))
 (test record-case-no-else (record-case (list 'zz) (one () 'one)))
+;; Chez's case: a single datum as a clause key (coderack.ss uses it)
+(test case-single-datum
+  (map (lambda (x) (case x (a 'one) ((b c) 'two) (7 'seven) (else 'other)))
+       (b:copy (list 'a 'b 'c 7 'd))))
 (test arithmetic
   (list (exp 0) (exp 1) (sqrt 16) (sqrt 2) (sqrt 1/4) (expt 2 10) (expt 2 0.5) (expt 2.0 3)
         (expt 1000 5/3) (expt 8 1/3) (log 10) (log 1) (atan 1 1) (exact->inexact 1/3)
