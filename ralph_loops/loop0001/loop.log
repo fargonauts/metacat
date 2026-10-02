@@ -3,3 +3,9 @@
 [2026-10-02 20:29:43] claude session it01 (cap 3.00 h) -> session_it01.log
 [2026-10-02 20:34:14] session it01: ok (exit 0, 22 tool calls)
 [2026-10-02 20:34:15] tests passed: GATE PASSED
+[2026-10-02 20:34:15] committed 81d12d5: 00 Toolchain and skeleton. Check that `racket` (8.x CS, with `racket/g
+[2026-10-02 20:34:17] pushed 81d12d5 to origin
+[2026-10-02 20:34:17] === iteration 2: 01 The original, headless, under Chez 10. `chez_scheme/oracle/prelude.ss` makes the
+[2026-10-02 20:34:17] claude session it02 (cap 3.00 h) -> session_it02.log
+[2026-10-02 20:53:30] session it02: ok (exit 0, 91 tool calls)
+[2026-10-02 20:53:54] tests passed: GATE PASSED

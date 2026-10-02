@@ -11,7 +11,7 @@
     items don't need to rediscover the structure. Test: `run-tests.sh` passes with one
     trivial test in each of Racket and Chez.
 
-- [ ] **01 The original, headless, under Chez 10.** `chez_scheme/oracle/prelude.ss` makes the
+- [x] **01 The original, headless, under Chez 10.** `chez_scheme/oracle/prelude.ss` makes the
     files in `chez_scheme/original/` load unmodified in `scheme --script`: `extend-syntax` (as a
     `syntax-case` macro), stub modules for the `swl:*` imports, stub threads,
     `swl:tcl-eval` and the widget classes as no-ops, and the configuration variables
