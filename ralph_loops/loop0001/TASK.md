@@ -97,4 +97,4 @@ The loop is complete when every item in `iterations.md` is DONE or BLOCKED. Only
   Run, Pause and Stop must work without races.
 - Marshall's dissertation (`https://science.slc.edu/~jmarshall/metacat/dissertation.pdf`)
   describes every panel and the intended behaviour; use it when the code is unclear.
-- Do not push; the owner pushes to `origin` (git@github.com:fargonauts/metacat.git).
+- Do not commit or push yourself; the driver commits after the gate passes and pushes to `origin` (git@github.com:fargonauts/metacat.git).

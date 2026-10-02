@@ -7,5 +7,6 @@
   "pause": false,
   "stop": false,
   "sleep_between_s": 0,
-  "run_tests": true
+  "run_tests": true,
+  "push": true
 }

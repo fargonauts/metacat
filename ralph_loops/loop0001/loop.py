@@ -5,7 +5,7 @@ Each iteration: read TASK.md + PROGRESS.md, take the first unchecked item in
 iterations.md, run a fresh Claude session on it under a wall-clock cap, run the
 regression tests, ask Claude to fix failures (up to N attempts), and commit if
 green. If tests still fail, the code is reverted and PROGRESS.md
-is kept. Stops when PROGRESS.md contains LOOP_COMPLETE, the item list is
+is kept. Each commit is pushed to origin. Stops when PROGRESS.md contains LOOP_COMPLETE, the item list is
 exhausted, or knobs.json says stop.
 
     python3 loop.py              # run up to knobs["max_iterations"] iterations
@@ -33,6 +33,7 @@ fix attempt, so they can be turned while the loop runs:
     stop                  true = finish the current iteration, commit, exit
     sleep_between_s       pause between iterations (default 0)
     run_tests             false = skip the test gate (not recommended)
+    push                  false = commit only; true = `git push origin` after each commit
 """
 from __future__ import annotations
 
@@ -72,6 +73,7 @@ DEFAULT_KNOBS = {
     "stop": False,
     "sleep_between_s": 0,
     "run_tests": True,
+    "push": True,
 }
 
 
@@ -223,7 +225,7 @@ Do exactly this item and nothing else. When finished:
    `### Completed`, `### Blockers`, `### Next`, and update the
    `Current: k/{n_items()} SOLVED` line.
 3. Mark the item in {ITEMS} as `- [x]` (done) or `- [!]` (blocked).
-4. Do not commit and do not push; the driver commits. Never edit anything in Metacat/.
+4. Do not commit and do not push; the driver commits and pushes. Never edit anything in Metacat/.
 5. If every item in {ITEMS} is now checked, add the exact line LOOP_COMPLETE at the
    end of PROGRESS.md.
 """
@@ -266,6 +268,22 @@ def commit(n: int, item: str, suffix: str = "") -> None:
            f"Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>")
     subprocess.run(["git", "commit", "-q", "-m", msg], cwd=REPO)
     log(f"committed {git('rev-parse', '--short', 'HEAD')}: {title}")
+
+
+def push() -> None:
+    """Push the current branch; a failure is logged and retried after the next commit."""
+    if not knobs()["push"]:
+        return
+    try:
+        proc = subprocess.run(["git", "push", "-q", "-u", "origin", "HEAD"], cwd=REPO,
+                              capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        log("push timed out; will retry after the next commit")
+        return
+    if proc.returncode == 0:
+        log(f"pushed {git('rev-parse', '--short', 'HEAD')} to origin")
+    else:
+        log(f"push FAILED (will retry after the next commit): {proc.stderr.strip()[-300:]}")
 
 
 def revert_code_keep_notes() -> None:
@@ -364,6 +382,7 @@ def main() -> None:
             log("tests still failing after fixes:\n" + tail)
             revert_code_keep_notes()
             commit(n, item, " (code reverted, notes kept)")
+        push()
         n_done += 1
         status(phase="between", started="", item="", last_iteration=n, outcome=outcome)
         if k["sleep_between_s"]:
