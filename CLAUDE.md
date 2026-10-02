@@ -38,6 +38,8 @@ Toolchain: Racket 8.18 [cs] (`racket`, `raco`), Chez Scheme 10.0.0 (`scheme` or 
 - When the port must differ from the original, record it in `docs/divergences.md`; record
   renames and restructurings that Racket forced, plus RNG and ordering subtleties, in
   `docs/porting-notes.md`.
+- Log every bug, oddity or unexplained behaviour (in the original, Chez, Racket or the port)
+  in `docs/anomalies_and_quirks.md`, using its entry format.
 
 ## Architecture (the original, which the port mirrors)
 

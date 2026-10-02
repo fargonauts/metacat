@@ -26,6 +26,10 @@
   the image with the Read tool. Compare with the figures in Marshall's dissertation (item
   12 fetches them). Describe in PROGRESS.md what you saw and fix layouts that look wrong.
 - **Small, verifiable steps.** If something can't be verified, it isn't done.
+- **Log the strange.** Anything surprising goes in `docs/anomalies_and_quirks.md`, in its
+  entry format: bugs in the original, runs that behave oddly, Chez/Racket quirks, hidden
+  couplings, things nobody can explain yet. Add it when you see it, even if it turns out
+  to be nothing, and update the entry's status when it's explained.
 
 ## Current Focus
 `racket racket/main.rkt` (or the `metacat` executable) opens a window where you
