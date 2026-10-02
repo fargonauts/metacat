@@ -44,6 +44,12 @@
 (include "engine/setup.rktl")          ; setup.ss (without setup, enable-resizing)
 (include "engine/coderack.rktl")       ; coderack.ss
 (include "engine/descriptions.rktl")   ; descriptions.ss
+(include "engine/workspace.rktl")      ; workspace.ss
+(include "engine/workspace-objects.rktl") ; workspace-objects.ss
+(include "engine/workspace-structures.rktl") ; workspace-structures.ss
+(include "engine/workspace-strings.rktl") ; workspace-strings.ss
+(include "engine/workspace-structure-formulas.rktl") ; workspace-structure-formulas.ss
+(include "engine/formulas.rktl")       ; formulas.ss
 (include "engine/slipnet.rktl")        ; slipnet.ss
 (include "engine/images.rktl")         ; images.ss
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
@@ -73,6 +79,12 @@
     *repl-thread*
     ;; slipnet.ss
     *top-down-slipnodes*
+    ;; workspace.ss
+    *workspace* *initial-string* *modified-string* *target-string* *answer-string*
+    *top-strings* *bottom-strings* *vertical-strings* *non-answer-strings*
+    *all-strings*
+    ;; formulas.ss
+    temp-adjusted-probability
     ;; not ported yet (engine/pending.rktl)
-    *workspace* *themespace* *trace* *display-mode?*
-    monitor-slipnode-activation-change temp-adjusted-probability))
+    *themespace* *trace* *display-mode?* *temperature-clamped?* *EEG*
+    monitor-slipnode-activation-change contains?))

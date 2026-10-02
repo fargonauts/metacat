@@ -59,7 +59,7 @@
     oracle's dump; activation spreading and decay over 20 updates from a fixed state
     match to the last bit.
 
-- [ ] **06 Workspace objects and strings.** Port `workspace.ss`, `workspace-objects.ss`,
+- [x] **06 Workspace objects and strings.** Port `workspace.ss`, `workspace-objects.ss`,
     `workspace-structures.ss`, `workspace-strings.ss`, `workspace-structure-formulas.ss`
     and `formulas.ss`. Tests: for every problem in `tests/problems.txt`, the initial
     workspace (letters, descriptions, initial salience and importance values) matches

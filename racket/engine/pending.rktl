@@ -18,22 +18,27 @@
   (begin (define name #f) ...))
 ;; run.ss
 (pending-variables *display-mode?* *step-mode?* %step-cycles%)
+;; *temperature-clamped?* has no definition in the original: init-mcat
+;; creates it by set! on the top level (formulas.ss reads it).
+(pending-variables *temperature-clamped?*)
 (define %update-cycle-length% 15)       ; run.ss's constant (slipnode 'reset)
-;; workspace.ss
-(pending-variables *workspace* %proposed% %evaluated% %built%)
-;; workspace-objects.ss
-(pending-procedures make-letter)
-;; workspace-structures.ss
-(pending-procedures make-workspace-structure)
+;; bonds.ss
+(pending-procedures same-bond-category? same-bond-direction?
+                    opposite-bond-category? opposite-bond-direction?)
 ;; groups.ss
-(pending-procedures contains? make-group)
-;; formulas.ss
-(pending-procedures temp-adjusted-probability)
+(pending-procedures contains? make-group same-group-category? same-group-direction?)
+;; bridges.ss
+(pending-procedures bridge-between? equivalent-workspace-objects?
+                    rule-describable-bridge?)
+;; breakers.ss
+(pending-procedures break-bridge)
 ;; themes.ss
 (pending-variables *themespace*)
+;; rules.ss
+(pending-procedures verbatim-clause?)
 ;; trace.ss
 (pending-variables *trace*)
-(pending-procedures monitor-slipnode-activation-change)
+(pending-procedures monitor-slipnode-activation-change full-workspace-object-name)
 ;; memory.ss
 (pending-variables *memory*)
 
@@ -46,7 +51,11 @@
 ;; general-graphics.ss
 (pending-procedures solid-box)
 ;; group-graphics.ss
-(pending-procedures make-group-pexp)
+(pending-procedures make-group-pexp group-graphics)
+;; bridge-graphics.ss
+(pending-procedures bridge-graphics)
+;; eeg-graphics.ss (the EEG records workspace values for its window)
+(pending-variables *EEG*)
 ;; coderack-graphics.ss
 (pending-variables %coderack-codelet-count-font%)
 ;; gui.ss

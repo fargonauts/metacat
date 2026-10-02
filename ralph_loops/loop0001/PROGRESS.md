@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 6/18 SOLVED
+- **Current**: 7/18 SOLVED
 
 ---
 
@@ -492,3 +492,132 @@ Item 05 (Slipnet and images): **SOLVED**.
     pending.rktl, not `#f`.
   - The fakes in slipnet-battery.scm (fake string, fake slippage and
     sliplog, fake themes) can be reused.
+
+---
+
+## Iteration 7 — 2026-10-02 22:28
+Item 06 (Workspace objects and strings): **SOLVED**.
+
+### Completed
+- Ported `workspace.ss`, `workspace-objects.ss`, `workspace-structures.ss`,
+  `workspace-strings.ss`, `workspace-structure-formulas.ss` and `formulas.ss`
+  to `racket/engine/*.rktl`, unchanged, with GPL headers kept and "Ported to
+  Racket" lines added. `racket/engine.rkt` includes them after
+  descriptions.rktl in metacat.ss's load order.
+- `compat.rkt`: `tanh`, Chez's own primitive via `ffi/unsafe/vm`'s
+  `vm-primitive`. racket/base has no `tanh`, and racket/math's may differ in
+  the last bit.
+- `engine/pending.rktl`:
+  - removed the stand-ins of the ported files;
+  - added stand-ins from bonds.ss, groups.ss, bridges.ss, breakers.ss,
+    rules.ss, trace.ss, the graphics files and `*EEG*`, plus
+    `*temperature-clamped?*`, which the original never defines (init-mcat
+    creates it with `set!`).
+- `set-global!` also lists the string globals, `*temperature-clamped?*`,
+  `*EEG*` and `contains?`.
+- Tests:
+  - **`tests/diff/workspace-battery.scm`** (77 tests, about 0.7 MB, identical
+    under Chez and Racket) + `racket/tests/workspace-diff-test.rkt`, plus
+    `tests/diff/workspace-dump.scm`.
+    - For **every problem in `tests/problems.txt`** (read at run time: 36
+      problems, all 109 problem × seed pairs), the initial workspace as
+      init-mcat builds it: strings, letters, every description (type,
+      descriptor, proposal level, strength, time stamp), raw and relative
+      importance, intra/inter/average unhappiness and salience, workspace
+      averages and mapping strengths. Also all slipnet activations, the EEG
+      messages and the generator state after each seed.
+    - Also: live queries on 10 problems of every shape, seeded choices at 4
+      seed/temperature pairs, fake bonds/groups/bridges/rules (every branch
+      of the unhappiness, salience and mapping-strength formulas, storage
+      expansion), workspace structures, `wins-fight?`/`wins-all-fights?`,
+      `temp-adjusted-probability`/`-values`, the group probability formulas,
+      `update-temperature` and `tanh`.
+  - **`chez_scheme/oracle/tests/workspace-init-check.ss`** (Chez only). The
+    battery's copy of init-mcat's Workspace steps (`b:init-problem`) gives
+    the same dump as the original's real `init-mcat` (with the real
+    Themespace, EEG and `contains?`) for all 36 problems, and draws nothing.
+    I checked that it catches changes: activating descriptors to 50 instead
+    of 100 makes 1 problem differ, and skipping the target's position
+    descriptions makes all 36 differ.
+  - `racket/tests/engine-test.rkt` (+5 checks): `*workspace*` exists at load
+    time, a headless workspace string, formulas at temperature 100.
+- Tests-first: the battery and dump were written and run under Chez before
+  any port code was included. Four battery bugs showed up there (a wrong
+  node name, a missing fake message, `tell` of `#f` for a non-justify
+  answer string, `lowest-level-object` returning one object). Before the
+  port, the Racket test failed: `set-global!: not a settable engine global:
+  *EEG*`. After the port, 71 of 72 tests agreed on the first run. The one
+  failure was a battery test that used `get-real-object`, which needs
+  bridges.ss's `equivalent-workspace-objects?`, so I removed that call. No
+  ported model code changed.
+- **Testing infrastructure bug found and fixed.** At first no mutation of
+  the ported code made the battery fail. The differential runner loaded a
+  stale `engine_rkt.zo`: the default load handler does not notice edits to
+  included `.rktl` files. `diff-runner.rkt` now loads through the
+  compilation manager, with the handler created inside the fresh namespace
+  (otherwise it skips the modules). The compilation manager also compares
+  timestamps in whole seconds. Details are in porting-notes.md and
+  anomalies_and_quirks.md.
+- Mutation checks, run with a one-second pause around each edit and each
+  restored afterwards:
+
+  | Mutation | Tests failed |
+  | --- | --- |
+  | intra-salience 80% → 70% | 39 |
+  | intra-salience 20% → 30% importance | 40 |
+  | two-bond unhappiness 1/6 → 1/5 | 3 |
+  | group importance factor 2/3 → 1/2 | 1 |
+  | raw-importance cap 300 → 200 | 1 |
+  | group-bridge weakness 1/2 → 1/3 | 3 |
+  | reversed letter list | 49 |
+  | relative importance without rounding | 1 |
+  | bond-scan distribution ^2 → ^3 | 8 |
+  | maximal-mapping tanh 1/40 → 1/30 | 1 |
+  | half-mapping 1/2 → 1/3 | 4 |
+  | rough count `(~ 2)` → `(~ 3)` | 2 |
+  | temp-adjusted-probability 10− → 11− | 3 |
+  | temperature weights 70/30 → 60/40 | 2 |
+  | structure strength weights swapped | 39 |
+  | length-description probability 1 → 0.9 | 1 |
+  | letter ascii-name format | 52 |
+  | descriptions appended instead of consed | 51 |
+  | average intra unhappiness → average unhappiness | 4 |
+
+  Before the `ws-importance` and `ws-maximal-mapping` tests existed, the 2/3,
+  rounding and tanh mutations passed. At the start of a run every raw
+  importance is 0, so they need fully active description types and a
+  maximal non-spanning mapping.
+- Docs:
+  - porting-notes.md: new item 06 section.
+  - anomalies_and_quirks.md: four new entries. Raw importance is always 0
+    at the start (descriptors are activated, description types are not);
+    `*temperature-clamped?*` is never defined; the stale `.zo` and
+    whole-second timestamps; `tanh` is missing from racket/base.
+  - chez_scheme/oracle/README.md: mentions the new battery and check.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  424 tests). `chez_scheme/original/` untouched.
+
+### Blockers
+- None. Not covered yet, because they need files not ported:
+  - `get-real-object` and `get-equivalent-bridge` for non-member bridges
+    (bridges.ss);
+  - `get-equivalent-bond`/`-flipped-bond`/`-group` beyond the member case
+    (bonds.ss, groups.ss);
+  - `delete-invalid-string-position-middle-descriptions` with bridges
+    (breakers.ss);
+  - workspace objects' `print` (trace.ss's `full-workspace-object-name`);
+  - the real Themespace.
+
+  The golden traces will check these once those files are ported.
+
+### Next
+- Item 07 in iterations.md. Notes:
+  - remove the bonds.ss/groups.ss stand-ins from engine/pending.rktl
+    (`same-bond-*`, `opposite-bond-*`, `same-group-*`, `contains?`,
+    `make-group`);
+  - keep `contains?` settable only if a battery still needs it;
+  - `b:init-problem` in tests/diff/workspace-dump.scm gives a ready initial
+    workspace for any problem in both runners, and the battery's fakes
+    (`b:fake-structure`, `b:fake-bridge`) can be reused;
+  - after editing an included `.rktl`, wait a second before re-running
+    tests if a mutation must take effect.

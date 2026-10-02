@@ -33,10 +33,12 @@
 ;; See docs/porting-notes.md (item 03) for what each one reproduces.
 
 (require (for-syntax racket/base)
-         (prefix-in rkt: racket/base))
+         (prefix-in rkt: racket/base)
+         (only-in ffi/unsafe/vm vm-primitive))
 
 (provide random random-seed
          (rename-out [chez-if if] [chez-case case] [chez-map map] [chez-for-each for-each]) sort remq remv remove 1+ -1+
+         tanh
          define-top-level-value set-top-level-value! top-level-value top-level-bound?
          number->string display write format fprintf printf newline error
          record-case reset reset-handler (struct-out metacat-reset) collect real-time
@@ -283,6 +285,11 @@
 
 (define (1+ x) (+ x 1))
 (define (-1+ x) (- x 1))
+
+;; tanh (workspace.ss's mapping strengths): racket/base has none, and
+;; racket/math's is computed in Racket, so it may differ from Chez's in the
+;; last bit.  Racket CS runs on Chez Scheme, so take Chez's own primitive.
+(define tanh (vm-primitive 'tanh))
 
 ;;;===========================================================================
 ;;; 3. Top-level values

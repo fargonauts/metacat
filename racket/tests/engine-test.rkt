@@ -43,8 +43,23 @@
            (car ((dynamic-require (build-path engine-path 'up "utilities.rkt") 'tell)
                  (engine 'plato-a) 'get-lateral-links)))
 
+;; item 06: the Workspace exists at load time, as in the original, and a
+;; workspace string can be made headless
+(define tell (dynamic-require (build-path engine-path 'up "utilities.rkt") 'tell))
+(check-equal? (tell (engine '*workspace*) 'object-type) 'workspace)
+(let ([s ((engine 'make-workspace-string) 'target 'mrrjjj)])
+  (check-equal? (tell s 'print-name) "mrrjjj")
+  (check-equal? (tell s 'get-max-object-capacity) 12)
+  (check-equal? (map (lambda (l) (tell l 'ascii-name)) (tell s 'get-letters))
+                '("m:0" "r:1" "r:2" "j:3" "j:4" "j:5")))
+;; formulas.ss at temperature 0 and 100
+((engine 'set-global!) '*temperature* 100)
+(check-equal? ((engine 'temp-adjusted-probability) 0.5) 0.5)
+(check-equal? ((engine 'temp-adjusted-values) '(1 2 3)) '(1 1 2)) ; round(v^0.5)
+((engine 'set-global!) '*temperature* 0)
+
 ;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'temp-adjusted-probability) 0.5)))
+(check-exn #rx"not ported yet" (lambda () ((engine 'bridge-between?) 'a 'b 'c)))
 
 ;; the engine never requires racket/gui (CLAUDE.md, TASK.md): loading it
 ;; into a fresh namespace declares no racket/gui or racket/draw module

@@ -39,11 +39,13 @@ port (`tests/golden/`).
 - `diff-eval.ss FILE ...` evaluates differential batteries with the
   original loaded: each FILE in turn, normally `tests/diff/helpers.scm` (the
   shared helpers) and then a battery such as `tests/diff/utilities-battery.scm`
-  or `tests/diff/coderack-battery.scm` or `tests/diff/slipnet-battery.scm`. It prints one canonical result per
+  or `tests/diff/coderack-battery.scm`, `tests/diff/slipnet-battery.scm` or
+  `tests/diff/workspace-battery.scm` (which loads `tests/diff/workspace-dump.scm`). It prints one canonical result per
   `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
   for batteries that set the original's globals. The Racket side is
   `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`
-  (compat.rkt + utilities.rkt) and `coderack-diff-test.rkt` and `slipnet-diff-test.rkt` (+ engine.rkt).
+  (compat.rkt + utilities.rkt) and `coderack-diff-test.rkt`, `slipnet-diff-test.rkt` and
+  `workspace-diff-test.rkt` (+ engine.rkt).
 
       scheme --script chez_scheme/oracle/diff-eval.ss tests/diff/helpers.scm tests/diff/utilities-battery.scm
 - `tests/` holds Chez checks; `tests/run-tests.sh` runs each one with
@@ -53,4 +55,6 @@ port (`tests/golden/`).
   identical output), `demo-replay-check.ss` (documented demo runs replay),
   `trace-check.ss` (traces are valid, reproducible and do not change the
   run), `golden-check.ss` (`make-golden.ss --check`, and every golden is
-  valid).
+  valid), `workspace-init-check.ss` (the battery's copy of init-mcat's
+  Workspace steps builds the same initial workspace as the real `init-mcat`,
+  for every problem in `tests/problems.txt`).

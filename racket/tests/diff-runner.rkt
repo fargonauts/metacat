@@ -7,6 +7,7 @@
 ;;
 ;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 (require rackunit
+         compiler/cm
          racket/runtime-path
          racket/string
          racket/system)
@@ -35,9 +36,19 @@
 (define (racket-output battery modules set-global!)
   (define ns (make-base-empty-namespace))
   (define result (open-output-string))
-  (parameterize ([current-namespace ns])
+  ;; the repository as current directory, as for Chez: batteries may load
+  ;; files by relative path (workspace-battery.scm does)
+  (parameterize ([current-namespace ns]
+                 [current-directory repo])
     (namespace-require 'racket/base)
-    (for ([m (in-list modules)]) (namespace-require m))
+    ;; the compilation manager recompiles a module whose included files
+    ;; changed (engine.rkt includes engine/*.rktl); the default load handler
+    ;; would load a stale .zo, since it only compares engine.rkt's own date.
+    ;; The handler must be made in the namespace it serves (it skips
+    ;; modules of other module registries).
+    (parameterize ([current-load/use-compiled
+                    (make-compilation-manager-load/use-compiled-handler)])
+      (for ([m (in-list modules)]) (namespace-require m)))
     (namespace-set-variable-value!
      'b:capture
      (lambda (thunk)

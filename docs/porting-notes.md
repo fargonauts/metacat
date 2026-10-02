@@ -430,3 +430,104 @@ several seeds; and images: 8 letter/group images × 29 operations (each
 followed by copy, leaf walk, postorder walk, state, reset), swapped
 image/state round trip, printing, string images over a fake string × 13
 operations, `change-length-first?`, `enumerate-letter`.
+
+## The Workspace, its objects and strings, and the formulas (item 06)
+
+- **Ported unchanged**: `workspace.ss`, `workspace-objects.ss`,
+  `workspace-structures.ss`, `workspace-strings.ss`,
+  `workspace-structure-formulas.ss` and `formulas.ss` → `racket/engine/*.rktl`,
+  included by engine.rkt after descriptions.rktl in metacat.ss's order
+  (bonds/groups/bridges/breakers, concept-mappings.ss and run.ss, which come
+  between them in the original, are not ported yet). No line of model code
+  changed. `(define *workspace* (make-workspace))` runs at load time, as in
+  the original.
+- **`tanh`** (workspace.ss, the mapping strength of a maximal mapping):
+  racket/base has none, and racket/math's is computed in Racket and may
+  differ from Chez's in the last bit. compat.rkt takes Chez's own primitive
+  through `(vm-primitive 'tanh)` (Racket CS runs on Chez Scheme; its Chez is
+  10.3, the oracle's 10.0; the battery checks 500+ arguments bit for bit).
+- **`*temperature-clamped?*` has no definition in the original.** formulas.ss
+  reads it, answers.ss and trace.ss `set!` it, and run.ss's `init-mcat`
+  creates it with `(set! *temperature-clamped?* #f)` on Chez's top level.
+  A Racket module needs a definition: engine/pending.rktl defines it (`#f`)
+  under run.ss, and the run.ss item must move it there.
+- **Stand-ins added** (engine/pending.rktl), all called only inside procedure
+  bodies: `same-bond-category?`, `same-bond-direction?`,
+  `opposite-bond-category?`, `opposite-bond-direction?` (bonds.ss);
+  `same-group-category?`, `same-group-direction?` (groups.ss);
+  `bridge-between?`, `equivalent-workspace-objects?`, `rule-describable-bridge?`
+  (bridges.ss); `break-bridge` (breakers.ss); `verbatim-clause?` (rules.ss);
+  `full-workspace-object-name` (trace.ss, used by workspace objects' `print`);
+  `group-graphics`, `bridge-graphics`; and `*EEG*` (eeg-graphics.ss), which the
+  Workspace's `initialize` messages. Removed: `*workspace*`, `%proposed%`,
+  `%evaluated%`, `%built%`, `make-letter`, `make-workspace-structure`,
+  `temp-adjusted-probability`.
+- **`set-global!`** now also lists the workspace.ss string globals
+  (`*initial-string*` … `*all-strings*`, which run.ss's `init-workspace`
+  sets), `*temperature-clamped?*`, `*EEG*` and `contains?`.
+- **Random draws and order.** These files draw only through `stochastic-pick`
+  (`choose-object`, `choose-...-neighbor`, `choose-description-for-rule`,
+  `wins-fight?`), `stochastic-pick-by-method`, `random-pick`
+  (`get-random-letter`), a probability distribution (`get-num-of-bonds-to-scan`)
+  and `~` (`rough-num-of-objects`). No call has two effectful arguments, and
+  `wins-fight?` updates the challenger's strength before the defender's in a
+  body, not in an argument list. Building the initial workspace draws nothing
+  (the checks below confirm the generator state is untouched).
+- **The initial workspace at the start of a run.** `init-mcat` activates each
+  letter's *descriptors* fully, but not the description *types*
+  (`relevant?` = `fully-active?` of the type), so every raw importance is 0
+  and every object of a string gets relative importance round(100/n). The
+  saliences at the start therefore come from unhappiness alone.
+- **Testing infrastructure fix: stale compiled engine.** The differential
+  runner (`racket/tests/diff-runner.rkt`) requires the engine into a fresh
+  namespace. The default load handler only compares engine.rkt's own date with
+  its `.zo`, so after editing an included `.rktl` the battery silently ran the
+  old engine (found because no mutation in this item made the battery fail).
+  The runner now loads through the compilation manager, whose handler must be
+  created inside the new namespace (it skips modules of other module
+  registries). Note also that the compilation manager compares timestamps in
+  whole seconds: a source edited in the same second as the last compile is
+  not recompiled, so mutation scripts must wait a second around each edit.
+  The mutation checks of items 04 and 05 were made with `raco make` between
+  edits, so they stand.
+
+**Tests**:
+- `racket/tests/workspace-diff-test.rkt`, battery
+  `tests/diff/workspace-battery.scm` (77 tests, about 0.7 MB of output, identical
+  under Chez and Racket), with `tests/diff/workspace-dump.scm`:
+  - **for every problem in `tests/problems.txt`** (read at run time; 36
+    problems, 109 problem × seed pairs), the initial workspace built as
+    `init-mcat` builds it (`b:init-problem`, a copy of the Workspace part of
+    run.ss under `b:` names), for each seed: every string (names, type,
+    length, object capacity, letter categories, image letters, average
+    unhappiness) and every letter (id, positions, letter category, each
+    description with its proposal level, strength and time stamp, raw and
+    relative importance, intra/inter/average unhappiness and salience, bonds,
+    bridges, group, image), the workspace averages and mapping strengths,
+    all slipnet activations, the EEG messages, and the generator state after;
+  - live queries on 10 problems of every shape (3 or 4 strings, lengths 1–7):
+    relevant and distinguishing descriptions, descriptions for rules, concept
+    patterns, descriptor and type tests for all nodes, neighbours, positions,
+    relevance of bond categories and directions, `spanning-group-possible?`,
+    `description-type-support`/`descriptor-support`, reference objects,
+    rule possibilities, translation-threshold distribution, `update-temperature`,
+    and seeded choices (objects, neighbours, descriptions, bonds to scan,
+    rough counts) under 4 seed/temperature pairs;
+  - objects with fake bonds, groups and bridges (every branch of the
+    unhappiness and salience formulas, a clamped salience), fully active
+    description types (raw importance, the 2/3 factor in a group), strings
+    with fake bonds and groups (tables, edge vectors, coincident groups,
+    storage expansion and the Workspace's bridge reallocation), Workspace
+    bridges and rules with fakes, maximal mappings (the tanh branch), workspace
+    structures (strength, weakness, age, proposal levels), `wins-fight?` and
+    `wins-all-fights?` over 15 seeds and 4 temperatures, `temp-adjusted-probability`
+    and `temp-adjusted-values` over 11 temperatures, the group probability
+    formulas, and `tanh`.
+  - Stand-ins in both runners: `*themespace*` (no active themes, as at the
+    start of a run), `*EEG*` (logs its messages), `contains?` (groups.ss's own
+    definition).
+- `chez_scheme/oracle/tests/workspace-init-check.ss` (Chez only): for every
+  problem and its first seed, the dump after `b:init-problem` equals the dump
+  after the original's real `init-mcat` (with the real Themespace, EEG and
+  `contains?`), and `b:init-problem` draws nothing. This is what makes the
+  battery's copy of run.ss trustworthy until run.ss is ported.

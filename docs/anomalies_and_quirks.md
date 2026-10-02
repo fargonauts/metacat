@@ -98,6 +98,20 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   image with `plato-right`.
 
 
+### Every raw importance is 0 at the start of a run
+- **Seen:** iteration 7 (item 06), dumping the initial workspace of every problem.
+- **What:** `init-mcat` sets each letter's descriptors (`a`, `letter`, `leftmost`, ...) to
+  full activation, but a description counts toward raw importance only if it is
+  `relevant?`, which tests the description *type* (`LetterCtgy`, `StringPos`, ...). The
+  types start inactive, so every raw importance is 0, every object in a string gets the
+  same relative importance (33 in `abc`, 17 in `mrrjjj`), and the initial saliences come
+  from unhappiness alone. Importance only starts to matter once the types become active.
+- **Evidence:** battery tests `ws-problem-*` in `tests/diff/workspace-battery.scm`
+  (`(importance 0 33)` for each letter of `abc`); `workspace-init-check.ss` checks the
+  same dump after the real `init-mcat`.
+- **Status:** explained (the original's behaviour, ported as is). Whether Marshall meant
+  it is not known; the comment in run.ss only says `set-activation` avoids trace events.
+
 ## ⚙️ Chez / Racket quirks
 
 ### Chez doesn't evaluate arguments left to right
@@ -127,6 +141,29 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around in `racket/compat.rkt`. The differential battery in
   `tests/diff/` checks each one against Chez.
 
+### A raw `.zo` load ignores changes to included files; the compilation manager counts whole seconds
+- **Seen:** iteration 7 (item 06), mutation checks on the ported workspace files.
+- **What:** the differential runner requires engine.rkt into a fresh namespace. The
+  default load handler uses `compiled/engine_rkt.zo` if it isn't older than engine.rkt
+  itself, so after an edit to an included `engine/*.rktl` the battery ran the old engine
+  and every mutation passed. Two more traps: the compilation manager's load handler skips
+  modules whose namespace has a different module registry from the one it was created in,
+  so it has to be created inside the new namespace; and it compares timestamps in whole
+  seconds, so a file edited in the same second as the last compile isn't recompiled.
+- **Evidence:** before the fix, changing `(list 70 30)` in formulas.rktl left
+  `raco test racket/tests/workspace-diff-test.rkt` green until `raco make racket/engine.rkt`;
+  after it, 2 tests fail.
+- **Status:** worked around in `racket/tests/diff-runner.rkt` (compilation manager,
+  created inside the namespace). Mutation scripts wait one second around each edit.
+
+### `tanh` is not in racket/base
+- **Seen:** iteration 7 (item 06), compiling workspace.ss.
+- **What:** Chez has `tanh` built in; Racket has it only in racket/math, which computes
+  it in Racket code and can differ from libm in the last bit.
+- **Status:** worked around: compat.rkt uses Chez's own primitive through
+  `ffi/unsafe/vm`'s `vm-primitive` (Racket CS's Chez is 10.3; the battery checks 500+
+  values bit for bit against Chez 10.0).
+
 ## 🔗 Hidden couplings
 
 ### Model state that only a window can provide
@@ -147,6 +184,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `(* (% conceptual-depth) activation)`. One stray flonum in the port would change the
   codelet choices.
 - **Status:** explained. The port keeps exact arithmetic; the trace writes `"n/d"`.
+
+### `*temperature-clamped?*` is never defined
+- **Seen:** iteration 7 (item 06), compiling formulas.ss.
+- **What:** formulas.ss's `update-temperature` reads `*temperature-clamped?*`, and
+  answers.ss and trace.ss `set!` it, but no file defines it. It exists only because
+  run.ss's `init-mcat` does `(set! *temperature-clamped?* #f)`, which Chez's top level
+  allows for an unbound variable. Calling `update-temperature` before the first
+  `init-mcat` would raise "variable not bound".
+- **Status:** worked around: engine/pending.rktl defines it as `#f` (porting-notes.md,
+  item 06); the run.ss item should keep a definition.
 
 ## 🛸 UFO sightings
 
