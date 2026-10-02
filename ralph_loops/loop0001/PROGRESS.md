@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 3/18 SOLVED
+- **Current**: 4/18 SOLVED
 
 ---
 
@@ -201,3 +201,100 @@ Item 02 (Traces and golden files): **SOLVED**.
   `tests/golden/`. The `rng` fields on codelet and slipnet lines show the
   first codelet whose draws diverge. Emit exact rationals as `"n/d"`, and
   reproduce the `halt` path of `report-error-and-halt`.
+
+---
+
+## Iteration 4 — 2026-10-02 21:41
+Item 03 (The compatibility layer): **SOLVED**.
+
+### Completed
+- `racket/compat.rkt` covers syntactic-sugar.ss and the Chez built-ins
+  Metacat relies on:
+  - Chez 10's `random`/`random-seed` (the LCG of trace-format.md, bit for
+    bit, including the 4-step path for ranges above 2^32−1);
+  - one-armed `if`;
+  - `map` in Chez's application order (pairs from the end for 1–2 lists,
+    last to first for 3+);
+  - `for-each` returning the last value;
+  - `sort` with Chez's argument order and Chez 10's own algorithm (list
+    merge below 25 elements, which sorts the second half first; Shivers's
+    vector merge above);
+  - all-occurrence `remq`/`remv`/`remove`, `1+`, `-1+`;
+  - a table of top-level values (`define-top-level-value`, `top-level-value`, …);
+  - Chez's printer: `number->string` (flonum layout rule from s/print.ss),
+    `display`, `write` (symbol/char/string escapes), `format`, `fprintf`,
+    `printf`, `newline`, `error`;
+  - `record-case`, `reset`/`reset-handler`, `collect`, `real-time`;
+  - the definitions of syntactic-sugar.ss and all 22 macros, plus
+    module-level forms `define-slipnet-node-list*` and
+    `define-codelet-type-list*`.
+- `racket/utilities.rkt`: utilities.ss line for line on top of compat. The
+  only changes are marked `port:`: the `scheme-round` family via `only-in`,
+  `ask` with `peek-char`, `eval` → `top-level-value`, `pause` → `sleep`,
+  and `pairwise-map` in Chez's evaluation order.
+- Differential tests: `tests/diff/utilities-battery.scm` (196 tests). It
+  covers every utility, including the random ones (`prob?`, `~`,
+  `random-pick`, `stochastic-pick` (TASK.md's weighted-pick),
+  `stochastic-pick-by-method`, `weighted-index`, `stochastic-select`,
+  `weighted-select`, `stochastic-filter`, `bounded-random-partition`,
+  `randomize`) over 15 seeds each, with the generator state afterwards. It
+  also checks the call order of every higher-order utility through logging
+  procedures, `sort` results and predicate-call sequences, flonum printing
+  (literals plus 350 random doubles across magnitudes), `format ~a/~s` on
+  every kind of datum, and every macro (slipnet and coderack macros against
+  logging stand-ins).
+  - Chez side: `chez_scheme/oracle/diff-eval.ss` loads the whole original
+    through prelude.ss and evaluates the battery.
+  - Racket side: `racket/tests/utilities-diff-test.rkt` evaluates it in
+    racket/base + compat + utilities, runs Chez, and compares line for line.
+  - The battery takes about 1.5 s in all.
+- `racket/tests/compat-test.rkt` (32 checks) covers what the battery cannot
+  express: known-answer RNG values from Chez, the module-level definers,
+  `fizzle` across modules, keyword matching by name, `record-case` hygiene,
+  `reset`/`report-error-and-halt`, `error` messages, and `mcat`'s
+  expansion-time token check.
+- Tests-first, honestly: the battery and `diff-eval.ss` were written and
+  run against Chez before compat.rkt existed. The Racket runner came
+  after a first draft of compat/utilities. Its first run failed:
+  - one-armed `if` is a syntax error in Racket;
+  - after that fix, 15 tests failed. Chez's `for-each` returns the last
+    value (for* loops pass it on), `for*` evaluates its bounds left to
+    right, `append` in `pairwise-map` evaluates the recursive call first,
+    and Chez's sort sorts the second half first. Two tests were artifacts
+    of Racket interning literal strings and flonums (now noted, and the
+    tests use computed values).
+
+  Each was fixed until all 196 agree. Mutation checks, each restored
+  afterwards: changing the LCG multiplier fails 20 tests; changing the
+  map order fails 10 or more (RNG and order tests); moving the flonum
+  exponent threshold fails 2; changing a symbol-escape rule fails 1.
+  compat-test.rkt was written after the code.
+- Findings, in `docs/porting-notes.md` (new item 03 section):
+  - Chez's argument evaluation order depends on the call's shape (a table
+    of observations), and cp0 inlines `map` over literal lists in an order
+    of its own;
+  - Racket's `call/cc` misbehaved inside rackunit, so `continuation-point*`
+    uses `call/ec` (the original only escapes upwards);
+  - `(ascending-index-list 0)` loops forever in the original;
+  - pairs are immutable (only rule-graphics.ss:77 mutates one);
+  - module-level expression values get printed by Racket, so engine
+    modules must discard them.
+- `chez_scheme/oracle/README.md` documents `diff-eval.ss`.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED.
+  `chez_scheme/original/` untouched.
+
+### Blockers
+- None.
+
+### Next
+- Item 04 in iterations.md. Notes for the engine port:
+  - require `compat.rkt` and `utilities.rkt`;
+  - Racket forbids `set!` on imported variables and module cycles, and
+    the original's 44 files are mutually recursive with globals set! across
+    files, so one engine module that `include`s the ported files in load
+    order (or a module language whose module-begin also voids top-level
+    expression values) is probably the simplest faithful structure;
+  - every call with two or more effectful arguments needs Chez's order,
+    checked against the goldens;
+  - slipnet.ss should use `define-slipnet-node-list*`, and rules.ss must
+    register `format-slipnode` as a top-level value.

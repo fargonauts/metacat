@@ -35,7 +35,7 @@
     about 30 s) and `chez_scheme/oracle/make-golden.ss`, which writes `tests/golden/*.jsonl`. Commit
     the goldens. Test: regenerating them reproduces the committed files byte for byte.
 
-- [ ] **03 The compatibility layer.** `racket/compat.rkt`: everything in
+- [x] **03 The compatibility layer.** `racket/compat.rkt`: everything in
     `syntactic-sugar.ss` as `syntax-rules` (`for*`, `repeat*`, `if*`, `stochastic-if*`,
     `continuation-point*`, `say`, the slipnet link forms, `post-codelet*`,
     `define-codelet-procedure*`, …), Chez `printf`/`format` directives, the PRNG decided

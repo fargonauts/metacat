@@ -120,3 +120,139 @@ Chez 10 without SWL, and what that reveals for the port.
   (`abc abd xyz dyz` 2836825623, documented answer dyz) gives up without
   an answer at codelet 3228 in the oracle. It is kept in the golden set:
   the golden records what the oracle does.
+
+## The compatibility layer (item 03)
+`racket/compat.rkt` (syntactic-sugar.ss plus Chez built-ins) and
+`racket/utilities.rkt` (utilities.ss, line for line). Engine modules require
+both; their bindings shadow racket/base's. Everything below is checked
+against Chez by `racket/tests/utilities-diff-test.rkt`, which evaluates
+`tests/diff/utilities-battery.scm` (196 tests) both under Chez with the
+whole original loaded (`chez_scheme/oracle/diff-eval.ss`) and in Racket, and
+compares the outputs line for line.
+
+**Shadowed or added built-ins** (each reproduces Chez 10):
+- `random`, `random-seed`: Chez's generator (trace-format.md). Racket's
+  `random` is never used. Bignum ranges above 2^60−1 are rejected (Metacat
+  never draws with them).
+- `if`: one-armed `(if test then)` is legal in Chez and common in the
+  original; compat's `if` adds `(void)` as the missing arm.
+- `map`: **Chez's application order.** For one or two lists Chez's library
+  map applies the procedure to pairs of elements from the end towards the
+  front (7 elements: 7 5 6 3 4 1 2); for three or more lists, last to
+  first. Racket goes first to last. This matters wherever the mapped
+  procedure draws random numbers or has other effects (`tell-all`,
+  `delegate-to-all`, …).
+  *Caveat for porting call sites:* Chez's compiler inlines `map` when a
+  list argument is a literal `(list …)` or a quoted list of at most four
+  elements, and the inlined order is the compiler's (observed: 3 2 1 for a
+  quoted 3-element list in one context, 1 2 3 in another). Such sites with
+  side-effecting procedures must be checked against the goldens.
+- `for-each`: Chez returns the value of the last application (void for an
+  empty list); the original's `for*` loops pass that value on.
+- `sort`: `(sort pred list)` with Chez 10's own algorithm (s/5_6.ss):
+  below 25 elements a top-down list merge sort that sorts the *second* half
+  first, otherwise Shivers's opportunistic vector merge sort. The battery
+  compares results for non-strict predicates (`<=`, `>=`) and the sequence
+  of predicate calls, both of which differ from Racket's `sort`.
+- `remq`, `remv`, `remove`: remove *every* occurrence (Racket's `remq` and
+  `remove` remove only the first). The model calls `remq` about 50 times.
+- `1+`, `-1+`.
+- `number->string`, `display`, `write`, `format`, `fprintf`, and
+  syntactic-sugar.ss's `printf`/`newline`: Chez's printer. Flonums are
+  positional when the exponent of the leading digit is in (−4, 10) and
+  `d.ddde<exp>` otherwise (`1e-4`, `1e10`, `1.234567890125e11`,
+  `1000000000.0`), with Chez's `|n` precision suffix on subnormals.
+  `display` abbreviates `(quote x)` as `'x`, `write` does not. Symbols are
+  written with Chez's `\xHH;` escapes (`\x31;+`, `a\x20;b`), characters with
+  Chez's names (`#\nul`, `#\delete`), strings with Chez's escapes.
+  Procedures print as `#<procedure name>` (Chez also prints source
+  positions for anonymous ones; not reproduced, the model never prints
+  procedures). Directives: `~a ~s ~% ~n ~~`, the only ones Metacat uses.
+  `printf` writes to the current output port at the time of the call, where
+  syntactic-sugar.ss captured the port current when it was loaded.
+- `error`: Chez's `(error who format-string arg …)`, `who` may be `#f`.
+- `record-case`: dispatches with `case` on `(car exp)`, binds the formals
+  with `apply`.
+- `reset`/`reset-handler`: Chez's `(reset)` abandons the computation (the
+  REPL's reset handler; under `--script` the process exits 255). compat's
+  default handler raises a `metacat-reset` value, for the run loop to catch;
+  `report-error-and-halt` reaches it through `tell`.
+- `collect` (a no-op: the original calls `(collect 4)` between runs),
+  `real-time` (milliseconds, only used by `randomize`).
+- **Top-level values.** `define-top-level-value`, `set-top-level-value!`,
+  `top-level-value`, `top-level-bound?` work on one table, because Racket
+  modules have no global environment. The original creates top-level
+  variables at run time from computed names (`establish-link` in slipnet.ss
+  names each link `a-b-link`), and utilities.ss's
+  `symbol->letter-categories` reads `plato-a` etc. with `eval`; the port
+  reads them with `top-level-value`. `reveal-obj` (a debugging aid) calls
+  `format-slipnode` (rules.ss) through `(top-level-value 'format-slipnode)`,
+  so the rules port must register it there.
+
+**The 22 macros.** Written with `syntax-case` rather than `syntax-rules`
+where they must build identifiers (`plato-` + name, `a-b-link`) or check
+fenders. Differences forced by Racket:
+- extend-syntax keywords (`each in from to do times forever until -->
+  <--> length: label: all-lengths: conceptual-depth: urgency:`) are matched
+  by name, so a local variable called `from` or `to` does not break `for*`.
+- Names that the original resolves in the global top level where the macro
+  is used (`tell`, `*coderack*`, `*control-panel*`, `%verbose%`,
+  `say-object`, `print`, `make-slipnode`, `establish-link`,
+  `make-codelet-type`, `rotate-90-degrees-clockwise`, the `plato-` nodes)
+  get the lexical context of the macro keyword, so they refer to the
+  engine's bindings at the use site. compat itself does not depend on
+  utilities (it keeps a private copy of `ascending-index-list`).
+- `slipnet-node-list*` and `codelet-type-list*` are used as expressions in
+  `(define *slipnet-nodes* (slipnet-node-list* …))`, and define a global
+  per node or type. The expression forms register top-level values only;
+  the module-level forms `(define-slipnet-node-list* *slipnet-nodes* …)` and
+  `(define-codelet-type-list* *codelet-types* …)` also define each name as a
+  module-level variable, in the same order of `make-slipnode` calls. The
+  link macros look the new link up with `top-level-value`.
+- `fizzle` is a compat variable; codelets set it through `set-fizzle!`,
+  since Racket forbids `set!` on an imported variable.
+- `continuation-point*` uses `call/ec`. The original uses `call/cc` only in
+  this macro, and only to escape upwards (`return`, `fizzle`, `fail`);
+  Racket's full `call/cc` captures up to the nearest prompt and misbehaved
+  inside rackunit checks. A late jump now raises an error instead of
+  re-entering.
+- `for*` from/to evaluates the bounds first `exp1`, then `exp2`, as the
+  oracle does.
+- At module level, Racket prints the value of an expression form (e.g. the
+  `'done` returned by `define-codelet-procedure*` or a link macro); the
+  engine modules must discard those values (e.g. a module language that
+  wraps top-level expressions in `void`).
+
+**utilities.rkt** is utilities.ss with these changes (marked `port:`):
+`scheme-round` etc. come from `(only-in racket/base [round scheme-round])`
+rather than `(define scheme-round round)`, because a module-level
+`(define round …)` shadows the import for the whole module; `ask` peeks the
+first character (no `unread-char`) and gets a `clear-input-port`;
+`symbol->letter-categories` and `reveal-obj` use `top-level-value` (above);
+`pause` uses `sleep`; and **`pairwise-map` evaluates its recursive call
+before the `map`**, as Chez evaluates `(append (map …) (pairwise-map …))`.
+
+**Evaluation order, more observations.** Under `scheme --script`, Chez's
+order of argument evaluation depends on the shape of the call:
+`(g s1 s2 s3 s4)` → 3 4 1 2, `(g s1 s2 s3 4)` → 3 1 2, `(g s1 2 s3 s4)`
+→ 3 4 1, `(g 1 s2 3 s4)` → 4 2, `(g s1 s2 3 4)` → 1 2,
+`(+ s1 s2 s3)` → 3 1 2, `(cons s1 s2)` → 1 2, `(list s1 s2 s3 s4)` → 1 2 3 4,
+a 2-binding `let` → 2 1 but a 3-binding `let` → 1 2 3 (all at top level;
+inside procedures it can differ). There is no simple rule; each port of a
+call with two or more effectful arguments is checked against the oracle,
+by a logging test or by the goldens.
+
+**Other Chez/Racket differences to watch for in the engine:**
+- Racket interns literal strings and flonums (`read-syntax`), so two
+  literals `"a"` or `1.5` are `eq?` in Racket but not in Chez. Values
+  computed at run time behave alike. `memq`/`eq?` on string or flonum
+  literals in the model must be checked when ported.
+- Pairs are immutable in Racket. The model never mutates pairs; only
+  rule-graphics.ss:77 (`set-car!` on a picture expression) does, and the GUI
+  port must restructure it.
+- `(ascending-index-list 0)` loops forever in the original (so does
+  `for-each-vector-element*` on an empty vector); the port keeps this.
+- An object that does not understand `object-type` sends
+  `report-error-and-halt` into infinite recursion, in both.
+- Chez reads `0+1.0i` as `0.0+1.0i`; Racket keeps an exact zero real part.
+  Only the graphics use complex numbers (`coord`).

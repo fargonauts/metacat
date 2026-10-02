@@ -36,6 +36,13 @@ port (`tests/golden/`).
       scheme --script chez_scheme/oracle/make-golden.ss --check    # compare only
 
 - `validate-trace.py FILE... [--require ev,...]` checks trace structure.
+- `diff-eval.ss BATTERY` evaluates a differential battery (e.g.
+  `tests/diff/utilities-battery.scm`) with the original loaded and prints
+  one canonical result per `(test NAME EXPR)` form;
+  `racket/tests/utilities-diff-test.rkt` evaluates the same battery against
+  `racket/compat.rkt` and `racket/utilities.rkt` and compares.
+
+      scheme --script chez_scheme/oracle/diff-eval.ss tests/diff/utilities-battery.scm
 - `tests/` holds Chez checks; `tests/run-tests.sh` runs each one with
   `scheme --script` from the repository root, and a check fails by exiting
   non-zero: `reader-check.ss`, `rng-check.ss` (the RNG specification),
