@@ -60,7 +60,7 @@ TEST_CMD = ["python3", f"ralph_loops/{LOOP_NAME}/gate.py"]
 # Kept when a failing iteration's code is reverted: the loop folder and the notes.
 KEEP_ON_REVERT = (str(HERE.relative_to(REPO)) + "/", "docs/")
 # Directories that must be clean before the loop starts.
-CODE_DIRS = ("racket", "oracle", "tests", "docs")
+CODE_DIRS = ("racket", "chez_scheme/oracle", "tests", "docs")
 UNCHECKED = re.compile(r"^- \[ \] (.*)$", re.M)
 
 DEFAULT_KNOBS = {
@@ -225,7 +225,7 @@ Do exactly this item and nothing else. When finished:
    `### Completed`, `### Blockers`, `### Next`, and update the
    `Current: k/{n_items()} SOLVED` line.
 3. Mark the item in {ITEMS} as `- [x]` (done) or `- [!]` (blocked).
-4. Do not commit and do not push; the driver commits and pushes. Never edit anything in Metacat/.
+4. Do not commit and do not push; the driver commits and pushes. Never edit anything in chez_scheme/original/.
 5. If every item in {ITEMS} is now checked, add the exact line LOOP_COMPLETE at the
    end of PROGRESS.md.
 """
@@ -234,10 +234,10 @@ Do exactly this item and nothing else. When finished:
 def fix_prompt(tail: str, attempt: int, max_attempts: int) -> str:
     return f"""The regression gate in the repository at {REPO} fails after the last
 Ralph-loop iteration (fix attempt {attempt} of {max_attempts}). Run
-`python3 ralph_loops/{LOOP_NAME}/gate.py` (Metacat/ must be unchanged, then
+`python3 ralph_loops/{LOOP_NAME}/gate.py` (chez_scheme/original/ must be unchanged, then
 tests/run-tests.sh), find the cause, and fix it without removing, skipping or
 weakening tests, and without regenerating golden traces to match a broken port.
-Never edit Metacat/. If you cannot fix it, say so in PROGRESS.md. The tail of
+Never edit chez_scheme/original/. If you cannot fix it, say so in PROGRESS.md. The tail of
 the failing run:
 
 {tail}

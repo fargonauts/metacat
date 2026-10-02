@@ -3,19 +3,19 @@
 - [ ] **00 Toolchain and skeleton.** Check that `racket` (8.x CS, with `racket/gui`),
     `raco` and Chez Scheme 10 (`scheme` or `chezscheme`) are installed; if any is
     missing, mark this item blocked and write the exact install command. Create
-    `racket/metacat/` with `info.rkt` and a stub `main.rkt`, `oracle/`, `docs/`
+    `racket/` with `info.rkt` and a stub `main.rkt`, `chez_scheme/oracle/`, `docs/`
     (`porting-notes.md`, `divergences.md`), and `tests/run-tests.sh`, which runs
     `raco test racket/` and every oracle check that exists, and fails on the first
-    error. Write `docs/code-map.md`: one paragraph per file in `Metacat/` (what it
+    error. Write `docs/code-map.md`: one paragraph per file in `chez_scheme/original/` (what it
     defines, what it depends on, its line count, and whether it touches SWL), so later
     items don't need to rediscover the structure. Test: `run-tests.sh` passes with one
     trivial test in each of Racket and Chez.
 
-- [ ] **01 The original, headless, under Chez 10.** `oracle/prelude.ss` makes the
-    files in `Metacat/` load unmodified in `scheme --script`: `extend-syntax` (as a
+- [ ] **01 The original, headless, under Chez 10.** `chez_scheme/oracle/prelude.ss` makes the
+    files in `chez_scheme/original/` load unmodified in `scheme --script`: `extend-syntax` (as a
     `syntax-case` macro), stub modules for the `swl:*` imports, stub threads,
     `swl:tcl-eval` and the widget classes as no-ops, and the configuration variables
-    `metacat.ss` expects. `oracle/run.ss abc abd xyz --seed N --max-codelets K` sets up
+    `metacat.ss` expects. `chez_scheme/oracle/run.ss abc abd xyz --seed N --max-codelets K` sets up
     a problem with the display turned off, runs it, and prints the answers and the
     commentary. Decide the randomness plan here and write it in `docs/trace-format.md`:
     prefer reproducing Chez 10's own `random`/`random-seed` exactly in Racket, so the
@@ -26,16 +26,16 @@
     an answer with three seeds, and the same seed twice gives identical output.
 
 - [ ] **02 Traces and golden files.** Instrument the oracle, from the prelude, by
-    wrapping top-level procedures after loading (never by editing `Metacat/`), to emit
+    wrapping top-level procedures after loading (never by editing `chez_scheme/original/`), to emit
     a JSON-lines trace: codelet run (type, urgency, time step), structure built or broken,
     temperature at each update, slipnet activations every N steps, answers, rule and
     theme events, commentary lines. Specify the format in `docs/trace-format.md`. Write
     `tests/problems.txt` (the problems in `demos.ss`, plus the classic set from the
     dissertation, each with 3-5 seeds and a codelet cap that keeps every run under
-    about 30 s) and `oracle/make-golden.ss`, which writes `tests/golden/*.jsonl`. Commit
+    about 30 s) and `chez_scheme/oracle/make-golden.ss`, which writes `tests/golden/*.jsonl`. Commit
     the goldens. Test: regenerating them reproduces the committed files byte for byte.
 
-- [ ] **03 The compatibility layer.** `racket/metacat/compat.rkt`: everything in
+- [ ] **03 The compatibility layer.** `racket/compat.rkt`: everything in
     `syntactic-sugar.ss` as `syntax-rules` (`for*`, `repeat*`, `if*`, `stochastic-if*`,
     `continuation-point*`, `say`, the slipnet link forms, `post-codelet*`,
     `define-codelet-procedure*`, …), Chez `printf`/`format` directives, the PRNG decided
@@ -81,8 +81,8 @@
     Metacat. Tests: theme and trace events match the goldens.
 
 - [ ] **11 Full runs and the CLI.** Port `run.ss` (headless parts) and write
-    `racket/metacat/cli.rkt`. Tests: **every golden run in `tests/golden/` matches event
-    for event**, and the CLI prints the same answers and commentary as `oracle/run.ss`.
+    `racket/cli.rkt`. Tests: **every golden run in `tests/golden/` matches event
+    for event**, and the CLI prints the same answers and commentary as `chez_scheme/oracle/run.ss`.
     This test stays in `run-tests.sh` for the rest of the loop. Record run time per
     problem against the oracle.
 

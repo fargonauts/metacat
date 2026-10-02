@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regression gate for loop0001. Exit 0 = green.
 
-1. Metacat/ (the original 1.2 source) is byte-for-byte unchanged since the
-   import commit, and has no untracked files.
+1. chez_scheme/original/ (the Metacat 1.2 source) is byte-for-byte the tree
+   imported in commit 9f072c0, with no uncommitted edits or untracked files.
 2. tests/run-tests.sh, once item 00 has created it, passes. It is the single
    entry point for every test in the repo (Chez oracle checks, raco test, the
    Racket-vs-Chez equivalence runs, the GUI render checks).
@@ -17,6 +17,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 IMPORT_COMMIT = "9f072c0"
+IMPORT_PATH = "Metacat"            # where the import commit put it
+ORIGINAL = "chez_scheme/original"  # where it lives now
 RUN_TESTS = REPO / "tests" / "run-tests.sh"
 
 
@@ -28,15 +30,23 @@ def step(name: str, cmd: list[str]) -> bool:
 
 
 def original_untouched() -> bool:
-    diff = subprocess.run(["git", "diff", "--quiet", IMPORT_COMMIT, "--", "Metacat"],
-                          cwd=REPO).returncode
-    untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "Metacat"],
+    # Compare git tree hashes, so the check holds wherever the original lives.
+    def tree(spec: str) -> str:
+        return subprocess.run(["git", "rev-parse", spec], cwd=REPO,
+                              capture_output=True, text=True).stdout.strip()
+    imported = tree(f"{IMPORT_COMMIT}:{IMPORT_PATH}")
+    committed = tree(f"HEAD:{ORIGINAL}")
+    worktree = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", ORIGINAL],
+                              cwd=REPO).returncode
+    untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard", ORIGINAL],
                                cwd=REPO, capture_output=True, text=True).stdout.strip()
-    if diff != 0:
-        print("Metacat/ differs from the import commit; the original must not be edited")
+    if committed != imported:
+        print(f"{ORIGINAL}/ in HEAD differs from the import commit; the original must not be edited")
+    if worktree != 0:
+        print(f"{ORIGINAL}/ has uncommitted edits; the original must not be edited")
     if untracked:
-        print("untracked files in Metacat/:\n" + untracked)
-    ok = diff == 0 and not untracked
+        print(f"untracked files in {ORIGINAL}/:\n" + untracked)
+    ok = bool(imported) and committed == imported and worktree == 0 and not untracked
     print(f"== original untouched: {'ok' if ok else 'FAILED'}", flush=True)
     return ok
 
