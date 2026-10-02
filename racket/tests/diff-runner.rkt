@@ -68,7 +68,13 @@
             (unless (eof-object? form)
               (if (and (pair? form) (eq? (car form) 'test))
                   (let* ([name (cadr form)]
-                         [text (with-handlers ([(lambda (e) #t) (lambda (e) "ERROR")])
+                         [text (with-handlers ([(lambda (e) #t)
+                                                (lambda (e)
+                                                  ;; METACAT_DIFF_DEBUG=1 shows why
+                                                  (when (getenv "METACAT_DIFF_DEBUG")
+                                                    (eprintf "~a: ~a\n" name
+                                                             (if (exn? e) (exn-message e) e)))
+                                                  "ERROR")])
                                  ((eval 'b:canon) (eval (caddr form))))])
                     (fprintf result "~a => ~a\n" name text))
                   (eval form))

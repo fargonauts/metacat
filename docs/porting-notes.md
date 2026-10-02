@@ -738,3 +738,146 @@ mistake and moved to their files. Added:
 - The goldens still can't be compared: real runs post rule-scout,
   answer-finder and self-watching codelets (and draw for their posting
   probabilities) from the first update on.
+
+## Rules and answers (item 09)
+
+**Changes**: `rules.ss` and `answers.ss` → `racket/engine/rules.rktl` and
+`answers.rktl`, verbatim apart from the GPL header's "Ported to Racket"
+lines, included by engine.rkt right after images.rktl (metacat.ss's load
+order). No model line changed.
+
+**Evaluation order, audited**: the draws are rule-scout's
+`stochastic-if*`/`random-pick`, `abstract-change-descriptions`
+(`bounded-random-partition`, `random`, `stochastic-if*`, `prob?`),
+`instantiate-change-template` and `choose-description-for-rule`
+(`stochastic-pick`), rule-evaluator's `stochastic-if*`, answer-finder's
+`stochastic-if*`/`stochastic-pick`, and `translate-rule-clause`'s
+`(filter (lambda (d) (prob? 0.4)) ...)`. Each sits in a `let*`, a sequence, a
+`map` (whose order compat.rkt reproduces) or a utilities.ss `filter`. In
+`(list 'intrinsic (list od) (map ...))` and `(add-extrinsic-change-description
+... (prob? ...))` only one argument draws. No call has two drawing arguments.
+
+**Stand-ins** (engine/pending.rktl). Removed: `rule-describable-bridge?`,
+`verbatim-clause?`, `equivalent-workspace-objects?` (now an early copy, below).
+Added:
+- run.ss: `go`, `post-initial-codelets`, `suspend`, `update-everything`
+  (answers.ss calls them when it reports an answer or a snag);
+- trace.ss: `monitor-new-rules`, `make-answer-event`, `make-snag-event`,
+  `theme-pattern-entries-equal?`; memory.ss: `abstract-answer-description`,
+  `abstract-snag-description`; justify.ss: `compare-rule-clause-lists`;
+- rule-graphics.ss: `initialize-rule-graphics`; bridge-graphics.ss:
+  `make-bridge-pexp` (both graphics-gated); constants.ss's four slippage
+  colours (`%vertical-slippage-color%`, …), read by the slippage log's
+  `get-highlight-color`, which only the graphics call;
+- **early verbatim copies** of pure definitions that the model calls on
+  every rule or answer: general-graphics.ss's `find-next-space-position`
+  (`transcribe-to-english`, called by every `make-rule`), trace.ss's
+  `equivalent-workspace-objects?` (the Workspace's `get-real-object`, called
+  by `set-translated-rule-information` for every answer), and themes.ss's
+  `diff` (= `#f`, the "different" relation of answers.ss's theme phrases).
+  Items 10 and 12–13 move them back.
+
+**`set-global!`** also lists `monitor-new-rules`, `*memory*`,
+`make-answer-event`, `make-snag-event`, `abstract-answer-description`,
+`abstract-snag-description`, `suspend`, `update-everything` and
+`post-initial-codelets`, so that the harness can replace them in both runners.
+
+**Tests**:
+- `racket/tests/rule-diff-test.rkt`, battery `tests/diff/rule-battery.scm`,
+  on the codelet harness with the new `b:rules?` setting (on top of
+  `b:bridges?`):
+  - `b:update-everything` starts with `check-if-rules-possible`, as run.ss's
+    does, and posts bottom-up codelets with the original's own
+    `add-bottom-up-codelets` over all of `*bottom-up-codelet-types*` (with
+    self-watching off, progress-watcher and jootser get probability 0, and
+    answer-finder or answer-justifier 0 depending on the mode);
+  - it also ends snag periods as run.ss does (`within-snag-period?`,
+    `progress-since-last-snag`, `stochastic-if*`, `undo-snag-condition`);
+  - a run stops after the codelet that reports its first answer.
+  Fakes, the same in both runners, for the files not ported yet:
+  - a Trace: events in a list, no clamp period, a snag period whose
+    progress is always 50;
+  - a Memory: no answer or snag is ever present;
+  - answer events (quality computed as `get-absolute-quality` does) and snag
+    events (`activate` does nothing);
+  - `abstract-answer/snag-description`, `monitor-new-rules`, the Commentary
+    window, `suspend` (ends the run);
+  - answer-justifier's procedure (justify.ss), which records its call.
+  The trace adds, to item 08's: every rule (type, English transcription,
+  clauses, proposal level, strength, time stamp, quality, relative quality,
+  uniformity, abstractness, succinctness, `supported?`, tagged supporting
+  bridges, theme pattern), the rule monitor, snags (failure result, both
+  rules, vertical bridges, slippage log, reference objects), each answer
+  (letters, name and groups of the translated string, both rules and the
+  translated rule's quality values and supporting bridges, vertical bridges,
+  supporting groups, reference objects, slippage log, quality), Memory
+  queries and the commentary answers.ss writes. Runs: all 109 problem × seed
+  pairs up to the first answer or 2500 codelets.
+  - The 57 justify runs build bottom rules and post answer-justifiers but
+    never answer, since justify.ss is not ported.
+  - 45 of the 52 other runs reach an answer.
+  Then `first-answers`, a summary of every run's first answer (codelet,
+  letters, quality, both rules in English).
+- **Rules examined directly** (`b:rule-matrix`, 12 runs): after a run, for every
+  rule of the Workspace, the rule, `currently-works?`, `apply-rule` (with
+  `ignore-snag`) on the string it describes, with the transforms per object
+  and the image's letters, and `translate` (translated rule, vertical bridges,
+  slippage log, supporting groups, reference objects), with the translated
+  rule applied to the other string. The generator state is recorded after
+  each rule, because `translate` draws.
+- With `b:rules?` off, the item 07 and 08 traces are unchanged (rules add an
+  empty list to the structures; the new update steps are skipped).
+- Not comparable yet: **the goldens' first answers**. The golden runs have
+  the real Themespace (themes appear from codelet 15), Trace and
+  self-watching codelets, all ported by items 10–11, so their first answers
+  come at other codelets (`abc abd xyz` seed 3852097033: `wyz` at codelet
+  2170 in the golden, `xyd` at 1174 in the harness). Item 11's full-run
+  comparison checks them, first answers included.
+- Tests-first: the port's code (the two `.rktl` files, the engine includes,
+  the stand-ins) was written first, to learn what the engine needed in order
+  to compile. Then the battery ran under Chez before the Racket test existed.
+  - Against a scratch worktree of HEAD (no port) with the new battery and
+    test, the Racket test fails: `set-global!: not a settable engine global:
+    *memory*`.
+  - With the port, the first Racket run agreed for 58,704 lines, then raised
+    an error on `eqe qeq abbbc` seed 3557912874:
+    `equivalent-workspace-objects?: not ported yet`. The Workspace's
+    `get-real-object` calls it for every answer, so it became an early copy.
+    After that, everything agreed.
+  - The battery then grew. At first only 36 of 109 runs answered:
+    `abc abd xyz` never did, because after its first snag the temperature
+    stayed clamped. So the fake Trace got its snag period. Then came the
+    first-answer summary and the rule matrix. The final battery's 220,531
+    lines agree, and no model line had to change.
+  - `racket/tests/diff-runner.rkt` now prints the message behind each
+    `ERROR` result when `METACAT_DIFF_DEBUG` is set.
+- Mutation checks, on a reduced battery (8 problems' runs, the summary, 4
+  rule matrices; 36,524 lines) compared with its saved Chez output, each
+  mutation restored afterwards with 1 s pauses around the edits:
+
+  | Mutation | Lines differing |
+  | --- | --- |
+  | verbatim-rule probability 0.01 → 0.02 | 36428 |
+  | rule-evaluator without `1-` | 36121 |
+  | rule-scout `random-pick` → `car` of possible rule types | 36139 |
+  | swap-abstraction probability 0.75 → 0.5 | 35712 |
+  | subobjects-abstraction probability 0.75 → 0.5 | 27095 |
+  | swap partition into all bridges instead of `(add1 (random n))` | 36139 |
+  | rule quality weights 3:2 → 2:3 | 35996 |
+  | succinctness 4/(3+n) → 4/(2+n) | 35996 |
+  | `sort-templates` extrinsic `>` → `<` | 0 (also 0 on the full battery) |
+  | maximum rule line length 60 → 30 | 148 |
+  | apply-rule nesting order `>` → `<` | 3 |
+  | answer-finder `^3` → `^2` | 35905 |
+  | answer-finder degree of support without `1-` | 36118 |
+  | translation's ignore probability 0.4 → 0.5 | 1 |
+  | irrelevant translated-string groups kept | 15 |
+  | answer comment "occurs" → "occurred" | 20 |
+  | process-snag keeps proposed bridges | 0 (also 0 on the full battery; equivalent) |
+  | rule-supporting groups without nested groups | 19 |
+
+  - The `sort-templates` mutation only matters for two extrinsic templates
+    with different numbers of dimensions, which no run builds.
+  - The snag mutation is equivalent: `delete-all-codelets`, called right
+    after, deletes every proposed structure that has a codelet, and every
+    proposed bridge does. The original's comment there says the same.

@@ -57,6 +57,8 @@
 (include "engine/formulas.rktl")       ; formulas.ss
 (include "engine/slipnet.rktl")        ; slipnet.ss
 (include "engine/images.rktl")         ; images.ss
+(include "engine/rules.rktl")          ; rules.ss
+(include "engine/answers.rktl")        ; answers.ss
 (include "engine/group-graphics.rktl") ; group-graphics.ss (group-graphics only)
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
@@ -94,6 +96,9 @@
     ;; not ported yet (engine/pending.rktl)
     *themespace* *trace* *display-mode?* *temperature-clamped?* *EEG*
     monitor-slipnode-activation-change monitor-new-groups
-    monitor-new-concept-mappings
+    monitor-new-concept-mappings monitor-new-rules *memory*
+    make-answer-event make-snag-event
+    abstract-answer-description abstract-snag-description
+    suspend update-everything post-initial-codelets
     ;; groups.ss
     contains?))

@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 9/18 SOLVED
+- **Current**: 10/18 SOLVED
 
 ---
 
@@ -873,3 +873,139 @@ Item 08 (Bridges and breakers): **SOLVED**.
     replaced as items 09–10 port them;
   - the bridges test is the slowest in the gate (about 85 s). If the gate
     gets too long, lower `b:codelet-cap` in bridge-battery.scm from 1000.
+
+---
+
+## Iteration 10 — 2026-10-03 00:09
+Item 09 (Rules and answers): **SOLVED**, with one criterion moved to item 11
+(see "Not met here" below).
+
+### Completed
+- Ported `rules.ss` and `answers.ss` to `racket/engine/rules.rktl` and
+  `answers.rktl`, verbatim apart from the GPL headers' "Ported to Racket"
+  lines. engine.rkt includes them right after images.rktl, in metacat.ss's
+  load order. No model line changed.
+  - Evaluation-order audit: every draw sits in a `let*`, a sequence, a
+    `map` or a utilities.ss `filter`. These are rule-scout, rule abstraction
+    (`bounded-random-partition`, `stochastic-if*`, `prob?`), template
+    instantiation (`stochastic-pick`), rule-evaluator, answer-finder and
+    translation's `(prob? 0.4)` filter. No call has two drawing arguments.
+- `engine/pending.rktl`:
+  - removed `rule-describable-bridge?` and `verbatim-clause?`;
+  - added stand-ins from run.ss (`go`, `post-initial-codelets`, `suspend`,
+    `update-everything`), trace.ss (`monitor-new-rules`, `make-answer-event`,
+    `make-snag-event`, `theme-pattern-entries-equal?`), memory.ss
+    (`abstract-answer-description`, `abstract-snag-description`), justify.ss
+    (`compare-rule-clause-lists`), rule-graphics.ss and bridge-graphics.ss,
+    plus four slippage colours from constants.ss;
+  - added **early verbatim copies** of three pure definitions that the
+    model calls on every rule or answer: general-graphics.ss's
+    `find-next-space-position` (every `make-rule` → `transcribe-to-english`),
+    trace.ss's `equivalent-workspace-objects?` (`get-real-object`, for every
+    answer) and themes.ss's `diff` (`#f`, compared in answers.ss's theme
+    phrases).
+  - `set-global!` lists the nine new hooks the harness replaces.
+- **Tests**:
+  - **The codelet harness with rules and answers**:
+    - `tests/diff/codelet-harness.scm` gets a `b:rules?` setting. Updates
+      start with `check-if-rules-possible`, post bottom-up codelets with the
+      original's own `add-bottom-up-codelets` over all bottom-up types
+      (self-watching off), and end snag periods as run.ss does.
+    - A run stops after the codelet that reports its first answer.
+    - Battery: `tests/diff/rule-battery.scm`. It has fakes, the same in both
+      runners, for the Trace (events in a list, a snag period with constant
+      progress), the Memory, answer and snag events, the abstract
+      descriptions, the rule monitor, the Commentary window, `suspend` and
+      answer-justifier's procedure.
+    - The trace adds every rule built (English transcription, clauses,
+      strength, quality values, supporting bridges), snags, every answer
+      (letters and groups of the translated string, both rules, bridges,
+      slippage log, quality), Memory queries and the commentary that
+      answers.ss writes.
+    - Runs: all 109 problem × seed pairs, up to the first answer or 2500
+      codelets. That is 220,531 lines and about 100 MB, identical under Chez
+      and Racket. 45 of the 52 non-justify runs reach an answer (`xyd`,
+      `xyz`, `ijl`, `mrrjjk`, `qeeeq`, …).
+    - `first-answers`: a summary of every run's first answer (codelet,
+      letters, quality, rule and translated rule in English).
+    - **The rule matrix** (12 runs): every rule of the Workspace applied
+      with `apply-rule` (transforms and image letters) and translated with
+      `translate` (translated rule, bridges, slippage log, groups, reference
+      objects), then the translated rule applied to the other string. The
+      generator state is recorded after each rule.
+    - Test: `racket/tests/rule-diff-test.rkt`. It also checks that rule
+      scouts, evaluators, builders, answer finders and answer justifiers
+      run, that top and bottom rules are built, and that answers, snags,
+      commentary and Memory queries occur. It checks that at least 30 runs
+      answer and that the matrix examines rules.
+  - `racket/tests/engine-test.rkt` (+17 checks): the rules/answers
+    procedures and codelet types, and the early copies.
+  - `diff-runner.rkt`: with `METACAT_DIFF_DEBUG=1`, it prints the message
+    behind each `ERROR` result.
+- Tests-first, honestly:
+  - The port's code was written first, to find out what the engine needed
+    in order to compile.
+  - The battery ran under Chez before the Racket test existed.
+  - Against a scratch worktree of HEAD (no port) with the new battery and
+    test, the Racket test fails: `set-global!: not a settable engine global:
+    *memory*`.
+  - With the port, the first Racket run agreed for 58,704 lines, then hit
+    `equivalent-workspace-objects?: not ported yet` on `eqe qeq abbbc`. This
+    was fixed with the early copy. After that everything agreed as the
+    battery grew (snag-period fake, summary, matrix).
+- **Mutation checks**: 18 mutations in rules.rktl and answers.rktl, run on a
+  reduced battery and each restored afterwards (porting-notes.md has the
+  table). 16 are caught, from 1 line (the translation's ignore probability)
+  to 36,428. Two are not caught, even on the full battery:
+  - `sort-templates`' extrinsic order (no run builds two extrinsic
+    templates);
+  - process-snag keeping proposed bridges. This one is equivalent:
+    `delete-all-codelets` deletes them anyway, as the original's comment
+    says.
+- Docs:
+  - porting-notes.md: new item 09 section.
+  - anomalies_and_quirks.md: two new entries. Rules and answers lean on
+    later files, including a REPL abbreviation, and only the Trace unclamps
+    the temperature after a snag. Rules are never removed (`delete-rule` is
+    never sent).
+  - chez_scheme/oracle/README.md mentions the new battery.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  519 tests; the gate now takes about 5 min, about 2.7 min of it the new
+  test). `chez_scheme/original/` untouched.
+
+### Not met here
+- **"The first answer on every golden run matches"** cannot be checked
+  before items 10–11.
+  - The golden runs have the real Themespace, with themes from codelet 15.
+    They also have the Trace (snag and clamp periods, events) and
+    self-watching codelets. answers.ss itself calls trace.ss, memory.ss and
+    run.ss for every answer.
+  - So the goldens' first answers come at other codelets and can differ:
+    `abc abd xyz` seed 3852097033 gives `wyz` at codelet 2170 in the golden
+    and `xyd` at codelet 1174 in the harness.
+  - What was checked instead: the first answer of every harness run, Chez
+    vs Racket, for all 109 problem × seed pairs, event for event.
+  - Item 11's "every golden run matches event for event" covers the goldens'
+    first answers. That item must not skip it.
+
+### Blockers
+- None.
+
+### Next
+- Item 10 (themes, justification, trace, jootsing, memory). Notes:
+  - move the early copies back out of engine/pending.rktl: the themes.ss
+    helpers (`bridge-type->theme-type`, `descriptions-affect-themespace?`,
+    `ignore-descriptions?`, `beta`, the sigmoid, `diff`) and trace.ss's
+    `equivalent-workspace-objects?`;
+  - justify.ss gives answer-justifier its procedure. The 57 justify runs in
+    rule-battery.scm only record answer-justifier calls through a fake, so
+    they could then run for real;
+  - the harness fakes (`b:fake-trace`, `b:fake-memory`, the event fakes,
+    `b:fake-themespace`) can be replaced one by one with the real objects.
+    At that point the harness converges on run.ss, and golden prefixes
+    become comparable;
+  - `abc ccbbaa ijk` seed 3 crashes the original in `transcribe-to-english`
+    (anomalies). The port should crash at the same codelet once full runs
+    exist;
+  - the gate is about 5 min now. If a new test adds a lot, lower
+    `b:codelet-cap` in bridge-battery.scm (1000) or rule-battery.scm (2500).

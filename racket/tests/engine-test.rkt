@@ -81,7 +81,21 @@
 (check-true (procedure? (engine 'group-graphics)))
 
 ;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'rule-describable-bridge?) 'a)))
+(check-exn #rx"not ported yet" (lambda () ((engine 'make-answer-event))))
+
+;; rules.ss and answers.ss (item 09), and the early copies in
+;; engine/pending.rktl of general-graphics.ss's find-next-space-position and
+;; themes.ss's diff
+(for ([name '(make-rule rule-describable-bridge? verbatim-clause? apply-rule
+              transcribe-to-english translate report-new-answer give-up
+              make-translated-string make-slippage-log)])
+  (check-true (procedure? (engine name)) (symbol->string name)))
+(for ([name '(rule-scout rule-evaluator rule-builder answer-finder)])
+  (check-true (and (memq (engine name) (engine '*codelet-types*)) #t)
+              (symbol->string name)))
+(check-equal? ((engine 'find-next-space-position) "ab cd" 0) 2)
+(check-equal? ((engine 'find-next-space-position) "abcd" 0) 4)
+(check-false (engine 'diff))
 
 ;; bridges.ss and breakers.ss (item 08), and the early copies of themes.ss's
 ;; pure helpers in engine/pending.rktl

@@ -60,6 +60,9 @@
         #f)
       (update-dominant-themes (theme-type)
         (b:event! (list 'update-dominant-themes theme-type)))
+      ;; rules.ss (item 09): with no theme, every cluster lacks a dominant
+      ;; theme, and the real pattern is just the type
+      (get-dominant-theme-pattern (theme-type) (list theme-type))
       (else (error 'fake-themespace "unexpected message" msg)))))
 
 (define b:null-themespace-window
@@ -195,9 +198,45 @@
                    (b:cm-names (tell b 'get-concept-mappings))
                    (b:cm-names (tell b 'get-bond-concept-mappings))
                    (b:cm-names (tell b 'get-symmetric-slippages))))
-           (b:all-bridges)))))
+           (b:all-bridges))
+      ;; every built rule (item 09)
+      (if b:rules?
+          (map b:rule-entry (tell *workspace* 'get-all-rules))
+          '()))))
 
 (define b:all-bridges (lambda () (tell *workspace* 'get-all-bridges)))
+
+;; rules (item 09): a rule as data, and any datum with the model's objects
+;; in it (rule clauses, failure results, transforms) as data
+(define b:datum
+  (lambda (x)
+    (cond
+      ((pair? x) (let* ((a (b:datum (car x))) (d (b:datum (cdr x)))) (cons a d)))
+      ((not (procedure? x)) x)
+      ((slipnode? x) (b:nm x))
+      ((or (letter? x) (group? x)) (b:obj-id x))
+      ((workspace-string? x) (list 'string (tell x 'get-string-type)))
+      ((bridge? x) (b:bridge-data x))
+      ((concept-mapping? x) (list 'cm (tell x 'print-name)))
+      (else 'object))))
+
+(define b:rule-data
+  (lambda (rule)
+    (list 'rule (tell rule 'get-rule-type)
+          (tell rule 'get-english-transcription)
+          (b:datum (tell rule 'get-rule-clauses)))))
+
+(define b:rule-entry
+  (lambda (rule)
+    (list (b:rule-data rule)
+          (tell rule 'get-proposal-level)
+          (tell rule 'get-strength) (tell rule 'get-time-stamp)
+          (list (tell rule 'get-quality) (tell rule 'get-relative-quality)
+                (tell rule 'get-uniformity) (tell rule 'get-abstractness)
+                (tell rule 'get-succinctness))
+          (tell rule 'supported?)
+          (b:datum (tell rule 'get-tagged-supporting-horizontal-bridges))
+          (tell rule 'get-theme-pattern))))
 
 ;; the number of descriptions of every object (description-builder)
 (define b:description-counts
@@ -273,6 +312,17 @@
 ;;     scouts of StrPosCtgy, AlphaPosCtgy and Length).
 (define b:bridges? #f)
 
+;; b:rules? (item 09) also enables rules.ss and answers.ss: on top of the
+;; bridges setting, update-everything starts with check-if-rules-possible
+;; as run.ss's does, and posts the bottom-up codelets with the original's
+;; add-bottom-up-codelets over all of *bottom-up-codelet-types* (with
+;; self-watching off, progress-watcher and jootser get probability 0, and
+;; answer-justifier too unless justifying), so rule scouts, evaluators,
+;; builders and answer finders run.  A run stops after the codelet that
+;; reports the first answer (suspend sets b:answered).
+(define b:rules? #f)
+(define b:answered #f)
+
 (define b:unclamp-time 0)
 
 (define b:clamp-initial-slipnodes
@@ -334,10 +384,16 @@
 
 (define b:update-everything
   (lambda ()
+    (if b:rules? (tell *workspace* 'check-if-rules-possible))
     (b:update-workspace-values)
+    ;; run.ss's end of a snag period, with rule-battery.scm's fake Trace
+    (if (and b:rules? (tell *trace* 'within-snag-period?))
+        (let ((progress-achieved (tell *trace* 'progress-since-last-snag)))
+          (stochastic-if* (% progress-achieved)
+            (tell *trace* 'undo-snag-condition))))
     (update-slipnet-activations)
     (update-temperature)
-    (b:add-bottom-up-codelets)
+    (if b:rules? (add-bottom-up-codelets) (b:add-bottom-up-codelets))
     (add-top-down-codelets)
     (tell *coderack* 'post-deferred-codelets)))
 
@@ -367,12 +423,13 @@
 (define b:run-codelets
   (lambda (strings seed k)
     (b:init-problem strings seed)
+    (set! b:answered #f)
     (tell *coderack* 'initialize)
     (b:clamp-initial-slipnodes)
     (b:post-initial-codelets)
     (let loop ((trace (list (list 'start strings seed (random-seed)
                                   (b:map-objects b:dump-ws-object)))))
-      (if (= *codelet-count* k)
+      (if (or (= *codelet-count* k) b:answered)
           (reverse (cons (list 'end (b:structures) (b:map-objects b:dump-ws-object)
                                (b:activations) *temperature* (random-seed))
                          trace))

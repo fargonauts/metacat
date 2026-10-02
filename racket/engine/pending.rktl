@@ -54,32 +54,66 @@
 	     (both-spanning-objects? (tell d1 'get-object) (tell d2 'get-object)))
 	(and (eq? (tell d1 'get-descriptor) plato-middle)
 	     (eq? (tell d2 'get-descriptor) plato-middle)))))
+;; answers.ss's theme phrases compare against themes.ss's abbreviation diff
+;; (the "different" relation, which is #f): an early verbatim copy.
+(define diff #f)
 (define beta 4)
 (define bridge-theme-compatibility-sigmoid
   (lambda (x) (sub1 (/ 2 (add1 (exp (* -2 beta x)))))))
-;; rules.ss
-(pending-procedures rule-describable-bridge?)
+;; run.ss: answers.ss calls these when it reports an answer or a snag
+(pending-procedures go post-initial-codelets suspend update-everything)
 ;; justify.ss
-(pending-procedures remove-whole/single-concept-mappings)
-;; rules.ss
-(pending-procedures verbatim-clause?)
+(pending-procedures remove-whole/single-concept-mappings compare-rule-clause-lists)
 ;; trace.ss
 (pending-variables *trace*)
 (pending-procedures monitor-slipnode-activation-change monitor-new-groups
                     monitor-new-concept-mappings
                     full-workspace-object-name entries
-                    equivalent-workspace-objects?)
+                    monitor-new-rules make-answer-event make-snag-event
+                    theme-pattern-entries-equal?)
+;; Called by the Workspace's get-real-object (rules.ss, set-translated-rule-
+;; information, for every answer): an early verbatim copy of trace.ss's
+;; definition (pure: no draws, no state), moved back by item 10.
+(define equivalent-workspace-objects?
+  (lambda (object1 object2)
+    (and (eq? (tell object1 'object-type) (tell object2 'object-type))
+         (eq? (tell object1 'which-string) (tell object2 'which-string))
+	 (= (tell object1 'get-left-string-pos) (tell object2 'get-left-string-pos))
+	 (= (tell object1 'get-right-string-pos) (tell object2 'get-right-string-pos))
+	 (if (letter? object1)
+	   (same-letter-category? object1 object2)
+	   (and (same-group-category? object1 object2)
+	        (same-group-direction? object1 object2)
+		(= (tell object1 'get-group-length) (tell object2 'get-group-length))
+		(andmap equivalent-workspace-objects?
+		  (tell object1 'get-constituent-objects)
+		  (tell object2 'get-constituent-objects)))))))
 ;; memory.ss
 (pending-variables *memory*)
+(pending-procedures abstract-answer-description abstract-snag-description)
 
 ;; Graphics (the GUI items)
 ;; constants.ss, graphics part
 (pending-variables %coderack-background-color% %current-codelet-color%
                    %extremely-low-urgency-color% %very-low-urgency-color%
                    %low-urgency-color% %medium-urgency-color% %high-urgency-color%
-                   %very-high-urgency-color% %extremely-high-urgency-color%)
+                   %very-high-urgency-color% %extremely-high-urgency-color%
+                   %vertical-slippage-color% %dim-vertical-slippage-color%
+                   %coattail-inducing-slippage-color%
+                   %dim-coattail-inducing-slippage-color%)
 ;; general-graphics.ss
 (pending-procedures solid-box outline-box arrowhead)
+;; Called by make-rule on every rule (transcribe-to-english, rules.ss): an
+;; early verbatim copy of general-graphics.ss's definition (pure string
+;; code), moved back by the GUI items.
+(define find-next-space-position
+  (lambda (s i)
+    (cond
+      ((>= i (string-length s)) (string-length s))
+      ((char=? (string-ref s i) #\space) i)
+      (else (find-next-space-position s (+ i 1))))))
+;; rule-graphics.ss
+(pending-procedures initialize-rule-graphics)
 ;; group-graphics.ss (group-graphics itself is in engine/group-graphics.rktl)
 (pending-procedures make-group-pexp draw-group-grope)
 (pending-variables %small-group-arrowhead-length% %group-arrowhead-angle%)
@@ -87,7 +121,8 @@
 ;; initialisation, never defined (groups.ss reads them in graphics-gated code)
 (pending-variables %group-letter-category-font% %relevant-group-length-font%)
 ;; bridge-graphics.ss
-(pending-procedures bridge-graphics draw-bridge-grope new-bridge-label-number)
+(pending-procedures bridge-graphics draw-bridge-grope new-bridge-label-number
+                    make-bridge-pexp)
 ;; eeg-graphics.ss (the EEG records workspace values for its window)
 (pending-variables *EEG*)
 ;; coderack-graphics.ss

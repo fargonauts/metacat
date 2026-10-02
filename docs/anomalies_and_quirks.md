@@ -272,6 +272,38 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   a one-argument `*`, harmless.
 - **Status:** not a bug; ported verbatim.
 
+### Rules and answers lean on later files and on a REPL abbreviation
+- **Seen:** iteration 10 (item 09).
+- **What:** rules.ss and answers.ss load before themes.ss, trace.ss and the graphics
+  files, yet the model reaches into them on every rule and answer:
+  - `make-rule` calls `transcribe-to-english`, which calls general-graphics.ss's
+    `find-next-space-position`;
+  - `set-translated-rule-information` calls the Workspace's `get-real-object`, which
+    calls trace.ss's `equivalent-workspace-objects?`;
+  - answers.ss's theme phrases compare a theme's relation with `diff`. That is one of
+    themes.ss's REPL abbreviations (`top`, `len`, `iden`, … for typing commands such as
+    `(set-themes top lcat same 100)`), and it is `#f`, the "different" relation;
+  - the slippage log's `get-highlight-color` reads four constants.ss colours.
+  Also, `process-snag` clamps the temperature (`*temperature-clamped?*`), and only the
+  Trace's `undo-snag-condition` (or a clamp's undo) unclamps it. Without a working Trace,
+  every run after its first snag stays at temperature 100 and never posts an
+  answer-finder.
+- **Evidence:** rules.ss line 1739, workspace.ss line 407 (`get-real-object`),
+  answers.ss lines 373–394 and 902 (`theme-abstractness`), trace.ss lines 188–196; `tests/diff/rule-battery.scm` (its fake Trace ends
+  snag periods for this reason).
+- **Status:** worked around. engine/pending.rktl has early verbatim copies of the pure
+  definitions (`find-next-space-position`, `equivalent-workspace-objects?`, `diff`),
+  which items 10 and 12 move back; the colours are `#f` stand-ins until the GUI items.
+
+### Rules are never removed
+- **Seen:** iteration 10 (item 09).
+- **What:** the Workspace understands `delete-rule`, but nothing sends it. The breaker
+  leaves rules out of its candidates (`filter-out rule?`, breakers.ss line 26), so every
+  rule built during a run stays in the Workspace until the next problem.
+- **Evidence:** `grep -n "'delete-rule" chez_scheme/original/*.ss` finds nothing;
+  `tests/diff/rule-battery.scm`'s traces contain no broken rule in 109 runs.
+- **Status:** not a bug, apparently by design; ported verbatim.
+
 ## 🛸 UFO sightings
 
 (none yet)

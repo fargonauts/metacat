@@ -73,7 +73,7 @@
 - [x] **08 Bridges and breakers.** Port `bridges.ss` and `breakers.ss`. Tests: trace
     prefixes match for longer K; bridges built and broken are identical.
 
-- [ ] **09 Rules and answers.** Port `rules.ss` and `answers.ss`. Tests: rules are
+- [x] **09 Rules and answers.** Port `rules.ss` and `answers.ss`. Tests: rules are
     abstracted and applied identically; the first answer on every golden run matches.
 
 - [ ] **10 Themes, justification, trace, jootsing, memory.** Port `themes.ss`,
