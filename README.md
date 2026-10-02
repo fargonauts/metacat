@@ -3,6 +3,8 @@
 A port of **Metacat**, James B. Marshall's model of analogy-making and self-watching
 perception, to [Racket](https://racket-lang.org) with a native GUI (`racket/gui`).
 
+**Metacat home page:** <https://science.slc.edu/~jmarshall/metacat/>
+
 Metacat solves letter-string analogy problems ("if `abc` changes to `abd`, what does `xyz`
 change to?"). It is the successor to Melanie Mitchell and Douglas Hofstadter's
 **Copycat**: besides building an interpretation of a problem, it keeps a trace of its own
