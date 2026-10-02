@@ -238,7 +238,8 @@ order of argument evaluation depends on the shape of the call:
 → 3 4 1, `(g 1 s2 3 s4)` → 4 2, `(g s1 s2 3 4)` → 1 2,
 `(+ s1 s2 s3)` → 3 1 2, `(cons s1 s2)` → 1 2, `(list s1 s2 s3 s4)` → 1 2 3 4,
 a 2-binding `let` → 2 1 but a 3-binding `let` → 1 2 3 (all at top level;
-inside procedures it can differ). There is no simple rule; each port of a
+inside procedures it can differ). Inside a procedure, `(append s1 s2)` → 2 1 (item 07,
+groups.ss's `get-local-density`). There is no simple rule; each port of a
 call with two or more effectful arguments is checked against the oracle,
 by a logging test or by the goldens.
 
@@ -531,3 +532,88 @@ operations, `change-length-first?`, `enumerate-letter`.
   after the original's real `init-mcat` (with the real Themespace, EEG and
   `contains?`), and `b:init-problem` draws nothing. This is what makes the
   battery's copy of run.ss trustworthy until run.ss is ported.
+
+## Bonds, groups and concept mappings (item 07)
+
+**Changes**: `bonds.ss`, `groups.ss` and `concept-mappings.ss` →
+`racket/engine/bonds.rktl`, `groups.rktl`, `concept-mappings.rktl`, included
+by engine.rkt in metacat.ss's load order (bonds and groups after
+descriptions.rktl, concept mappings after workspace-strings.rktl). One line
+of model code changed:
+- **groups.ss, a group's `get-local-density`**: `(append (neighbors self
+  'choose-left-neighbor) (neighbors self 'choose-right-neighbor))`. Both
+  arguments draw: `choose-left-neighbor`/`choose-right-neighbor` pick at
+  random when a letter and a group are both neighbours. Chez evaluates
+  `append`'s second argument first (checked: `(append (show 'L) (show 'R))`
+  inside a procedure prints `RL`), so the port binds the right neighbours
+  first in a `let*`, marked `port:`. Found by the harness below: `abc abd
+  iijjkk` seed 3 left the oracle at the update after codelet 735, where the
+  slipnet's jump draws were shifted by one. The 400-codelet runs never
+  reached it, the 2000-codelet run did. This is the only call in the three
+  files with two drawing arguments; the others (`let` with two
+  `descriptor-support`s, `append` of incompatible bridges, `cons` of
+  neighbours) have at most one.
+- **`group-graphics`** (group-graphics.ss) is now an engine procedure,
+  verbatim, in `racket/engine/group-graphics.rktl`: group-builder calls
+  `(group-graphics 'erase proposed-group)` ungated when it consolidates
+  sameness groups, so a headless run needs it. It only sends messages to
+  `*workspace-window*` (`caching-on`, `flush`, and `draw-group`/`erase-group`
+  for drawn groups). The rest of group-graphics.ss waits for the Workspace
+  panel.
+
+**Stand-ins** (engine/pending.rktl). Removed: `same-bond-*`,
+`opposite-bond-*`, `same-group-*`, `contains?`, `make-group`,
+`group-graphics`. Added: `incompatible-horizontal-CMs?`,
+`incompatible-vertical-CMs?` (bridges.ss; `break-bridge` moved under
+bridges.ss too, where it is defined); `monitor-new-groups` (trace.ss);
+`outline-box`, `arrowhead` (general-graphics.ss); `draw-group-grope`,
+`%small-group-arrowhead-length%`, `%group-arrowhead-angle%`
+(group-graphics.ss); `%group-letter-category-font%` and
+`%relevant-group-length-font%`, which the original never defines
+(workspace-graphics.ss creates them by `set!`); and `same-direction?`, which
+the original never defines either (bonds.ss's `bonds-equal?`, itself never
+called, refers to it): it raises as Chez would. All these are read only in
+graphics-gated code or in procedures not called yet.
+
+**`set-global!`** also lists `monitor-new-groups` (the harness records its
+calls); `contains?` stays (workspace-battery.scm still replaces it).
+
+**Concept mappings** are made in these files only inside
+`get-incompatible-bridge` (bonds and groups), which needs a bridge; with no
+bridges they are never made during a run, so the battery tests them
+directly. Bridges (item 08) will exercise them in runs.
+
+**Tests**:
+- **The codelet-level differential harness**: `racket/tests/codelet-diff-test.rkt`,
+  battery `tests/diff/codelet-battery.scm`, harness
+  `tests/diff/codelet-harness.scm`. `b:run-codelets` is a copy of run.ss's
+  `run-mcat` loop (`step-mcat`, unclamping, re-posting on an empty
+  Coderack, `update-everything` every 15 codelets) with only the bond and
+  group codelet types enabled: initial codelets are bottom-up bond scouts
+  only, bottom-up posting covers `bottom-up-bond-scout` and
+  `group-scout:whole-string`, `*top-down-slipnodes*` holds only the 8 bond
+  and group nodes, self-watching is off, and `update-everything` leaves out
+  rules, the Trace's snag/clamp periods and the Themespace. The trace has
+  one line per codelet (type, urgency, time stamp, generator state,
+  structures built and broken with strengths, Workspace-window messages,
+  `monitor-slipnode-activation-change` and `monitor-new-groups` calls,
+  numbers of proposed structures) and per update (temperature, every
+  activation, Coderack size, generator state; every object of the
+  Workspace every 4th update). The Racket test compares the lines one by one
+  and reports the first difference with its problem, seed and codelet.
+  Runs: all 109 problem × seed pairs of tests/problems.txt for 400
+  codelets, plus 7 runs of 2000 codelets on problems where group-builder
+  consolidates sameness groups (the ungated `group-graphics` path); about
+  60,000 lines. The test also checks that all 10 enabled codelet types run,
+  that bonds and groups are built and broken, and that `group-graphics` is
+  called.
+- Concept mappings, in the same battery: every message of a mapping
+  (names, link, predicates, degree of association, depth, strength,
+  slippability, concept pattern, symmetric mapping, `CMs-equal?`) for every
+  pair of instances of each of the 9 slipnet categories, and for every pair
+  of same-type descriptions of initial and target objects (letters and
+  groups) after 600 codelets of 5 problems, with `remove-duplicate-CMs` and
+  the activations left by `activate-descriptions`/`activate-label`.
+- Exploration, not in the gate: the same harness for **2000 codelets on all
+  109 runs** (218,000 codelets, 90 MB of trace) is byte-identical under Chez
+  and Racket (Chez about 33 s, Racket about 58 s).

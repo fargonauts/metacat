@@ -39,3 +39,9 @@
 [2026-10-02 22:12:08] claude session it07 (cap 3.00 h) -> session_it07.log
 [2026-10-02 22:30:24] session it07: ok (exit 0, 64 tool calls)
 [2026-10-02 22:31:21] tests passed: GATE PASSED
+[2026-10-02 22:31:21] committed 319863a: 06 Workspace objects and strings. Port `workspace.ss`, `workspace-obje
+[2026-10-02 22:31:24] pushed 319863a to origin
+[2026-10-02 22:31:24] === iteration 8: 07 Bonds, groups, concept mappings. Port `bonds.ss`, `groups.ss` and
+[2026-10-02 22:31:24] claude session it08 (cap 3.00 h) -> session_it08.log
+[2026-10-02 22:57:14] session it08: ok (exit 0, 95 tool calls)
+[2026-10-02 22:58:35] tests passed: GATE PASSED

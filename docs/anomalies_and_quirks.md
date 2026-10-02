@@ -37,6 +37,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** open. The golden set uses seed 4 instead. Nobody knows whether it happened
   under 1999-era Chez, where argument evaluation order may have differed.
 
+### `bonds-equal?` calls `same-direction?`, which nothing defines
+- **Seen:** iteration 8 (item 07), compiling bonds.ss.
+- **What:** bonds.ss's `bonds-equal?` ends with `(same-direction? bond1 bond2)`; no file
+  defines `same-direction?` (bonds.ss has `same-bond-direction?`). Chez's top level
+  compiles the reference and would raise "variable same-direction? is not bound" if
+  `bonds-equal?` were ever called; nothing calls it.
+- **Evidence:** `grep -n "same-direction?" chez_scheme/original/*.ss` (one hit);
+  racket/tests/engine-test.rkt checks the port's stand-in raises.
+- **Status:** won't fix (latent). engine/pending.rktl defines a stand-in that raises.
+
 ### A string image's `new-alpha-position-category` sends `new-start-letter`
 - **Seen:** iteration 6 (item 05), reading images.ss and checking it under Chez.
 - **What:** `make-string-image` answers `new-alpha-position-category` by sending each
@@ -156,6 +166,19 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around in `racket/tests/diff-runner.rkt` (compilation manager,
   created inside the namespace). Mutation scripts wait one second around each edit.
 
+### Chez evaluates `append`'s second argument first
+- **Seen:** iteration 8 (item 07): the codelet harness, `abc abd iijjkk` seed 3, the
+  update after codelet 735 (only in a 2000-codelet run; the 400-codelet runs pass).
+- **What:** a group's `get-local-density` (groups.ss) computes
+  `(append (neighbors self 'choose-left-neighbor) (neighbors self 'choose-right-neighbor))`,
+  and both calls can draw. Chez evaluates the right one first; Racket the left one. The
+  port drew one number early, which surfaced as different slipnodes jumping to full
+  activation in the next `update-slipnet-activations`.
+- **Evidence:** `(define (show x) (display x) (list x))` then
+  `((lambda () (append (show 'L) (show 'R))))` prints `RL` under `scheme --script`;
+  racket/tests/codelet-diff-test.rkt (the `codelets-long-iijjkk-3` run).
+- **Status:** worked around (groups.rktl binds the right neighbours first, marked `port:`).
+
 ### `tanh` is not in racket/base
 - **Seen:** iteration 7 (item 06), compiling workspace.ss.
 - **What:** Chez has `tanh` built in; Racket has it only in racket/math, which computes
@@ -194,6 +217,23 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `init-mcat` would raise "variable not bound".
 - **Status:** worked around: engine/pending.rktl defines it as `#f` (porting-notes.md,
   item 06); the run.ss item should keep a definition.
+
+### Fonts the model reads but nothing defines
+- **Seen:** iteration 8 (item 07), compiling groups.ss.
+- **What:** groups.ss's `set-graphics-parameters` reads `%group-letter-category-font%`
+  and `%relevant-group-length-font%`, which exist only once the Workspace window's
+  initialisation `set!`s them (workspace-graphics.ss). Like `*temperature-clamped?*`,
+  they rely on Chez's top level accepting `set!` of an unbound variable.
+- **Status:** worked around: engine/pending.rktl defines them as `#f`; the Workspace
+  panel item must define them.
+
+### Concept mappings are only made through bridges
+- **Seen:** iteration 8 (item 07).
+- **What:** bonds.ss and groups.ss make concept mappings only in
+  `get-incompatible-bridge`, which returns early without a bridge. With bridge codelets
+  disabled, a run never makes one, so the codelet harness cannot exercise
+  concept-mappings.ss; its battery tests the mappings directly.
+- **Status:** explained. Item 08 (bridges) exercises them in runs.
 
 ## 🛸 UFO sightings
 

@@ -58,6 +58,28 @@
 (check-equal? ((engine 'temp-adjusted-values) '(1 2 3)) '(1 1 2)) ; round(v^0.5)
 ((engine 'set-global!) '*temperature* 0)
 
+;; item 07: a bond and a group between letters of a headless string; the
+;; original's undefined same-direction? (bonds.ss) raises, as under Chez
+(let* ([s ((engine 'make-workspace-string) 'target 'abc)]
+       [a (tell s 'get-letter 0)]
+       [b (tell s 'get-letter 1)]
+       [bond ((engine 'make-bond) a b (engine 'plato-successor) (engine 'plato-letter-category)
+                                  (engine 'plato-a) (engine 'plato-b))])
+  (check-equal? (tell bond 'object-type) 'bond)
+  (check-eq? (tell bond 'get-direction) (engine 'plato-right))
+  (check-equal? (tell bond 'calculate-internal-strength)
+                ((engine 'bond-degree-of-assoc) (engine 'plato-successor)))
+  (check-eq? (tell (tell bond 'make-flipped-version) 'get-bond-category)
+             (engine 'plato-predecessor))
+  (let ([cm ((engine 'make-concept-mapping)
+             a (engine 'plato-letter-category) (engine 'plato-a)
+             b (engine 'plato-letter-category) (engine 'plato-b))])
+    (check-equal? (tell cm 'print-name) "a=>b")
+    (check-eq? (tell cm 'get-label) (engine 'plato-successor))))
+(check-exn #rx"same-direction[?] is not bound"
+           (lambda () ((engine 'same-direction?) 'a 'b)))
+(check-true (procedure? (engine 'group-graphics)))
+
 ;; names from files not ported yet raise when called
 (check-exn #rx"not ported yet" (lambda () ((engine 'bridge-between?) 'a 'b 'c)))
 

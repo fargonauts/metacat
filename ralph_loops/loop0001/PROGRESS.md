@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 7/18 SOLVED
+- **Current**: 8/18 SOLVED
 
 ---
 
@@ -621,3 +621,136 @@ Item 06 (Workspace objects and strings): **SOLVED**.
     (`b:fake-structure`, `b:fake-bridge`) can be reused;
   - after editing an included `.rktl`, wait a second before re-running
     tests if a mutation must take effect.
+
+---
+
+## Iteration 8 — 2026-10-02 22:56
+Item 07 (Bonds, groups, concept mappings): **SOLVED**.
+
+### Completed
+- Ported `bonds.ss`, `groups.ss` and `concept-mappings.ss` to
+  `racket/engine/*.rktl`, with GPL headers kept and "Ported to Racket" lines
+  added. engine.rkt includes them in metacat.ss's load order. Apart from the
+  headers they are verbatim, except for one `port:` line in groups.rktl (the
+  evaluation-order fix below).
+- `racket/engine/group-graphics.rktl`: group-graphics.ss's `group-graphics`
+  procedure, verbatim. groups.ss calls it ungated when group-builder
+  consolidates sameness groups. It only messages `*workspace-window*`; the
+  rest of group-graphics.ss waits for the GUI items.
+- `engine/pending.rktl`:
+  - removed the bonds/groups stand-ins;
+  - added stand-ins for bridges.ss, trace.ss and graphics names
+    (`monitor-new-groups`, `incompatible-*-CMs?`, `outline-box`, `arrowhead`,
+    …);
+  - added two names the original never defines: `same-direction?` (called by
+    the unused `bonds-equal?`; the stand-in raises, as Chez would) and two
+    group fonts that workspace-graphics.ss creates by `set!`.
+  - `set-global!` also lists `monitor-new-groups`.
+- **The codelet-level differential harness**:
+  - Files: `tests/diff/codelet-harness.scm`, `tests/diff/codelet-battery.scm`,
+    `racket/tests/codelet-diff-test.rkt`.
+  - The harness copies run.ss's `run-mcat` loop with only the 10 bond and
+    group codelet types enabled:
+    - bond scouts are the only initial codelets;
+    - bottom-up posting covers bond scouts and whole-string group scouts;
+    - only the bond and group top-down slipnodes post;
+    - self-watching is off;
+    - `update-everything` leaves out rules, Trace periods and themes.
+  - It runs in Chez with the original loaded and in Racket with the engine.
+  - The trace has one line per codelet: type, urgency, time stamp, generator
+    state, structures built and broken (with strengths), Workspace-window
+    messages, slipnode and new-group monitor calls, and proposed counts.
+  - It also has one line per update cycle: temperature, all activations,
+    Coderack size and generator state, plus every Workspace object every 4th
+    update.
+  - The Racket test compares the traces line by line and reports the first
+    difference, with problem, seed and codelet (e.g. "traces differ at line
+    10 … (8 bond-evaluator 70 …" vs "… 63 …").
+  - Runs: all 109 problem × seed pairs for 400 codelets, plus 7 runs of 2000
+    codelets that reach group-builder's sameness consolidation. That is
+    about 60,000 lines; the test takes about 22 s.
+  - The test also checks that all 10 codelet types run, that bonds and
+    groups are built and broken, and that `group-graphics` is called.
+- Concept mappings are only made through bridges, so they never appear in
+  these runs. The battery tests them directly:
+  - every message, for every pair of instances of the 9 slipnet categories;
+  - real description pairs of letters and groups after 600 codelets on 5
+    problems, with `remove-duplicate-CMs` and the activation effects.
+- `racket/tests/engine-test.rkt` (+8 checks): a headless bond, its flipped
+  version, a concept mapping, the `same-direction?` stand-in, and
+  `group-graphics`.
+- Tests-first, honestly: I copied the files and got the engine compiling
+  first, to find the missing names. The engine.rkt includes were in place
+  before the battery existed.
+  - The battery was written and run under Chez before the Racket side ran
+    at all.
+  - With the HEAD engine.rkt/pending.rktl, i.e. without the port, the Racket
+    test fails: `set-global!: not a settable engine global:
+    monitor-new-groups`.
+  - With the port, the 400-codelet runs agreed on the first run.
+  - Adding the 2000-codelet runs found a real divergence: `abc abd iijjkk`
+    seed 3, the update after codelet 735.
+    - A group's `get-local-density` does `(append (neighbors … 'choose-left-neighbor)
+      (neighbors … 'choose-right-neighbor))`. Both arguments can draw, and
+      Chez evaluates the second first (checked: `RL`).
+    - Fixed with a `let*`, marked `port:`.
+    - I audited the three files: no other call has two drawing arguments.
+- Exploration (not in the gate): the harness at **2000 codelets on all 109
+  runs** (218,000 codelets, 90 MB of trace) is byte-identical under Chez and
+  Racket.
+- Mutation checks, each restored afterwards (1 s pauses around edits):
+
+  | Mutation | Caught |
+  | --- | --- |
+  | bond-degree-of-assoc 11 → 10 | yes (line 10) |
+  | bond-evaluator without `1-` | yes |
+  | bond local support 0.6 → 0.5 | yes |
+  | bond compatibility factor 0.7 → 0.8 | yes |
+  | bond-builder group weight → 1 | yes |
+  | bond direction left/right swapped | yes |
+  | `intersect` argument order in choose-bond-facet | no (equivalent: both objects list facets in the same order) |
+  | group length factor 40 → 20 | yes |
+  | group local support 0.6 → 0.5 | yes |
+  | group-evaluation-probability /5 → /6 | yes |
+  | group bond-factor weight 0.98 → 0.97 | yes |
+  | whole-string scout `random-pick` → `car` | yes |
+  | CM strength without `^2` | yes |
+  | unlabeled CM degree 5 → 6 | yes |
+  | reversible CM type group → length | yes |
+  | `activate-label` without flush | yes |
+
+- Docs:
+  - porting-notes.md: new item 07 section, plus `append`'s order in the
+    evaluation-order table.
+  - anomalies_and_quirks.md: four new entries. `same-direction?` is
+    undefined; Chez evaluates `append`'s second argument first; group fonts
+    are never defined; concept mappings are only made through bridges.
+  - chez_scheme/oracle/README.md mentions the new battery.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  451 tests). `chez_scheme/original/` untouched.
+
+### Blockers
+- None. Not covered yet, because they need bridges.ss/breakers.ss:
+  - `get-incompatible-bridge(s)` of bonds and groups with real bridges;
+  - `break-group` with bridges (`delete-proposed-*-bridges`, `break-bridge`);
+  - flipped groups (`make-flipped-version` via bridges, `monitor-new-groups`
+    with flipped? = #t).
+
+  The goldens can't be compared yet either: real runs post bottom-up
+  bridge scouts among the initial codelets, so the golden prefix diverges
+  at the first bridge scout.
+
+### Next
+- Item 08 (bridges and breakers). Notes:
+  - extend codelet-harness.scm: enable the bridge types (post the initial
+    bridge scouts as run.ss does, add `bottom-up-bridge-scout` and
+    `important-object-bridge-scout` to `b:bottom-up-types`) and the
+    breaker;
+  - with only rule, answer and self-watching codelets left out, the
+    harness then gets close to the real run;
+  - remove the bridges.ss stand-ins (`incompatible-*-CMs?`, `break-bridge`,
+    …) from pending.rktl;
+  - check every call with two drawing arguments against Chez's order;
+    `append` evaluates its second argument first;
+  - run some long (2000-codelet) runs: the 400-codelet prefix missed the
+    `append` bug.

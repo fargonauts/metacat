@@ -44,14 +44,18 @@
 (include "engine/setup.rktl")          ; setup.ss (without setup, enable-resizing)
 (include "engine/coderack.rktl")       ; coderack.ss
 (include "engine/descriptions.rktl")   ; descriptions.ss
+(include "engine/bonds.rktl")          ; bonds.ss
+(include "engine/groups.rktl")         ; groups.ss
 (include "engine/workspace.rktl")      ; workspace.ss
 (include "engine/workspace-objects.rktl") ; workspace-objects.ss
 (include "engine/workspace-structures.rktl") ; workspace-structures.ss
 (include "engine/workspace-strings.rktl") ; workspace-strings.ss
+(include "engine/concept-mappings.rktl") ; concept-mappings.ss
 (include "engine/workspace-structure-formulas.rktl") ; workspace-structure-formulas.ss
 (include "engine/formulas.rktl")       ; formulas.ss
 (include "engine/slipnet.rktl")        ; slipnet.ss
 (include "engine/images.rktl")         ; images.ss
+(include "engine/group-graphics.rktl") ; group-graphics.ss (group-graphics only)
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
 ;; (set-global! 'name value): set! one of the engine's global variables from
@@ -87,4 +91,6 @@
     temp-adjusted-probability
     ;; not ported yet (engine/pending.rktl)
     *themespace* *trace* *display-mode?* *temperature-clamped?* *EEG*
-    monitor-slipnode-activation-change contains?))
+    monitor-slipnode-activation-change monitor-new-groups
+    ;; groups.ss
+    contains?))

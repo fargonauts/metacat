@@ -22,23 +22,24 @@
 ;; creates it by set! on the top level (formulas.ss reads it).
 (pending-variables *temperature-clamped?*)
 (define %update-cycle-length% 15)       ; run.ss's constant (slipnode 'reset)
-;; bonds.ss
-(pending-procedures same-bond-category? same-bond-direction?
-                    opposite-bond-category? opposite-bond-direction?)
-;; groups.ss
-(pending-procedures contains? make-group same-group-category? same-group-direction?)
+;; Never defined in the original: bonds.ss's bonds-equal? (itself never
+;; called) refers to it.  Under Chez a call would raise "variable
+;; same-direction? is not bound"; this raises too.  Not pending on any item.
+(define (same-direction? . args)
+  (error 'same-direction? "variable same-direction? is not bound"))
 ;; bridges.ss
 (pending-procedures bridge-between? equivalent-workspace-objects?
-                    rule-describable-bridge?)
-;; breakers.ss
-(pending-procedures break-bridge)
+                    rule-describable-bridge?
+                    incompatible-horizontal-CMs? incompatible-vertical-CMs?
+                    break-bridge)
 ;; themes.ss
 (pending-variables *themespace*)
 ;; rules.ss
 (pending-procedures verbatim-clause?)
 ;; trace.ss
 (pending-variables *trace*)
-(pending-procedures monitor-slipnode-activation-change full-workspace-object-name)
+(pending-procedures monitor-slipnode-activation-change monitor-new-groups
+                    full-workspace-object-name)
 ;; memory.ss
 (pending-variables *memory*)
 
@@ -49,9 +50,13 @@
                    %low-urgency-color% %medium-urgency-color% %high-urgency-color%
                    %very-high-urgency-color% %extremely-high-urgency-color%)
 ;; general-graphics.ss
-(pending-procedures solid-box)
-;; group-graphics.ss
-(pending-procedures make-group-pexp group-graphics)
+(pending-procedures solid-box outline-box arrowhead)
+;; group-graphics.ss (group-graphics itself is in engine/group-graphics.rktl)
+(pending-procedures make-group-pexp draw-group-grope)
+(pending-variables %small-group-arrowhead-length% %group-arrowhead-angle%)
+;; workspace-graphics.ss: created by set! in the Workspace window's
+;; initialisation, never defined (groups.ss reads them in graphics-gated code)
+(pending-variables %group-letter-category-font% %relevant-group-length-font%)
 ;; bridge-graphics.ss
 (pending-procedures bridge-graphics)
 ;; eeg-graphics.ss (the EEG records workspace values for its window)

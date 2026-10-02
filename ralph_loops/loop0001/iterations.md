@@ -65,7 +65,7 @@
     workspace (letters, descriptions, initial salience and importance values) matches
     the oracle.
 
-- [ ] **07 Bonds, groups, concept mappings.** Port `bonds.ss`, `groups.ss` and
+- [x] **07 Bonds, groups, concept mappings.** Port `bonds.ss`, `groups.ss` and
     `concept-mappings.ss`. Tests: the codelet-level differential harness — run the
     oracle and the port side by side for the first K codelets of each problem, with
     only these codelet types enabled if needed, and compare the trace prefix.
