@@ -617,3 +617,124 @@ directly. Bridges (item 08) will exercise them in runs.
 - Exploration, not in the gate: the same harness for **2000 codelets on all
   109 runs** (218,000 codelets, 90 MB of trace) is byte-identical under Chez
   and Racket (Chez about 33 s, Racket about 58 s).
+
+## Bridges and breakers (item 08)
+
+**Changes**: `bridges.ss` and `breakers.ss` → `racket/engine/bridges.rktl` and
+`breakers.rktl`, verbatim apart from the GPL header's "Ported to Racket"
+lines, included by engine.rkt right after groups.rktl (metacat.ss's load
+order). No model line changed.
+
+**Evaluation order, audited**: the draws in these files are
+`stochastic-pick` of the bridge type, `choose-object`,
+`stochastic-pick-by-method`, `stochastic-if*`, `random-pick`,
+`wins-fight?`/`wins-all-fights?`, and, through bridge-builder,
+`build-group`/`break-group`/`break-bond`. Every one sits in a `let*`, a
+sequence or an `and`/`or`; no call or `let` has two drawing arguments.
+`propose-group` (draws) is reached only from `propose-singleton-group` and
+`try-to-propose-singleton-group`, which nothing calls. Calls whose arguments
+are evaluated in a different order in Racket (`append` in
+`get-incompatible-bridges`, the `let`s of `bridge-builder` and `breaker`)
+have no side effects.
+
+**Stand-ins** (engine/pending.rktl). Removed: `bridge-between?`,
+`incompatible-horizontal-CMs?`, `incompatible-vertical-CMs?`, `break-bridge`
+(now defined by bridges.rktl). `equivalent-workspace-objects?` (trace.ss) and
+`rule-describable-bridge?` (rules.ss) had been listed under bridges.ss by
+mistake and moved to their files. Added:
+- themes.ss: `check-descriptions`, `conflicts-with-theme?`,
+  `supported-by-theme?` as raising stand-ins (only called with an active
+  theme); and **early verbatim copies** of `bridge-type->theme-type`,
+  `descriptions-affect-themespace?`, `ignore-descriptions?`, `beta` and
+  `bridge-theme-compatibility-sigmoid`. Every bridge calls the first when it
+  is made, the sigmoid when its strength is updated, and bridge-builder the
+  second; they are pure (no draws, no state), so copying them early changes
+  nothing. Item 10 deletes the copies when it ports themes.ss.
+- trace.ss: `monitor-new-concept-mappings` (called by every `build-bridge`),
+  `entries`; justify.ss: `remove-whole/single-concept-mappings` (both only
+  used by `supports-theme-pattern?`, i.e. memory.ss);
+- bridge-graphics.ss: `draw-bridge-grope`, `new-bridge-label-number`
+  (graphics-gated).
+
+**`set-global!`** also lists `monitor-new-concept-mappings`.
+
+**Tests**:
+- `racket/tests/bridge-diff-test.rkt`, battery `tests/diff/bridge-battery.scm`,
+  on the item 07 harness (`tests/diff/codelet-harness.scm`) with its new
+  `b:bridges?` setting (`b:enable-bridges!`):
+  - initial codelets as run.ss posts them (bottom-up bond and bridge scouts,
+    interleaved);
+  - bottom-up types: those of `*bottom-up-codelet-types*` except rule-scout,
+    answer-finder, answer-justifier, progress-watcher and jootser, i.e. bond
+    scout, whole-string group scout, both bridge scouts, the description scout
+    and the breaker;
+  - `*top-down-slipnodes*` as in the original (the bond/group nodes plus
+    StrPosCtgy, AlphaPosCtgy and Length, whose top-down codelets are
+    description scouts), so descriptions.ss's codelets now run too;
+  - a fake Themespace with no active theme that records bridge-builder's
+    boosts (`add-theme-if-possible`, answering #f, and
+    `update-dominant-themes`) and a null Themespace window recording
+    `update-graphics`.
+  The trace adds, to item 07's: every built bridge (type, objects, flipped
+  groups, proposal level, strength, time stamp, concept mappings, bond
+  concept mappings, symmetric slippages), proposed top and vertical bridges,
+  the number of descriptions of every object, and
+  `monitor-new-concept-mappings` calls. Runs: all 109 problem × seed pairs for
+  **1000 codelets** (item 07: 400), about 116,000 lines, 48 MB. The test
+  checks that the bridge, description and breaker codelets all run, that top,
+  vertical and bottom (justify) bridges are built and bridges broken, that
+  the breaker breaks structures, that a bridge with a flipped group is built,
+  and that the monitor and Themespace boosts are called.
+- With `b:bridges?` off, the item 07 battery's traces are unchanged (bridges
+  only add an empty list to its structures).
+- Also in the battery, **bridges examined directly** (`b:bridge-matrix`, 9
+  runs of 1500 codelets): after the run, a fresh bridge for every pair of
+  initial × modified objects (horizontal) and initial × target objects
+  (vertical), with its concept mappings and their strengths, internal
+  coherence, internal and external strength, incompatible bridges and bond,
+  `reverse-direction-orientation?`, `letter-category-mappable-objects?`,
+  `singleton-letter-factor`; `direction-incompatible-bridges` for every pair
+  of directed groups under both direction mappings; and every pair of built
+  bridges of a type (incompatible, supporting, CM-list incompatibility,
+  enclosing). Nothing there draws.
+- Tests-first: the battery ran under Chez before the Racket test existed (one
+  harness bug found there: `b:structures` passed the bridges list to `apply
+  append` as its last argument). With HEAD's engine.rkt and pending.rktl
+  (no port) the Racket test fails: `set-global!: not a settable engine
+  global: monitor-new-concept-mappings`. With the port, all lines agreed on
+  the first run; no model line had to change.
+- Mutation checks (each restored, 1 s pauses around edits; compared with the
+  saved Chez output):
+
+  | Mutation | Lines differing |
+  | --- | --- |
+  | horizontal CM-count factor 1.2 → 1.3 | 78165 |
+  | vertical CM-count factor 1.2 → 1.3 | 2590 |
+  | horizontal internal-coherence factor 2.5 → 2.0 | 0 (strengths clip at 100) |
+  | singleton-letter factor 0.1 → 0.2 | 621 |
+  | horizontal external strength halved | 69537 |
+  | vertical external strength halved | 78746 |
+  | bridge-scout type weights without `100-` | 116216 |
+  | important-object scout by salience | error (caught) |
+  | bridge-evaluator without `1-` | 110334 |
+  | bridge vs bond fight weights 3:2 → 2:3 | 2739 |
+  | build-bridge without symmetric slippages | 8130 |
+  | direction partition `< >` → `< <`, `> <` → `> >` | 0 (equivalent here, below) |
+  | direction-incompatible: `remq-elements` dropped | 21185 |
+  | horizontal incompatible-CMs label test dropped | 1 (only the bridge matrix) |
+  | vertical mappable: `slip-linked?` dropped | 73813 |
+  | breaker temperature test inverted | 56231 |
+  | breaker group×bond probability → bond only | 80 |
+  | breaker picks first structure | 59618 |
+
+  The partition mutations are equivalent on these runs: `partition` inserts
+  from the end of the list, and a group's subobject bridges come in string
+  order, so the second predicate is never consulted. The coherence factor
+  multiplies strengths that already exceed 100 with either value.
+- Exploration, not in the gate: the bridges harness for **3000 codelets on
+  all 109 runs** (327,000 codelets, 349,055 lines, 151 MB) is byte-identical
+  under Chez and Racket (Chez 77 s, Racket 135 s): 2160 bridges built, 105
+  structures broken by the breaker, 6 bridges with flipped groups.
+- The goldens still can't be compared: real runs post rule-scout,
+  answer-finder and self-watching codelets (and draw for their posting
+  probabilities) from the first update on.

@@ -45,3 +45,9 @@
 [2026-10-02 22:31:24] claude session it08 (cap 3.00 h) -> session_it08.log
 [2026-10-02 22:57:14] session it08: ok (exit 0, 95 tool calls)
 [2026-10-02 22:58:35] tests passed: GATE PASSED
+[2026-10-02 22:58:35] committed e4890c7: 07 Bonds, groups, concept mappings. Port `bonds.ss`, `groups.ss` and
+[2026-10-02 22:58:38] pushed e4890c7 to origin
+[2026-10-02 22:58:38] === iteration 9: 08 Bridges and breakers. Port `bridges.ss` and `breakers.ss`. Tests: trace
+[2026-10-02 22:58:38] claude session it09 (cap 3.00 h) -> session_it09.log
+[2026-10-02 23:32:17] session it09: ok (exit 0, 78 tool calls)
+[2026-10-02 23:34:39] tests passed: GATE PASSED

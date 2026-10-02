@@ -44,12 +44,27 @@
 (define b:events '())
 (define b:event! (lambda (e) (set! b:events (cons e b:events)) 'done))
 
+(define b:nm (lambda (node) (if node (tell node 'get-name-symbol) #f)))
+
+;; No theme is ever active.  Bridge-builder boosts themes through the
+;; Themespace (add-theme-if-possible for each pair of descriptions that
+;; affect it, then update-dominant-themes and the Themespace window's
+;; update-graphics); the calls are recorded, and no theme is created.
 (define b:fake-themespace
   (lambda msg
     (record-case (cdr msg)
       (get-active-themes (types) '())
       (get-all-active-themes () '())
+      (add-theme-if-possible (theme-type dimension relation)
+        (b:event! (list 'add-theme theme-type (b:nm dimension) (b:nm relation)))
+        #f)
+      (update-dominant-themes (theme-type)
+        (b:event! (list 'update-dominant-themes theme-type)))
       (else (error 'fake-themespace "unexpected message" msg)))))
+
+(define b:null-themespace-window
+  (lambda msg
+    (b:event! (list 'themespace-window (cadr msg)))))
 
 (define b:fake-eeg (lambda msg 'done))
 
@@ -65,6 +80,7 @@
 (b:set-global! '*themespace* b:fake-themespace)
 (b:set-global! '*EEG* b:fake-eeg)
 (b:set-global! '*workspace-window* b:null-workspace-window)
+(b:set-global! '*themespace-window* b:null-themespace-window)
 (b:set-global! '%workspace-graphics% #f)
 (b:set-global! '%slipnet-graphics% #f)
 (b:set-global! '%coderack-graphics% #f)
@@ -77,8 +93,6 @@
   (lambda (type)
     (tell type 'set-graphics-parameters b:null-coderack-window #f #f #f #f #f #f #f #f))
   *codelet-types*)
-
-(define b:nm (lambda (node) (if node (tell node 'get-name-symbol) #f)))
 
 ;; trace.ss's monitors, recording their arguments
 (b:set-global! 'monitor-slipnode-activation-change
@@ -135,6 +149,22 @@
     (b:event! (list 'new-group (b:group-data group) flipped?
                     (tell group 'get-strength)))))
 
+(define b:bridge-data
+  (lambda (bridge)
+    (list 'bridge
+          (tell bridge 'get-bridge-type)
+          (b:obj-id (tell bridge 'get-object1))
+          (b:obj-id (tell bridge 'get-object2))
+          (tell bridge 'flipped-group1?)
+          (tell bridge 'flipped-group2?))))
+
+(define b:cm-names
+  (lambda (cms) (map (lambda (cm) (tell cm 'print-name)) cms)))
+
+(b:set-global! 'monitor-new-concept-mappings
+  (lambda (cms bridge)
+    (b:event! (list 'new-cms (b:cm-names cms) (b:bridge-data bridge)))))
+
 (define b:strings
   (lambda ()
     (if %justify-mode%
@@ -144,7 +174,8 @@
 ;; every built bond and group, with its strengths and proposal level
 (define b:structures
   (lambda ()
-    (apply append
+    (append
+     (apply append
       (map (lambda (s)
              (append
                (map (lambda (b)
@@ -156,7 +187,22 @@
                             (tell g 'get-strength) (tell g 'get-time-stamp)
                             (map b:dump-description (tell g 'get-descriptions))))
                     (tell s 'get-groups))))
-           (b:strings)))))
+           (b:strings)))
+      ;; every built bridge, with its concept mappings
+      (map (lambda (b)
+             (list (b:bridge-data b) (tell b 'get-proposal-level)
+                   (tell b 'get-strength) (tell b 'get-time-stamp)
+                   (b:cm-names (tell b 'get-concept-mappings))
+                   (b:cm-names (tell b 'get-bond-concept-mappings))
+                   (b:cm-names (tell b 'get-symmetric-slippages))))
+           (b:all-bridges)))))
+
+(define b:all-bridges (lambda () (tell *workspace* 'get-all-bridges)))
+
+;; the number of descriptions of every object (description-builder)
+(define b:description-counts
+  (lambda ()
+    (b:map-objects (lambda (obj) (length (tell obj 'get-descriptions))))))
 
 (define b:member-equal?
   (lambda (x l) (and (pair? l) (or (equal? x (car l)) (b:member-equal? x (cdr l))))))
@@ -173,10 +219,16 @@
 
 (define b:proposed-counts
   (lambda ()
-    (map (lambda (s)
-           (list (length (tell s 'get-all-bonds))
-                 (length (tell s 'get-all-groups))))
-         (b:strings))))
+    (let* ((counts (map (lambda (s)
+                          (list (length (tell s 'get-all-bonds))
+                                (length (tell s 'get-all-groups))))
+                        (b:strings))))
+      (if b:bridges?
+          (append counts
+                  (list (length (tell *workspace* 'get-proposed-bridges 'top))
+                        (length (tell *workspace* 'get-proposed-bridges 'vertical))
+                        (b:description-counts)))
+          counts))))
 
 (define b:activations
   (lambda () (map (lambda (n) (tell n 'get-activation)) *slipnet-nodes*)))
@@ -211,6 +263,16 @@
 ;;; The run loop (run.ss's run-mcat, step-mcat, update-everything,
 ;;; clamp-initial-slipnodes and post-initial-codelets, restricted as above)
 
+;; b:bridges? (item 08) also enables bridges.ss and breakers.ss, and with
+;; them the description codelets (descriptions.ss), which bridges post:
+;;   - the initial codelets are run.ss's: bottom-up bond and bridge scouts;
+;;   - the bottom-up types are those of *bottom-up-codelet-types* but rules,
+;;     answers and self-watching (rule-scout, answer-finder,
+;;     answer-justifier, progress-watcher, jootser);
+;;   - *top-down-slipnodes* is the original's (adding the description
+;;     scouts of StrPosCtgy, AlphaPosCtgy and Length).
+(define b:bridges? #f)
+
 (define b:unclamp-time 0)
 
 (define b:clamp-initial-slipnodes
@@ -226,10 +288,35 @@
           (begin
             (tell *coderack* 'add-deferred-codelet
               (tell bottom-up-bond-scout 'make-codelet %very-low-urgency%))
+            (if b:bridges?
+                (tell *coderack* 'add-deferred-codelet
+                  (tell bottom-up-bridge-scout 'make-codelet %very-low-urgency%)))
             (loop (- i 1)))))
     (tell *coderack* 'post-deferred-codelets)))
 
 (define b:bottom-up-types (list bottom-up-bond-scout group-scout:whole-string))
+
+(define b:bond-group-slipnodes
+  (list plato-left plato-right plato-predecessor plato-successor
+        plato-sameness plato-predgrp plato-succgrp plato-samegrp))
+
+;; switch to the bridges setting (b:bridges?), or back
+(define b:enable-bridges!
+  (lambda (on?)
+    (set! b:bridges? on?)
+    (if on?
+        (begin
+          (set! b:bottom-up-types
+            (list bottom-up-bond-scout group-scout:whole-string
+                  bottom-up-bridge-scout important-object-bridge-scout
+                  bottom-up-description-scout breaker))
+          (b:set-global! '*top-down-slipnodes*
+            (append b:bond-group-slipnodes
+                    (list plato-string-position-category
+                          plato-alphabetic-position-category plato-length))))
+        (begin
+          (set! b:bottom-up-types (list bottom-up-bond-scout group-scout:whole-string))
+          (b:set-global! '*top-down-slipnodes* b:bond-group-slipnodes)))))
 
 (define b:add-bottom-up-codelets
   (lambda ()

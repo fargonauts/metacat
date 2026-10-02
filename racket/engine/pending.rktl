@@ -27,19 +27,48 @@
 ;; same-direction? is not bound"; this raises too.  Not pending on any item.
 (define (same-direction? . args)
   (error 'same-direction? "variable same-direction? is not bound"))
-;; bridges.ss
-(pending-procedures bridge-between? equivalent-workspace-objects?
-                    rule-describable-bridge?
-                    incompatible-horizontal-CMs? incompatible-vertical-CMs?
-                    break-bridge)
 ;; themes.ss
 (pending-variables *themespace*)
+;; Called by bridges only with an active theme (none can exist yet):
+(pending-procedures check-descriptions conflicts-with-theme? supported-by-theme?)
+;; Called on every bridge: early verbatim copies of themes.ss's definitions
+;; (pure: no draws, no state), so that bridges can be built and their
+;; strength computed before themes.ss is ported (item 10 moves them back).
+(define bridge-type->theme-type
+  (lambda (theme-type)
+    (case theme-type
+      (top 'top-bridge)
+      (bottom 'bottom-bridge)
+      (vertical 'vertical-bridge))))
+(define descriptions-affect-themespace?
+  (lambda (d1 d2)
+    (and (tell d1 'description-type? (tell d2 'get-description-type))
+         (not (ignore-descriptions? d1 d2)))))
+(define ignore-descriptions?
+  (lambda (d1 d2)
+    (or (not (tell d1 'relevant?))
+        (not (tell d2 'relevant?))
+	(and (tell d1 'description-type? plato-object-category)
+	     (both-spanning-groups? (tell d1 'get-object) (tell d2 'get-object)))
+        (and (tell d1 'description-type? plato-string-position-category)
+	     (both-spanning-objects? (tell d1 'get-object) (tell d2 'get-object)))
+	(and (eq? (tell d1 'get-descriptor) plato-middle)
+	     (eq? (tell d2 'get-descriptor) plato-middle)))))
+(define beta 4)
+(define bridge-theme-compatibility-sigmoid
+  (lambda (x) (sub1 (/ 2 (add1 (exp (* -2 beta x)))))))
+;; rules.ss
+(pending-procedures rule-describable-bridge?)
+;; justify.ss
+(pending-procedures remove-whole/single-concept-mappings)
 ;; rules.ss
 (pending-procedures verbatim-clause?)
 ;; trace.ss
 (pending-variables *trace*)
 (pending-procedures monitor-slipnode-activation-change monitor-new-groups
-                    full-workspace-object-name)
+                    monitor-new-concept-mappings
+                    full-workspace-object-name entries
+                    equivalent-workspace-objects?)
 ;; memory.ss
 (pending-variables *memory*)
 
@@ -58,7 +87,7 @@
 ;; initialisation, never defined (groups.ss reads them in graphics-gated code)
 (pending-variables %group-letter-category-font% %relevant-group-length-font%)
 ;; bridge-graphics.ss
-(pending-procedures bridge-graphics)
+(pending-procedures bridge-graphics draw-bridge-grope new-bridge-label-number)
 ;; eeg-graphics.ss (the EEG records workspace values for its window)
 (pending-variables *EEG*)
 ;; coderack-graphics.ss

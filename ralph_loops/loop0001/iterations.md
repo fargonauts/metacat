@@ -70,7 +70,7 @@
     oracle and the port side by side for the first K codelets of each problem, with
     only these codelet types enabled if needed, and compare the trace prefix.
 
-- [ ] **08 Bridges and breakers.** Port `bridges.ss` and `breakers.ss`. Tests: trace
+- [x] **08 Bridges and breakers.** Port `bridges.ss` and `breakers.ss`. Tests: trace
     prefixes match for longer K; bridges built and broken are identical.
 
 - [ ] **09 Rules and answers.** Port `rules.ss` and `answers.ss`. Tests: rules are

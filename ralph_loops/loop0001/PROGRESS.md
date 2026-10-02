@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 8/18 SOLVED
+- **Current**: 9/18 SOLVED
 
 ---
 
@@ -754,3 +754,122 @@ Item 07 (Bonds, groups, concept mappings): **SOLVED**.
     `append` evaluates its second argument first;
   - run some long (2000-codelet) runs: the 400-codelet prefix missed the
     `append` bug.
+
+---
+
+## Iteration 9 — 2026-10-02 23:30
+Item 08 (Bridges and breakers): **SOLVED**.
+
+### Completed
+- Ported `bridges.ss` and `breakers.ss` to `racket/engine/bridges.rktl` and
+  `breakers.rktl`, verbatim apart from the GPL headers' "Ported to Racket"
+  lines. engine.rkt includes them right after groups.rktl, in metacat.ss's
+  load order. No model line changed.
+  - Evaluation-order audit: every draw (bridge-type pick, `choose-object`,
+    `stochastic-pick-by-method`, `stochastic-if*`, `random-pick`,
+    `wins-fight?`, and the builds and breaks in bridge-builder) sits in a
+    `let*`, a sequence or an `and`/`or`. No call has two drawing arguments.
+- `engine/pending.rktl`:
+  - removed the bridges.ss stand-ins;
+  - moved `equivalent-workspace-objects?` (trace.ss) and
+    `rule-describable-bridge?` (rules.ss), which had been filed under
+    bridges.ss, to their own files;
+  - added stand-ins for themes.ss, trace.ss (`monitor-new-concept-mappings`,
+    `entries`), justify.ss and bridge-graphics.ss names.
+  - Every bridge calls four small pure themes.ss helpers
+    (`bridge-type->theme-type`, `bridge-theme-compatibility-sigmoid` with
+    `beta`, `descriptions-affect-themespace?`, `ignore-descriptions?`), so
+    pending.rktl holds early verbatim copies of them. Item 10 moves them back.
+  - `set-global!` also lists `monitor-new-concept-mappings`.
+- Tests:
+  - **The codelet harness with bridges**:
+    - `tests/diff/codelet-harness.scm` gets a `b:bridges?` setting
+      (`b:enable-bridges!`). It posts run.ss's initial bond and bridge scouts
+      and every bottom-up type except rules, answers and self-watching (so
+      both bridge scouts, the description scout and the breaker run). It also
+      uses the original's full `*top-down-slipnodes*`, so the description
+      codelets run.
+    - A fake Themespace with no active theme records bridge-builder's boosts.
+    - The trace now also records bridges built and broken (type, objects,
+      flipped groups, strength, concept mappings, bond CMs, symmetric
+      slippages), proposed bridges, description counts per object, and
+      `monitor-new-concept-mappings` calls.
+    - Battery: `tests/diff/bridge-battery.scm`; test:
+      `racket/tests/bridge-diff-test.rkt`.
+    - Runs: all 109 problem × seed pairs for **1000 codelets** (item 07 ran
+      400). That is about 116,000 lines and 48 MB, identical under Chez and
+      Racket.
+    - The test also checks what the runs reach: all bridge, description and
+      breaker codelet types; top, vertical and bottom bridges built; bridges
+      broken; the breaker breaking structures; a bridge with a flipped group;
+      monitor and Themespace calls.
+    - With `b:bridges?` off, item 07's traces are unchanged.
+  - **The bridge matrix**: 9 runs of 1500 codelets. Afterwards, a fresh
+    bridge for every horizontal and vertical object pair, with:
+    - its CMs and their strengths, coherence, internal and external
+      strength, incompatible bridges and bond;
+    - `direction-incompatible-bridges` for every pair of directed groups;
+    - every pair of built bridges (incompatible, supporting, enclosing).
+  - `racket/tests/engine-test.rkt` (+11 checks): the bridge procedures, the
+    breaker codelet type, the early themes.ss copies. A pending check now
+    uses `rule-describable-bridge?`.
+- Tests-first, honestly:
+  - The battery ran under Chez before the Racket test existed. One harness
+    bug showed up there: an `apply append` nesting error in `b:structures`.
+  - With HEAD's engine.rkt and pending.rktl, the Racket test fails:
+    `set-global!: not a settable engine global: monitor-new-concept-mappings`.
+  - The port's own code (bridges.rktl, breakers.rktl, engine includes,
+    pending changes) was written before the battery. All 116,000 lines
+    agreed on the first run.
+- **Mutation checks**: 19 mutations in bridges.rktl and breakers.rktl
+  (porting-notes.md has the table).
+  - 16 are caught: CM-count factors, singleton factor, external strengths,
+    scout weights, evaluator, fight weights, symmetric slippages,
+    `remq-elements`, slip-linked, all three breaker mutations, and so on.
+    The CM-label test in `incompatible-horizontal-CMs?` was caught only
+    after I added the bridge matrix.
+  - 3 are equivalent on these runs and not caught:
+    - the coherence factor 2.5 → 2.0 (strengths clip at 100 either way);
+    - the two partition-predicate swaps in `direction-incompatible-bridges`
+      (subobject bridges come in string order, so the second predicate is
+      never consulted).
+- **Exploration** (not in the gate): the bridges harness at **3000 codelets
+  on all 109 runs** is byte-identical under Chez and Racket. That is 327,000
+  codelets and 151 MB, with 2160 bridges built, 105 breaker breaks and 6
+  flipped-group bridges.
+- Docs:
+  - porting-notes.md: new item 08 section.
+  - anomalies_and_quirks.md: three new entries.
+    1. `letter-category-mappable-objects?` compares object1's group category
+       with itself, a bug in the original that is always true.
+    2. Bridges call themes.ss and trace.ss on every bridge, and
+       `*themespace-window*` is messaged ungated.
+    3. Dead code: the singleton-group proposers are never called.
+  - The concept-mappings entry is updated.
+  - chez_scheme/oracle/README.md mentions the new battery.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  483 tests; the gate takes about 2.5 min, about 85 s of it the new test).
+  `chez_scheme/original/` untouched.
+
+### Blockers
+- None. Still not compared with the goldens: real runs also post
+  rule-scout, answer-finder, answer-justifier, progress-watcher and jootser
+  (drawing for their posting probabilities at every update). The real
+  Themespace and Trace aren't ported either, so the golden prefixes still
+  diverge at the first update.
+
+### Next
+- Item 09 (rules and answers). Notes:
+  - add rule-scout, answer-finder and answer-justifier to the harness's
+    `b:bottom-up-types` and call `check-if-rules-possible` in
+    `b:update-everything`;
+  - remove `rule-describable-bridge?` and `verbatim-clause?` from
+    pending.rktl;
+  - rules.ss calls `get-real-object` → `equivalent-workspace-objects?`
+    (trace.ss): copy it early, as was done for the themes.ss helpers, or
+    make it settable;
+  - the harness may now be close enough to compare golden prefixes up to the
+    first self-watching event, if the fake Themespace and Trace are
+    replaced as items 09–10 port them;
+  - the bridges test is the slowest in the gate (about 85 s). If the gate
+    gets too long, lower `b:codelet-cap` in bridge-battery.scm from 1000.

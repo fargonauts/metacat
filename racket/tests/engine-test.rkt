@@ -81,7 +81,18 @@
 (check-true (procedure? (engine 'group-graphics)))
 
 ;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'bridge-between?) 'a 'b 'c)))
+(check-exn #rx"not ported yet" (lambda () ((engine 'rule-describable-bridge?) 'a)))
+
+;; bridges.ss and breakers.ss (item 08), and the early copies of themes.ss's
+;; pure helpers in engine/pending.rktl
+(for ([name '(make-horizontal-bridge make-vertical-bridge bridge-between? break-bridge
+              build-bridge propose-bridge incompatible-horizontal-CMs?
+              incompatible-vertical-CMs?)])
+  (check-true (procedure? (engine name)) (symbol->string name)))
+(check-true (and (memq (engine 'breaker) (engine '*codelet-types*)) #t))
+(check-equal? (map (engine 'bridge-type->theme-type) '(top bottom vertical))
+              '(top-bridge bottom-bridge vertical-bridge))
+(check-equal? ((engine 'bridge-theme-compatibility-sigmoid) 0) 0)
 
 ;; the engine never requires racket/gui (CLAUDE.md, TASK.md): loading it
 ;; into a fresh namespace declares no racket/gui or racket/draw module

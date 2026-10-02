@@ -46,6 +46,8 @@
 (include "engine/descriptions.rktl")   ; descriptions.ss
 (include "engine/bonds.rktl")          ; bonds.ss
 (include "engine/groups.rktl")         ; groups.ss
+(include "engine/bridges.rktl")        ; bridges.ss
+(include "engine/breakers.rktl")       ; breakers.ss
 (include "engine/workspace.rktl")      ; workspace.ss
 (include "engine/workspace-objects.rktl") ; workspace-objects.ss
 (include "engine/workspace-structures.rktl") ; workspace-structures.ss
@@ -92,5 +94,6 @@
     ;; not ported yet (engine/pending.rktl)
     *themespace* *trace* *display-mode?* *temperature-clamped?* *EEG*
     monitor-slipnode-activation-change monitor-new-groups
+    monitor-new-concept-mappings
     ;; groups.ss
     contains?))

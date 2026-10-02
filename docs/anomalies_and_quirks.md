@@ -76,6 +76,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** won't fix. images.ss only calls `relationship-between` on two or more
   sub-images, and `print` is a debugging aid.
 
+### `letter-category-mappable-objects?` compares a group with itself
+- **Seen:** iteration 9 (item 08), reading bridges.ss.
+- **What:** for two groups, the test is `(related? (tell object1 'get-group-category)
+  (tell object1 'get-group-category))`: `object1` twice, so it is always true and any
+  two groups (that have letter-category descriptions) may be mapped on LettCtgy. The
+  intent was surely `object2` in the second place. The other three cases are fine.
+- **Evidence:** bridges.ss line 1521; called by `horizontal-mappable-descriptions?`
+  for every horizontal bridge's LettCtgy description pair.
+- **Status:** won't fix (ported verbatim; the goldens depend on it).
+
 ## 🌀 Anomalies
 
 ### Most documented demo seeds replay exactly; a few don't
@@ -233,7 +243,34 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `get-incompatible-bridge`, which returns early without a bridge. With bridge codelets
   disabled, a run never makes one, so the codelet harness cannot exercise
   concept-mappings.ss; its battery tests the mappings directly.
-- **Status:** explained. Item 08 (bridges) exercises them in runs.
+- **Status:** explained. Since item 08, bridges make them in runs, and
+  tests/diff/bridge-battery.scm checks them (`new-cms` events, each bridge's mappings).
+
+### Bridges call themes.ss on every bridge
+- **Seen:** iteration 9 (item 08).
+- **What:** although bridges.ss loads before themes.ss, every bridge calls themes.ss's
+  `bridge-type->theme-type` when it is made, `bridge-theme-compatibility-sigmoid` (via
+  `get-thematic-compatibility`) whenever its strength is updated, and bridge-builder's
+  `boost-themespace-activations` calls `descriptions-affect-themespace?` and messages
+  `*themespace*` and `*themespace-window*` for every bridge built (the window message
+  is not gated by `%workspace-graphics%`; the oracle's null window absorbs it). With no
+  active theme the strength only depends on `(weighted-average '() '())` = 0 and
+  sigmoid(0) = 0. Building a bridge also calls trace.ss's
+  `monitor-new-concept-mappings`.
+- **Evidence:** bridges.ss lines 42, 270–313, 1352, 1416; tests/diff/bridge-battery.scm
+  records the boost calls (`add-theme`, `update-dominant-themes`, `themespace-window
+  update-graphics`) and the monitor calls (`new-cms`).
+- **Status:** worked around: engine/pending.rktl has early verbatim copies of the four
+  pure themes.ss helpers (item 10 moves them back); `monitor-new-concept-mappings` is a
+  settable stand-in until trace.ss is ported.
+
+### Dead code in bridges.ss
+- **Seen:** iteration 9 (item 08).
+- **What:** `propose-singleton-group` and `try-to-propose-singleton-group` are never
+  called (the comment in `build-bridge` describing singleton-group proposals has no code
+  under it). `calculate-external-strength` computes `(round (* (min 100 total-support)))`,
+  a one-argument `*`, harmless.
+- **Status:** not a bug; ported verbatim.
 
 ## 🛸 UFO sightings
 
