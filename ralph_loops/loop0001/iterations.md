@@ -1,6 +1,6 @@
 # loop0001 — Metacat 1.2 to Racket, through the code in load order: items
 
-- [ ] **00 Toolchain and skeleton.** Check that `racket` (8.x CS, with `racket/gui`),
+- [x] **00 Toolchain and skeleton.** Check that `racket` (8.x CS, with `racket/gui`),
     `raco` and Chez Scheme 10 (`scheme` or `chezscheme`) are installed; if any is
     missing, mark this item blocked and write the exact install command. Create
     `racket/` with `info.rkt` and a stub `main.rkt`, `chez_scheme/oracle/`, `docs/`
