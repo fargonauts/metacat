@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 2/18 SOLVED
+- **Current**: 3/18 SOLVED
 
 ---
 
@@ -129,3 +129,75 @@ Item 01 (The original, headless, under Chez 10): **SOLVED**.
   candidates. Watch for null-window errors on new problems: the null windows
   are strict on purpose, and any new message must be checked to be a command
   before it is allowed.
+
+---
+
+## Iteration 3 — 2026-10-02 21:09
+Item 02 (Traces and golden files): **SOLVED**.
+
+### Completed
+- `chez_scheme/oracle/trace.ss`: JSON-lines trace instrumentation, entirely
+  from outside the original. It wraps top-level procedures after loading
+  (`build-bond/-group/-bridge/-description`, `break-bond/-group/-bridge`,
+  `update-temperature`, `update-slipnet-activations`,
+  `abstract-answer-description`, `report-error-and-halt`). It forwards
+  `*coderack*` (to see each `choose-codelet`) and `*workspace*` (to see
+  `add-rule`) through closures that pass the original object as `self`, and
+  records Temporal Trace events from the Trace window plus commentary from
+  the Commentary hook. Twelve event types: start, codelet (type, urgency,
+  posted, rng state), build/break (bond, group, bridge, description, rule),
+  temperature, slipnet (all activations every 15 codelets plus rng state),
+  themes (when changed), event (answer/snag/clamp/rule/group/
+  concept-mapping/concept-activation), answer, comment, halt, end.
+- `run.ss --trace FILE`; the summary now also prints `Stopped: suspend|cap|halt`.
+- `docs/trace-format.md`: the format, down to field order, string escapes
+  and number formatting (exact rationals as `"n/d"`, Chez flonum syntax),
+  how `t` counts codelets, what is deliberately left out, and the golden set.
+- `tests/problems.txt`: 36 problems, 109 runs. These are the 25 problems of
+  `demos.ss` with their documented seeds plus small seeds (3–5 per problem;
+  misc3–5 with `keep-going`), and 11 classic problems from the dissertation
+  (picked by how often the dissertation text names them) with seeds 1–3.
+  Caps are 10000 (17000 for eqe-aaabaaa). Each run takes 1–8 s.
+- `chez_scheme/oracle/make-golden.ss` writes `tests/golden/*.jsonl` (one
+  fresh Chez process per run, `nproc` in parallel, about 13 s here).
+  `--check` regenerates into /tmp and compares byte for byte, and reports
+  missing or extra files. Goldens are written and committed: 109 files,
+  40 MB uncompressed, 4.8 MB gzipped.
+- `chez_scheme/oracle/validate-trace.py`: a structural checker for traces
+  (fields and order, types, start/end, one codelet line per codelet,
+  activation count, required event types). The Racket port can reuse it.
+- Tests written first, and seen failing before the code:
+  `chez_scheme/oracle/tests/trace-check.ss` (4 runs, including a justify run
+  and a keep-going run: tracing does not change the stdout, the trace is
+  valid and has the required event types, and it is byte-identical when
+  repeated). Before the code it failed with run.ss's usage error on
+  `--trace`. `chez_scheme/oracle/tests/golden-check.ss` (`make-golden.ss
+  --check` plus validation of every golden) failed with "make-golden.ss:
+  no such file or directory". I also checked that the checks catch
+  breakage: one changed rng value in a golden gives "differs: ...
+  line 100", an extra golden file gives "1 of 109 do not match", and
+  deleting a line gives "codelet event 149 has t = 150". Each golden was
+  restored afterwards (`cmp` identical).
+- Findings (in porting-notes.md):
+  1. the original itself fails on some runs. `eqe qeq abbba aaabaaa`
+     seed 3 calls `report-error-and-halt` at codelet 4004, and `(reset)`
+     makes `--script` exit 255. run.ss now ends the run like `break`
+     (Stopped: halt), and that run is in the golden set. `abc ccbbaa ijk`
+     seed 3 raises a Chez error (`caddr` of `#f` in `transcribe-to-english`);
+     the set avoids it by using seed 4.
+  2. Urgencies are often exact rationals (3601 codelet lines), so the port
+     must keep Chez's exact arithmetic.
+  3. run4's documented seed (abc abd xyz dyz) gives up without an answer in
+     the oracle, as misc3 already did.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (about 48 s).
+  `chez_scheme/original/` untouched.
+
+### Blockers
+- None.
+
+### Next
+- Item 03 in iterations.md. For the equivalence runs: the Racket port should
+  write the same trace (trace-format.md) and compare it byte for byte with
+  `tests/golden/`. The `rng` fields on codelet and slipnet lines show the
+  first codelet whose draws diverge. Emit exact rationals as `"n/d"`, and
+  reproduce the `halt` path of `report-error-and-halt`.

@@ -77,3 +77,46 @@ Chez 10 without SWL, and what that reveals for the port.
   not evaluate call arguments left to right (`(f a b c)` evaluates c, a, b
   in the observed case); every site where that changes the order of random
   draws or other side effects must be ported with an explicit order.
+
+## Traces (item 02)
+- **Instrumentation from outside.** `chez_scheme/oracle/trace.ss` wraps
+  top-level procedures with `set!` after loading (`build-bond`,
+  `break-bond`, `build-group`, `break-group`, `build-bridge`,
+  `break-bridge`, `build-description`, `update-temperature`,
+  `update-slipnet-activations`, `abstract-answer-description`,
+  `report-error-and-halt`); callers reach them through their top-level
+  bindings, including the recursive `break-group`. Codelet procedures
+  cannot be wrapped that way (`define-codelet-procedure*` hands the
+  procedure to its codelet type at load time), so codelets are seen by
+  forwarding `*coderack*`'s `choose-codelet`, and rules by forwarding
+  `*workspace*`'s `add-rule`. The forwarding closures pass the original
+  object as `self`. Note that top-down codelets receive `*workspace*` as
+  their scope argument (slipnet.ss), so they hold the forwarder; only
+  `tell` is ever applied to it. The port has no need for any of this: it
+  emits the same events from the same places directly (through a trace
+  hook that a run without tracing leaves empty).
+- **Exact rationals.** Codelet urgencies are often exact non-integer
+  rationals (`(* (% conceptual-depth) activation)` and friends: 3601 of the
+  golden codelet lines, e.g. `102/5`). Racket's numeric tower keeps them
+  exact as Chez does; the port must not introduce flonums where Chez has
+  exact arithmetic, and the trace writes them as `"n/d"` strings.
+- **The original fails on some runs.** Two kinds, both in the model, with
+  the display off and no tracing:
+  1. `report-error-and-halt` (an object gets a message it does not
+     understand) prints `Ooops: ...` and calls `(reset)`; under the SWL
+     REPL this abandons the run, under `scheme --script` it exits 255.
+     Seen on `eqe qeq abbba aaabaaa` seed 3 at codelet 4004
+     (`answer-justifier` sends `get-constituent-objects` to a letter).
+     run.ss prints the same message and ends the run (`Stopped: halt`);
+     the trace has a `halt` event. The golden set includes this run, so
+     the port must halt at the same point.
+  2. A Chez error: `abc ccbbaa ijk` seed 3, `caddr` of `#f` in
+     `transcribe-to-english` (rules.ss), called from `make-rule`. Under
+     the SWL REPL this too would abandon the run. The golden set avoids it
+     (seed 4 instead); the oracle exits 1 with a backtrace. Whether these
+     happened under the 1999 Chez is unknown (a different argument
+     evaluation order could change the path).
+- **Seeds that do not replay.** Besides misc3 (item 01), run4
+  (`abc abd xyz dyz` 2836825623, documented answer dyz) gives up without
+  an answer at codelet 3228 in the oracle. It is kept in the golden set:
+  the golden records what the oracle does.

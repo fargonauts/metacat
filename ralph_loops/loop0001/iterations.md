@@ -25,7 +25,7 @@
     Tests: `abc abd xyz`, `abc abd ijk`, `eqe qeq abbbc` and `abc abd mrrjjj` each reach
     an answer with three seeds, and the same seed twice gives identical output.
 
-- [ ] **02 Traces and golden files.** Instrument the oracle, from the prelude, by
+- [x] **02 Traces and golden files.** Instrument the oracle, from the prelude, by
     wrapping top-level procedures after loading (never by editing `chez_scheme/original/`), to emit
     a JSON-lines trace: codelet run (type, urgency, time step), structure built or broken,
     temperature at each update, slipnet activations every N steps, answers, rule and

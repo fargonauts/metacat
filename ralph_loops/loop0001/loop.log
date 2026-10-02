@@ -9,3 +9,9 @@
 [2026-10-02 20:34:17] claude session it02 (cap 3.00 h) -> session_it02.log
 [2026-10-02 20:53:30] session it02: ok (exit 0, 91 tool calls)
 [2026-10-02 20:53:54] tests passed: GATE PASSED
+[2026-10-02 20:53:54] committed f4e7ab5: 01 The original, headless, under Chez 10. `chez_scheme/oracle/prelude.
+[2026-10-02 20:53:57] pushed f4e7ab5 to origin
+[2026-10-02 20:53:57] === iteration 3: 02 Traces and golden files. Instrument the oracle, from the prelude, by
+[2026-10-02 20:53:57] claude session it03 (cap 3.00 h) -> session_it03.log
+[2026-10-02 21:10:05] session it03: ok (exit 0, 60 tool calls)
+[2026-10-02 21:10:54] tests passed: GATE PASSED

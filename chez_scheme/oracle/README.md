@@ -21,8 +21,26 @@ port (`tests/golden/`).
   ends at the first answer (where the original pauses for Go) unless
   `--keep-going` is given. The original's console messages ("Type (go) or
   click on the Workspace to continue...", "Codelets run: N") are printed too.
+  `Stopped:` says why the run ended: `suspend`, `cap` or `halt` (the
+  original called `report-error-and-halt`). `--trace FILE` also writes the
+  JSON-lines trace (`docs/trace-format.md`) without changing the run.
+- `trace.ss` is the trace instrumentation: it wraps top-level procedures
+  (`build-bond`, `break-group`, `update-temperature`, …), forwards
+  `*coderack*` and `*workspace*` through closures that note codelets and
+  rules, and records the Temporal Trace's events from the Trace window.
+- `make-golden.ss` writes `tests/golden/*.jsonl`, one trace per problem and
+  seed in `tests/problems.txt`, running them in parallel; with `--check`
+  it regenerates into a temporary directory and compares byte for byte.
+
+      scheme --script chez_scheme/oracle/make-golden.ss            # rewrite the goldens
+      scheme --script chez_scheme/oracle/make-golden.ss --check    # compare only
+
+- `validate-trace.py FILE... [--require ev,...]` checks trace structure.
 - `tests/` holds Chez checks; `tests/run-tests.sh` runs each one with
   `scheme --script` from the repository root, and a check fails by exiting
   non-zero: `reader-check.ss`, `rng-check.ss` (the RNG specification),
   `headless-run-check.ss` (4 problems × 3 seeds reach an answer, twice with
-  identical output), `demo-replay-check.ss` (documented demo runs replay).
+  identical output), `demo-replay-check.ss` (documented demo runs replay),
+  `trace-check.ss` (traces are valid, reproducible and do not change the
+  run), `golden-check.ss` (`make-golden.ss --check`, and every golden is
+  valid).
