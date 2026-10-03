@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 14/18 SOLVED
+- **Current**: 15/18 SOLVED
 
 ---
 
@@ -1549,3 +1549,114 @@ Item 13 (Workspace, bridge, group and rule graphics): **SOLVED**.
   - The Trace's and Memory's `display` methods drive the Slipnet, Themespace,
     Coderack and Temperature windows, so their views are testable once those exist.
   - The gate is about 7–8 min.
+
+---
+
+## Iteration 15 — 2026-10-03 04:50
+Item 14 (The other panels): **SOLVED**. Every panel of the original program is
+ported. With all eleven windows attached, all 109 golden runs still match byte for
+byte.
+
+### Completed
+- **Ported** slipnet-, coderack-, temperature-, theme-, trace-, memory-, commentary-
+  and eeg-graphics.ss as `racket/gui/*-graphics.rktl`. They are included by
+  racket/gui/views.rkt in metacat.ss's load order and are verbatim apart from `port:`
+  changes:
+  - fonts that the original creates by `set!` without ever defining them;
+  - `relation-names-pexp`, which the original never defines (see the anomalies below);
+  - comments where definitions moved to the engine.
+- **Engine split**, following item 13: the parts the model uses without a window are
+  verbatim in the engine:
+  - `engine/trace-graphics.rktl`: `group-event-pexp-text-string`;
+  - `engine/theme-graphics.rktl`: `relation-name`;
+  - `engine/eeg-graphics.rktl`: the EEG object, `%EEG-table%`, `*EEG*`.
+  - The early copies and the pending `*EEG*` are gone.
+  - `%coderack-codelet-count-font%` is a view global.
+  - engine/pending.rktl now holds only gui.ss's speed settings.
+- **`attach-views!`** (views.rkt) makes every window as `(setup)` does and turns every
+  graphics switch on. The logo and the control panel wait for item 15.
+- **racket/headless.rkt**:
+  - Headless runs now use the engine's real EEG, as the oracle does.
+  - The commentary and Trace-event recording moved into wrappers around whichever
+    windows are installed, so the real Commentary and Trace windows can be attached.
+    CLI output and goldens are unchanged.
+- **Tests**:
+  - `tests/diff/panels-battery.scm` (38 tests) + `racket/tests/panels-diff-test.rkt`:
+    Chez with the original vs the engine + views.rkt. The two sides give identical
+    output, and no test errors on either side (checked). It covers:
+    - the thermometer and mercury pexps;
+    - Themespace layout and names, and the horizontal and vertical panel layout
+      procedures;
+    - a theme panel object on a fake window with a fake Themespace (every drawing and
+      update branch);
+    - all seven Trace event icons;
+    - Memory icons;
+    - the Trace and Memory windows' mouse handlers;
+    - the EEG object over 47 recordings;
+    - the Slipnet layout table.
+  - `racket/tests/views-test.rkt` (item 13's workspace-view-test.rkt, renamed):
+    - **all 109 golden runs with every window attached give traces identical to
+      tests/golden/**, and every window is drawn into;
+    - the crash run crashes at the same point;
+    - **48 pixel snapshots over 8 scenes**, including a click on a clamp event through
+      the original Trace press handler, and clicks comparing two answers through the
+      Memory press handler.
+    - Item 13's six Workspace snapshots are pixel-identical with all panels attached.
+  - engine-test.rkt: the moved definitions and the real EEG.
+- **Tests first, honestly**:
+  - The panel files and a first rendering of each window came before the tests.
+  - Against a scratch worktree of HEAD with only the new tests, the battery fails
+    (`compute-horizontal-panel-info: undefined`) and the view test does not compile
+    (`attach-views!: unbound identifier`).
+  - With the port, the goldens with all views matched on the first run.
+  - My own first tests failed:
+    - a blank-picture check on windows a scene leaves empty;
+    - a too-high item threshold for short commentaries;
+    - a Memory battery test that cleaned the icon procedure before calling it (ERROR
+      on both sides, which I caught by reading the Chez output).
+- **Mutation checks**: 14 mutations, all restored afterwards (the table is in
+  porting-notes.md, item 14).
+  - 13 are caught, by the battery, by the pictures or by both.
+  - The answer-icon sizing mutation passed the battery until the fake window's text
+    widths were made large enough for the minimum width not to win.
+  - One is equivalent: the Memory's first icon spacing, which `initialize` always
+    recomputes.
+  - **A Slipnet window that draws one random number in `update-graphics` makes all
+    109 goldens-with-views differ.**
+- **What I saw** (Read on every PNG, with crops, against the dissertation's figures):
+  - Slipnet matches Fig. 1.2's 13×5 grid; after the clamp click it shows "Concept
+    Pattern".
+  - Coderack matches Fig. 4.8 (p169-312, p237-649): two-line labels, counts, bars,
+    "100 Total", the last codelet type highlighted. After the clamp click it shows
+    "Codelet Pattern".
+  - Top and Vertical Themes match Fig. 4.1's panel order and two-column vertical
+    layout. A seemingly missing outline was only lost in downscaling.
+  - Trace icons match Fig. 4.13, and the clicked clamp is highlighted.
+  - Memory matches Fig. 4.17, with the clicked answer black with yellow.
+  - The Commentary shows the answer comparison as in Chapter 5. The margin is one
+    space, 4 px.
+  - Thermometer and EEG: no reference figures. Both look right; a crop showed that
+    the EEG verticals are pure red.
+- Docs:
+  - porting-notes.md: new item 14 section;
+  - anomalies_and_quirks.md: `relation-names-pexp` is never defined; the dead Memory
+    spacing; updates to the default-font, graphics-coupling and draws-nothing entries;
+  - divergences.md: test name;
+  - chez_scheme/oracle/README.md: the new battery.
+
+### Blockers
+- None.
+
+### Next
+- Item 15 (the control panel and main window). Notes:
+  - `attach-views!` builds every window but the logo and the control panel. Each
+    window's host is offscreen; `set-window-host-maker!` installs on-screen hosts.
+  - engine/pending.rktl's last stand-ins are gui.ss's speed settings
+    (`%num-of-flashes%` …). The control panel's speed slider sets them;
+    `attach-views!` sets them to full speed for now.
+  - The theme edit mode (`*theme-edit-mode?*`, theme-graphics.rktl) and the control
+    panel messages the handlers send (`ready-to-edit?`, `edit-theme-type`,
+    `raise-theme-edit-dialog`) are gui.ss's.
+  - Mouse handlers: views-harness.rkt shows how to click through the original
+    handlers. `thread-break` in views.rkt still raises: the engine thread is item 15's.
+  - views-test.rkt now takes about 70 s, and the gate about 8 min.

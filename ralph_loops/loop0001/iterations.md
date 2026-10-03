@@ -101,7 +101,7 @@
     dissertation's figures; a headless run with the views attached still matches the
     goldens (watching changes nothing).
 
-- [ ] **14 The other panels.** Port `slipnet-graphics.ss`, `coderack-graphics.ss`,
+- [x] **14 The other panels.** Port `slipnet-graphics.ss`, `coderack-graphics.ss`,
     `temperature-graphics.ss`, `theme-graphics.ss`, `trace-graphics.ss`,
     `memory-graphics.ss`, `commentary-graphics.ss` and `eeg-graphics.ss`. Tests: as in 13,
     per panel.

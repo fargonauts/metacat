@@ -47,6 +47,6 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
     were aliased, so overpainting erased them exactly.
   - Speed settings: no control panel yet. The pauses only make the program wait, and
     with `%flash-pause%` 0 a flash draws nothing.
-- **Tests:** racket/tests/workspace-view-test.rkt runs all 109 golden runs with the
-  Workspace window attached and requires identical traces; its pixel snapshots and
+- **Tests:** racket/tests/views-test.rkt (item 13's workspace-view-test.rkt) runs all 109
+  golden runs with every window attached (item 14) and requires identical traces; its pixel snapshots and
   racket/tests/sgl-test.rkt's pin the rendering.

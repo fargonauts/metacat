@@ -36,44 +36,6 @@
               "variable complement-codelet-pattern is not bound")]))
 
 ;; Graphics (the GUI items)
-;; trace-graphics.ss: every group event's print name (make-group-event,
-;; trace.ss) is made by group-event-pexp-text-string.  An early verbatim
-;; copy (pure string code), moved back by the GUI items.
-(define group-event-pexp-text-string
-  (lambda (group)
-    (let* ((bond-facet (tell group 'get-bond-facet))
-	   (constituent-objects (tell group 'get-constituent-objects))
-	   (descriptors (tell-all constituent-objects 'get-descriptor-for bond-facet))
-	   (descriptor-strings
-	     (map (lambda (object descriptor)
-		    (cond
-		      ((platonic-number? descriptor)
-		       (format "~a" (platonic-number->number descriptor)))
-		      ((letter? object) (tell descriptor 'get-lowercase-name))
-		      ((group? object) (tell descriptor 'get-uppercase-name))))
-	       constituent-objects
-	       descriptors)))
-      (apply string-append
-	(cons (1st descriptor-strings)
-	  (adjacency-map
-	    (lambda (x y) (format "-~a" y))
-	    descriptor-strings))))))
-;; theme-graphics.ss: trace.ss's print-pattern (a debugging printer) names
-;; relations with relation-name.  An early verbatim copy (pure), moved back
-;; by the GUI items.
-(define relation-name
-  (lambda (relation)
-    (cond
-      ((eq? relation #f) "diff")
-      ((eq? relation plato-identity) "iden")
-      ((eq? relation plato-opposite) "opp")
-      ((eq? relation plato-successor) "succ")
-      ((eq? relation plato-predecessor) "pred")
-      (else #f))))
-;; eeg-graphics.ss (the EEG records workspace values for its window)
-(pending-variables *EEG*)
-;; coderack-graphics.ss
-(pending-variables %coderack-codelet-count-font%)
 ;; gui.ss
 (pending-variables %num-of-flashes% %flash-pause% %snag-pause%
                    %codelet-highlight-pause% %text-scroll-pause%)

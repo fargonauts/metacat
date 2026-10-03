@@ -112,6 +112,31 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   the port fails with "application: not a procedure" on the `swl-font%` object.
 - **Status:** open, latent. Every panel seen so far binds a font before drawing text;
   items 13–14 will show whether any panel relies on the default. Ported verbatim.
+- **Update (iteration 15, item 14):** all panels are ported and every `text` they draw
+  has a `font` binding around it; 109 golden runs with every window attached and 48
+  pictures never reach the default.
+
+### `relation-names-pexp` is never defined (theme-graphics.ss)
+- **Seen:** iteration 15 (item 14), compiling theme-graphics.ss in Racket.
+- **What:** a theme panel (`make-panel`) answers `get-relation-names-pexp` with
+  `relation-names-pexp`, but its variable is `relation-names-pexps` (plural). Chez
+  compiles the reference to an unbound top-level variable; Racket rejects the module.
+  Nothing sends `get-relation-names-pexp`.
+- **Evidence:** `grep -n "relation-names-pexp\b" chez_scheme/original/theme-graphics.ss`
+  (line 510).
+- **Status:** worked around, latent. racket/gui/theme-graphics.rktl defines
+  `relation-names-pexp` as an identifier macro that raises Chez's error ("variable
+  relation-names-pexp is not bound"), as engine/pending.rktl does for
+  `complement-codelet-pattern`.
+
+### The Memory window's first icon spacing is dead code
+- **Seen:** iteration 15 (item 14), a mutation check.
+- **What:** `new-memory-window` computes `memory-icon-spacing` (and `next-y`) in its
+  `let*`, but `make-memory-window` always sends `initialize` next, which recomputes both
+  with the same formula. Changing the first one changes nothing.
+- **Evidence:** memory-graphics.ss lines 82–86 and 119–122; the mutation table in
+  porting-notes.md, item 14.
+- **Status:** not a bug (harmless redundancy); ported verbatim.
 
 ## 🌀 Anomalies
 
@@ -276,7 +301,7 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `record-case` applied a `lambda`, which raised an arity error at the first answer of
   every run once workspace graphics were on.
 - **Evidence:** racket/tests/compat-test.rkt (extra, missing and rest arguments);
-  without the fix, racket/tests/workspace-view-test.rkt fails on every run that reaches
+  without the fix, racket/tests/workspace-view-test.rkt (now views-test.rkt) fails on every run that reaches
   an answer.
 - **Status:** worked around. compat's `record-case` binds as Chez does (item 13).
 
@@ -339,6 +364,13 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: engine/pending.rktl has an early verbatim copy of
   `group-event-pexp-text-string` (pure); racket/tests/golden-harness.rkt gives a null
   `*EEG*`. The GUI items move them back.
+- **Update (iteration 15, item 14):** the engine now has these parts of the graphics
+  files, verbatim: `group-event-pexp-text-string` (engine/trace-graphics.rktl),
+  `relation-name` (engine/theme-graphics.rktl, used by trace.ss's `print-pattern`) and
+  the EEG object with `%EEG-table%` (engine/eeg-graphics.rktl). The early copies and the
+  null `*EEG*` are gone: headless runs use the real EEG, as the oracle does. The EEG
+  records values only when `%workspace-graphics%` is on, and the goldens with views
+  attached show that recording changes nothing.
 
 ### Urgencies are exact rationals
 - **Seen:** iteration 3 (item 02).
@@ -460,11 +492,18 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   in cache mode and takes the cached pexp back). The EEG records values each update.
   Groups and bridges also keep a `drawn?` flag that only the graphics set. A run could
   diverge if any of this drew from the generator or changed what the model reads.
-- **Evidence:** racket/tests/workspace-view-test.rkt: all 109 golden runs give identical
-  traces with the Workspace window attached, and a mutation that makes `bridge-graphics`
+- **Evidence:** racket/tests/views-test.rkt (workspace-view-test.rkt in item 13): all 109
+  golden runs give identical traces with the Workspace window attached, and a mutation that makes `bridge-graphics`
   draw one random number makes them differ.
 - **Status:** explained: none of it draws or feeds back into the model's choices. The
   ported graphics are verbatim, so this also holds for the original.
+- **Update (iteration 15, item 14):** the same holds with every window attached and every
+  graphics switch on. The Slipnet, Coderack, Temperature and EEG windows redraw at every
+  update. The Coderack window recomputes the selection probabilities, and the codelet
+  types keep its slot pexps. Themes keep their panel. Trace events and Memory answers
+  keep their icons and bounding boxes. All 109 traces stay identical, and a mutation
+  that makes the Slipnet window's `update-graphics` draw one random number changes
+  all 109.
 
 ### `update-rule-pexps!` mutates pexps shared with the rules
 - **Seen:** iteration 14 (item 13), porting rule-graphics.ss.

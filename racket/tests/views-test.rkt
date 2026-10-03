@@ -1,20 +1,22 @@
 #lang racket/base
-;; Item 13: the Workspace view (racket/gui/views.rkt: workspace-graphics.ss,
-;; general-graphics.ss's windows, with the engine's group-, bridge- and
-;; rule-graphics.ss) attached to runs.
+;; Items 13-14: the views (racket/gui/views.rkt: the windows of
+;; workspace-, slipnet-, coderack-, temperature-, theme-, trace-, memory-,
+;; commentary- and eeg-graphics.ss, on general-graphics.ss's windows, with
+;; the engine's group-, bridge- and rule-graphics.ss) attached to runs.
 ;;
 ;; 1. Watching changes nothing: every golden run of tests/problems.txt, run
-;;    with the Workspace window attached (workspace graphics on, as in the
-;;    original program), gives a trace identical to tests/golden/, and the
+;;    with every window attached (attach-views!: all graphics on, as in the
+;;    original program), gives a trace identical to tests/golden/, and every
 ;;    window was drawn into.  The run on which the original crashes crashes
-;;    at the same point with the view attached.
-;; 2. Pictures: the Workspace window at six points of golden runs
+;;    at the same point with the views attached.
+;; 2. Pictures: the windows at eight points of golden runs
 ;;    (racket/tests/views-harness.rkt's scenes: mid-run, answers, a snag
-;;    event's view, an answer description, a justify run) must equal
-;;    racket/tests/snapshots/workspace-<scene>.png pixel for pixel.
-;;    METACAT_UPDATE_SNAPSHOTS=1 rewrites them; a mismatch writes
-;;    /tmp/workspace-<scene>-actual.png.  By hand:
-;;      racket racket/tests/views-harness.rkt SCENE OUT.png
+;;    event's view, an answer description, a justify run, a click on a
+;;    clamp event in the Trace window, clicks comparing two answers in the
+;;    Memory window) must equal racket/tests/snapshots/WINDOW-SCENE.png
+;;    pixel for pixel.  METACAT_UPDATE_SNAPSHOTS=1 rewrites them; a mismatch
+;;    writes /tmp/WINDOW-SCENE-actual.png.  By hand:
+;;      racket racket/tests/views-harness.rkt SCENE DIR
 ;; 3. views.rkt needs racket/draw but never loads racket/gui.
 ;;
 ;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
@@ -38,7 +40,7 @@
   (check-equal? (length runs) 109)
   (define results (run-golden-runs harness 'views-run runs golden-dir))
   (check-equal? (length results) (length runs))
-  (define total-items 0)
+  (define total-items (make-hasheq))
   (for ([result (sort results string<? #:key car)])
     (define name (car result))
     (cond
@@ -50,11 +52,24 @@
            (fail (format "~a: with the view attached, traces differ at line ~a\n  golden: ~a\n  port:   ~a"
                          name (car d) (short (caddr d)) (short (cadr d))))
            (check-true #t))
-       (define items (regexp-match #rx"Workspace view: ([0-9]+) items\n$" (list-ref result 3)))
-       (check-true (and items (> (string->number (cadr items)) 20) #t)
-                   (format "~a: the Workspace window was drawn into" name))
-       (when items (set! total-items (+ total-items (string->number (cadr items)))))]))
-  (check-true (> total-items 10000) "the views drew"))
+       ;; every window was drawn into (the Memory and Trace windows only
+       ;; once there are answers or events, the vertical themes once there
+       ;; are themes, the bottom themes only in justify runs)
+       (for ([window '(workspace slipnet coderack top-themes vertical-themes memory
+                       commentary trace temperature EEG)])
+         (define items (regexp-match (pregexp (format "\n~a view: ([0-9]+) items\n" window))
+                                     (list-ref result 3)))
+         (define n (and items (string->number (cadr items))))
+         (check-true (and n (> n (case window
+                                    [(memory trace vertical-themes) -1]
+                                    [(commentary) 1]   ; the first paragraph, two lines or more
+                                    [else 10]))
+                          #t)
+                     (format "~a: the ~a window was drawn into" name window))
+         (when n
+           (hash-update! total-items window (lambda (t) (+ t n)) 0)))]))
+  (for ([(window n) total-items])
+    (check-true (> n 1000) (format "the ~a window drew (~a items)" window n))))
 
 ;; The original's crash (abc ccbbaa ijk, seed 3: golden-test.rkt) happens at
 ;; the same point with the view attached.
@@ -74,12 +89,12 @@
   (define-values (view-error view-trace)
     (crash-trace harness 'views-run 'views-partial-trace))
   (check-true (and view-error (regexp-match? #rx"^caddr: " view-error) #t)
-              (format "with the view attached, the port crashes in caddr: ~a" view-error))
+              (format "with the views attached, the port crashes in caddr: ~a" view-error))
   (check-equal? view-error plain-error)
   (check-true (and view-trace (> (length (string-split view-trace "\n")) 1000) #t))
   (check-equal? view-trace plain-trace "the traces up to the crash are the same"))
 
-;; Pictures of the Workspace window
+;; Pictures of the windows
 (module+ test
   ;; a fresh engine per scene, sharing this module's racket/draw (and so its
   ;; class system), so that the bitmaps can be read here
@@ -96,18 +111,21 @@
     (define bytes (make-bytes (* 4 w h)))
     (send bm get-argb-pixels 0 0 w h bytes)
     (values w h bytes))
-  (for ([scene scenes])
-    (define name (car scene))
-    (define file (build-path snapshot-dir (format "workspace-~a.png" name)))
-    (define bm
-      (parameterize ([current-namespace (scene-namespace)])
-        ((dynamic-require harness 'render-scene) name)))
+  (define pictures 0)
+  (for* ([scene scenes]
+         [picture (parameterize ([current-namespace (scene-namespace)])
+                    ((dynamic-require harness 'render-scene) (car scene)))])
+    (define name (format "~a-~a" (car picture) (car scene)))
+    (define bm (cdr picture))
+    (define file (build-path snapshot-dir (format "~a.png" name)))
     (define-values (w h got) (argb bm))
-    (check-equal? (list w h) '(800 600) (format "~a: the window's size" name))
-    ;; not blank: black text and lines on the white background
-    (check-true (for/or ([i (in-range 0 (bytes-length got) 4)])
-                  (and (= (bytes-ref got (+ i 1)) 0) (= (bytes-ref got (+ i 2)) 0)
-                       (= (bytes-ref got (+ i 3)) 0)))
+    (set! pictures (add1 pictures))
+    (when (eq? (car picture) 'workspace)
+      (check-equal? (list w h) '(800 600) (format "~a: the window's size" name)))
+    ;; not blank: at least two colours
+    (check-true (for/or ([i (in-range 4 (bytes-length got) 4)])
+                  (not (= (integer-bytes->integer got #f #f i (+ i 4))
+                          (integer-bytes->integer got #f #f 0 4))))
                 (format "~a: something is drawn" name))
     (cond
       [(getenv "METACAT_UPDATE_SNAPSHOTS")
@@ -117,10 +135,11 @@
        (define-values (sw sh want) (argb (read-bitmap file)))
        (define same? (and (= sw w) (= sh h) (equal? got want)))
        (unless same?
-         (send bm save-file (format "/tmp/workspace-~a-actual.png" name) 'png))
+         (send bm save-file (format "/tmp/~a-actual.png" name) 'png))
        (check-true same?
-                   (format "~a: the rendering differs from ~a (see /tmp/workspace-~a-actual.png)"
-                           name file name))])))
+                   (format "~a: the rendering differs from ~a (see /tmp/~a-actual.png)"
+                           name file name))]))
+  (check-equal? pictures 48 "every scene's windows were pictured"))
 
 ;; views.rkt: racket/draw, never racket/gui
 (module+ test

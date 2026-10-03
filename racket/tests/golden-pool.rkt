@@ -1,7 +1,7 @@
 #lang racket/base
 ;; Running golden runs (tests/problems.txt) in parallel, each in a fresh
 ;; engine: shared by golden-test.rkt (items 10-11) and
-;; workspace-view-test.rkt (item 13).
+;; views-test.rkt (items 13-14).
 ;;
 ;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 (require compiler/cm

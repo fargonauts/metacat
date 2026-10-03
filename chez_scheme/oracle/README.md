@@ -54,7 +54,8 @@ port (`tests/golden/`).
   `sgl-interpreter.ss` against it; diff-eval.ss takes any number of files), or
   `tests/diff/graphics-battery.scm` (item 13: the pexp builders of
   general-, group-, bridge- and rule-graphics.ss against a recording Workspace
-  window). It prints one canonical result per
+  window), or `tests/diff/panels-battery.scm` (item 14: the panel code that works
+  without a window, against fake windows and model objects). It prints one canonical result per
   `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
   for batteries that set the original's globals. The Racket side is
   `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`

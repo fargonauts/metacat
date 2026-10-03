@@ -165,8 +165,8 @@
         (error 'headless-window "~s received unexpected message ~s" name msg))))
 
 ;; commentary-graphics.ss's comment window (its model part: the eliza and
-;; non-eliza paragraphs) on a recording text window that emits each
-;; paragraph drawn
+;; non-eliza paragraphs) without a text window; the recorder below prints
+;; and emits each paragraph drawn
 (define (make-headless-comment-window)
   (let ([eliza-paragraphs '()]
         [non-eliza-paragraphs '()])
@@ -202,10 +202,6 @@
                   [paragraph2 (apply string-append lines2)])
               (set! eliza-paragraphs (cons 1 (cons paragraph1 eliza-paragraphs)))
               (set! non-eliza-paragraphs (cons 1 (cons paragraph2 non-eliza-paragraphs)))
-              (let ([paragraph (if %eliza-mode% paragraph1 paragraph2)])
-                ;; the oracle's $commentary-hook prints it as it is drawn
-                (printf "Comment: ~a~%" paragraph)
-                (emit 'comment (cons 'text paragraph)))
               'done))
           (clear ()
             (set! eliza-paragraphs '())
@@ -240,26 +236,9 @@
                       (tell (cadr msg) 'set-graphics-info (lambda (activation) 'no-icon) 'no-icon)
                       'done]
                      [else (apply null-window self msg)]))))
-  ;; the Trace window records the Temporal Trace's events (trace.ss)
-  (set-global! '*trace-window*
-               (let ([window (make-null-window 'trace '(initialize add-event))])
-                 (lambda (self . msg)
-                   (when (eq? (car msg) 'add-event)
-                     (let ([event (cadr msg)])
-                       (emit 'event
-                             (cons 'type (tell event 'get-type))
-                             (cons 'number (tell event 'get-event-number))
-                             (cons 'name (tell event 'print-name))
-                             (cons 'time (tell event 'get-time))
-                             (cons 'temperature (tell event 'get-temperature)))))
-                   (apply window self msg))))
+  (set-global! '*trace-window* (make-null-window 'trace '(initialize add-event)))
   (set-global! '*temperature-window* (make-null-window 'temperature '(initialize update-graphics)))
   (set-global! '*EEG-window* (make-null-window 'EEG '(initialize plot-current-values)))
-  ;; eeg-graphics.ss's EEG object (not ported yet): a headless run only
-  ;; initializes it (the Workspace's initialize); recording is gated by
-  ;; %workspace-graphics% (on when a Workspace view is attached), and the
-  ;; model never reads it
-  (set-global! '*EEG* (make-null-window 'EEG-object '(initialize record-current-values)))
   (let ([coderack-graphics (make-null-window 'coderack-graphics '(set-last-codelet-type))])
     (for-each
       (lambda (type)
@@ -273,6 +252,42 @@
                    [else (error 'headless-window "control panel received unexpected message ~s"
                                 msg)])))
   (set-global! '*comment-window* (make-headless-comment-window)))
+
+;; The recorders: the Commentary window's paragraphs (the oracle's
+;; $commentary-hook prints each one as it is drawn) and the Trace window's
+;; events (trace.ss), around whichever windows are installed, headless or
+;; the views' (racket/gui/views.rkt).  Each wrapper passes itself as self,
+;; so the window's own (tell self 'add-comment ...) is recorded too.
+(define recorders '())
+
+(define (install-recorders!)
+  (unless (memq *comment-window* recorders)
+    (let ([window *comment-window*])
+      (define recorder
+        (lambda (self . msg)
+          (when (eq? (car msg) 'add-comment)
+            (let ([paragraph (apply string-append
+                                    (if %eliza-mode% (cadr msg) (caddr msg)))])
+              (printf "Comment: ~a~%" paragraph)
+              (emit 'comment (cons 'text paragraph))))
+          (apply window self msg)))
+      (set! recorders (cons recorder recorders))
+      (set-global! '*comment-window* recorder)))
+  (unless (memq *trace-window* recorders)
+    (let ([window *trace-window*])
+      (define recorder
+        (lambda (self . msg)
+          (when (eq? (car msg) 'add-event)
+            (let ([event (cadr msg)])
+              (emit 'event
+                    (cons 'type (tell event 'get-type))
+                    (cons 'number (tell event 'get-event-number))
+                    (cons 'name (tell event 'print-name))
+                    (cons 'time (tell event 'get-time))
+                    (cons 'temperature (tell event 'get-temperature)))))
+          (apply window self msg)))
+      (set! recorders (cons recorder recorders))
+      (set-global! '*trace-window* recorder))))
 
 ;;;---------------------------------------------------------------------------
 ;;; The trace's wrappers (trace.ss, install-trace!), installed once around
@@ -413,6 +428,7 @@
     (set-global! 'quiet-break headless-break)
     (set! installed? #t))
   (when views (views))
+  (install-recorders!)
   (set! out trace-port)
   (set! last-themes #f)
   (set! answers '())

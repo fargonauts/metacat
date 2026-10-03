@@ -66,11 +66,15 @@
 (include "engine/jootsing.rktl")       ; jootsing.ss
 (include "engine/memory.rktl")         ; memory.ss
 ;; the graphics files' pexp builders, which the model calls when
-;; %workspace-graphics% is on (their windows are in racket/gui/)
+;; %workspace-graphics% is on, and the parts of the other graphics files
+;; the model uses (their windows are in racket/gui/)
 (include "engine/general-graphics.rktl") ; general-graphics.ss (without the windows)
 (include "engine/group-graphics.rktl") ; group-graphics.ss
 (include "engine/bridge-graphics.rktl") ; bridge-graphics.ss
 (include "engine/rule-graphics.rktl")  ; rule-graphics.ss
+(include "engine/theme-graphics.rktl") ; theme-graphics.ss (relation-name only)
+(include "engine/trace-graphics.rktl") ; trace-graphics.ss (group-event-pexp-text-string only)
+(include "engine/eeg-graphics.rktl")   ; eeg-graphics.ss (the EEG object, without the window)
 (include "engine/view-globals.rktl")   ; colours and fonts the views install
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
@@ -147,7 +151,7 @@
     %rule-font% %workspace-title-font% %codelet-count-font% %letter-font%
     %irrelevant-group-length-font% %relevant-concept-mapping-font%
     %irrelevant-concept-mapping-font% %concept-mapping-list-superscript-font%
-    restore-current-state
+    restore-current-state %coderack-codelet-count-font%
     ;; gui.ss's speed settings (engine/pending.rktl), read by the windows
     %num-of-flashes% %flash-pause% %snag-pause% %codelet-highlight-pause%
     %text-scroll-pause%))

@@ -49,3 +49,7 @@
 ;; which only the Workspace window's handlers turn on
 (define restore-current-state
   (lambda () (error 'restore-current-state "no views are loaded")))
+;; coderack-graphics.ss: a font created by set! when the Coderack window is
+;; made (select-coderack-fonts), never defined; coderack.ss's codelet types
+;; draw their counts with it
+(view-variables %coderack-codelet-count-font%)

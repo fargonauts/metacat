@@ -1292,3 +1292,152 @@ the same top level as the model, and the model calls them directly whenever
   - views.rkt loads racket/draw and not racket/gui.
 - racket/tests/engine-test.rkt: the builders are engine procedures, and the view
   globals are `#f` until views are loaded.
+
+## The other panels (item 14)
+
+slipnet-, coderack-, temperature-, theme-, trace-, memory-, commentary- and
+eeg-graphics.ss are ported as `racket/gui/*-graphics.rktl`, included by
+racket/gui/views.rkt in metacat.ss's load order (slipnet before workspace, then
+temperature, coderack, theme, trace, memory, commentary, eeg). They are verbatim but for
+the changes marked `port:` and the parts that moved to the engine.
+
+**Split between engine and views**, following item 13: the engine gets what the model
+calls whether or not a window exists, verbatim, included after rule-graphics.rktl:
+- `engine/trace-graphics.rktl`: `group-event-pexp-text-string` (trace.ss names every
+  group event with it);
+- `engine/theme-graphics.rktl`: `relation-name` (trace.ss's `print-pattern`);
+- `engine/eeg-graphics.rktl`: `%EEG-table%`, `%EEG-buffer-size%`, `make-EEG` and `*EEG*`
+  (workspace.ss initializes the EEG, run.ss's `update-everything` feeds it).
+
+The early copies of the first two in engine/pending.rktl are gone, and so is the
+pending `*EEG*`. `%coderack-codelet-count-font%`, which coderack.ss's codelet types read,
+moved to engine/view-globals.rktl (and `set-global!`), so coderack-graphics.rktl's
+`set!` installs it in the engine. engine/pending.rktl now only holds gui.ss's speed
+settings, which item 15 takes.
+
+**Changes marked `port:`**:
+- slipnet- and coderack-graphics.rktl define the fonts their `select-...-fonts`
+  create by `set!` (`%slipnet-title-font%`, `%slipnode-label-font%`,
+  `%coderack-title-font%`, `-subtitle-`, `-codelet-type-`, `-codelet-sum-font%`). The
+  original never defines them, and a module cannot `set!` an undefined name. This is
+  the same fix as item 13's Workspace fonts.
+- theme-graphics.rktl: `relation-names-pexp`, which the original never defines
+  (anomalies), is an identifier macro that raises Chez's "not bound" error.
+- The definitions that moved to the engine are replaced by a comment in the views
+  files.
+- views.rkt no longer defines its stand-in `*theme-edit-mode?*`: theme-graphics.rktl
+  defines it.
+
+**Attaching the views**: `attach-views! [scale]` makes every window as setup.ss's
+`(setup)` does: `set-window-size-defaults`, then the Workspace, Slipnet (`*13x5-layout-table*`),
+Coderack, Themespace (and its three theme windows), Memory, Commentary, Trace, Temperature
+and EEG windows. It turns every graphics switch on, as setup.ss defines them, and sets
+gui.ss's speed settings to full speed with no flashing. The logo and the control panel
+are item 15's. It returns the windows by name.
+
+**Headless driver** (racket/headless.rkt):
+- The null `*EEG*` is gone, so headless runs use the engine's EEG, like the oracle.
+- The commentary and the Trace window's events used to be printed and emitted by the
+  headless windows themselves. They are now recorded by wrappers (`install-recorders!`)
+  around whichever windows are installed when a run starts, headless or the views'.
+  Each wrapper passes itself as `self`, so the real Commentary window's own `(tell
+  self 'add-comment ...)` in `new-problem` is recorded too. The CLI's output and every
+  golden are unchanged.
+
+**Tests**:
+- `tests/diff/panels-battery.scm` (38 tests) + `racket/tests/panels-diff-test.rkt`:
+  Chez with the original loaded, against the engine plus views.rkt. Colours and fonts
+  are SWL stubs under Chez and racket/draw objects in Racket, so `b:clean` turns
+  non-data into `'obj`; numbers are compared exactly (flonums to the last bit). It
+  covers:
+  - the Slipnet layout table;
+  - `mercury-pexp` and `draw-thermometer` on a fake window;
+  - the Themespace layout, panel orders, relation and dimension names, and the
+    Themespace's relations sorted for the panels;
+  - `compute-horizontal-panel-info` and `compute-vertical-panel-info` (exact and
+    flonum);
+  - a theme panel (`make-panel`) on a fake window with a fake Themespace and cluster:
+    initialize, add and remove relations, theme graphics parameters, drawing with and
+    without a dominant theme, the three `update-graphics` branches, and drawing,
+    decreasing and erasing activations (with `*fg-color*` restored);
+  - all seven Trace event icons (`*-event-pexp-info`) on fake events, including group
+    events in both directions and none, and both rule types;
+  - `group-event-pexp-text-string` and the event arrowheads;
+  - `get-memory-icon-pexp-info` and its icon procedure at three activations;
+  - the Trace and Memory windows' mouse handlers against fake windows and model
+    objects (selecting nothing, highlighting, unhighlighting through
+    `restore-current-state`, ignored while running, a snag after an answer);
+  - the EEG object over 47 recordings (current values, averages, previous values,
+    variation), and its table.
+- `racket/tests/views-test.rkt` (item 13's workspace-view-test.rkt, renamed and
+  extended):
+  - all 109 golden runs with **every** window attached (`attach-views!`): traces
+    identical to tests/golden/, and each window drawn into;
+  - the crash run crashes in the same place;
+  - pixel snapshots of 48 window pictures over 8 scenes (racket/tests/views-harness.rkt).
+    Item 13's six Workspace snapshots are unchanged: with all panels attached they come
+    out pixel for pixel the same. The scenes added here are:
+    - `xyz-clamp-click`: a click on the last clamp event of run7 in the Trace window,
+      through the original `trace-window-press-handler`. The click point is found by
+      asking the Temporal Trace (`get-mouse-selected-event`).
+    - `glz-compare`: clicks on the `flz` and `dlz` icons of the Memory window after the
+      keep-going run `abc abd glz` seed 1108779034, through
+      `memory-window-press-handler`. This gives the answer description and the
+      Commentary's comparison of the two answers.
+  - Windows a scene leaves blank are not pictured (the bottom themes outside justify
+    runs and answer displays, for example).
+
+**Tests first, honestly**: the panel files came first (copying them showed what the
+engine split needed), and so did a first rendering of every window. The battery, the
+harness changes and the extended view test came after. Against a scratch worktree of
+HEAD with only the new tests added, the battery fails (`compute-horizontal-panel-info:
+undefined`) and the view test does not compile (`attach-views!: unbound identifier`).
+With the port, the 109 goldens matched on the first run with every view attached.
+
+**Mutation checks** (each restored afterwards; "pictures" counts the 48 snapshots that
+differ):
+
+| Mutation | Battery | Pictures |
+| --- | --- | --- |
+| `mercury-pexp` `=` → `<` | 3 tests | 5 |
+| horizontal panel x-spacing without `add1` | 9 tests | 6 |
+| answer-event oval sizing 3/2 → 4/3 | 2 tests (only after the fake text widths were made large enough for the minimum width not to win) | 1 |
+| Coderack slot height `(+ 1 n)` → `(+ 2 n)` | – | 5 |
+| Slipnet activation diameter 2δ → 9/4δ | – | 4 |
+| Memory icon spacing 5/4 → 3/2 in the `let*` | – | 0: equivalent, `initialize` recomputes it (anomalies) |
+| the same in `initialize` | – | 3 |
+| EEG previous values off by one | 1 test | 3 |
+| EEG cycle width 1/400 → 1/300 | – | 3 |
+| Commentary eliza/normal paragraphs swapped | – | 4 |
+| panel activation without restoring `*fg-color*` | 1 test | most pictures of 3 scenes (the colour leaks into other windows) |
+| Trace event spacing doubled | – | 4 |
+| Slipnet `update-graphics` draws `(random 2)` | – | 13 pictures; **all 109 goldens with views differ** (views-test: 147 failures) |
+
+**What I saw** (Read on each PNG, plus crops), compared with the dissertation's figures:
+- Slipnet (`slipnet-*.png`; Fig. 1.2, p040-042): the same 13×5 grid of italic labels
+  under activation disks, with the bold italic title "Slipnet Activation". After the
+  clamp click it reads "Concept Pattern", with one outlined disk on StringPos.
+- Coderack (Fig. 4.8, p169-312, p237-649): the same layout, with "Coderack", "Codelet
+  Type" / "Selection Probability", 27 slots with two-line labels and counts, bars, the
+  last codelet type highlighted, the double line and "100 Total". After the clamp click
+  it reads "Codelet Pattern": slots shaded by the pattern's urgencies, no bars or counts.
+- Themes (Fig. 4.1, p150-280): the Top Themes window has two rows of panels in panel
+  order (Letter Category, String Position, Object Type, Alphabetic Position), with
+  dominant panels highlighted in the pressure-off colour. The Vertical Themes window
+  has two columns of narrow panels, with String Pos. in the second row as in the
+  figure. A crop showed that a panel outline I thought missing was only lost in
+  downscaling.
+- Trace (Fig. 4.13, p181-333): oval concept-activation and answer icons, group boxes
+  with arrowheads above the text (`x-y-z`), double-bordered rule boxes, octagonal SNAG
+  signs and rounded Clamp boxes. The clicked clamp is highlighted in green.
+- Memory (Fig. 4.17, p215-470): rounded icons, the snag dark and the answers lighter by
+  activation, a clicked answer black with yellow text and outline, as in the figure.
+- Commentary (Fig. 4.14, p195-354): bold italic sans-serif paragraphs that scroll up,
+  including the two-answer comparison ("The only essential difference between the
+  answer dlz and the answer flz ..."). The margin is one space (4 pixels).
+- Temperature: a thermometer with a bulb, a white highlight ring, ten gradations
+  (every fifth longer) and the value in italics next to the mercury. No figure shows
+  it.
+- EEG: average activity in yellow and temperature in red on black, with the title
+  "Average Workspace Activity (yellow) and Temperature (red)". A crop confirmed pure
+  red verticals where the downscaled image looked grey. No figure shows it.

@@ -50,7 +50,7 @@
                     =pink= =orange=))
 
 (provide (except-out (all-defined-out) window-host%)
-         attach-workspace-view! window->bitmap save-window-png
+         attach-workspace-view! attach-views! window->bitmap save-window-png
          make-window-host set-window-host-maker!)
 
 ;;-----------------------------------------------------------------------------
@@ -90,10 +90,6 @@
 (define thread-break
   (lambda (thread ignore k)
     (error 'thread-break "no engine thread to interrupt yet")))
-
-;; theme-graphics.ss (not ported yet): the Workspace window's mouse handler
-;; reads it
-(define *theme-edit-mode?* #f)
 
 ;; The window host: SWL's <toplevel> and its <frame> or <scrollframe>, with
 ;; the methods make-graphics-window sends them.  Offscreen by default (it
@@ -141,7 +137,15 @@
 
 (include "constants.rktl")             ; constants.ss (graphics part)
 (include "general-graphics.rktl")      ; general-graphics.ss (windows)
+(include "slipnet-graphics.rktl")      ; slipnet-graphics.ss
 (include "workspace-graphics.rktl")    ; workspace-graphics.ss
+(include "temperature-graphics.rktl")  ; temperature-graphics.ss
+(include "coderack-graphics.rktl")     ; coderack-graphics.ss
+(include "theme-graphics.rktl")        ; theme-graphics.ss (without relation-name)
+(include "trace-graphics.rktl")        ; trace-graphics.ss (without group-event-pexp-text-string)
+(include "memory-graphics.rktl")       ; memory-graphics.ss
+(include "commentary-graphics.rktl")   ; commentary-graphics.ss
+(include "eeg-graphics.rktl")          ; eeg-graphics.ss (the window)
 
 ;;-----------------------------------------------------------------------------
 ;; port: attaching views to a run, and pictures of them
@@ -159,6 +163,47 @@
   (set! *workspace-window* (make-workspace-window width))
   (set! %workspace-graphics% #t)
   *workspace-window*)
+
+;; Every window, as setup.ss's (setup) makes them (without the logo and the
+;; control panel, item 15), with every graphics switch on as setup.ss
+;; defines them.  scale is (setup)'s, for set-window-size-defaults.  The
+;; speed settings are as in attach-workspace-view!.  Call before init-mcat.
+;; Returns an association list of the windows by name.
+(define (attach-views! [scale 1])
+  (set! %num-of-flashes% 1)
+  (set! %flash-pause% 0)
+  (set! %snag-pause% 0)
+  (set! %codelet-highlight-pause% 0)
+  (set! %text-scroll-pause% 0)
+  (set-window-size-defaults scale)
+  (set! *workspace-window* (make-workspace-window))
+  (set! *slipnet-window* (make-slipnet-window *13x5-layout-table*))
+  (set! *coderack-window* (make-coderack-window))
+  (set! *themespace-window* (make-themespace-window *themespace-window-layout*))
+  (set! *top-themes-window* (tell *themespace-window* 'get-window 'top-bridge))
+  (set! *bottom-themes-window* (tell *themespace-window* 'get-window 'bottom-bridge))
+  (set! *vertical-themes-window* (tell *themespace-window* 'get-window 'vertical-bridge))
+  (set! *memory-window* (make-memory-window))
+  (set! *comment-window* (make-comment-window))
+  (set! *trace-window* (make-trace-window))
+  (set! *temperature-window* (make-temperature-window))
+  (set! *EEG-window* (make-EEG-window))
+  (set! %workspace-graphics% #t)
+  (set! %slipnet-graphics% #t)
+  (set! %coderack-graphics% #t)
+  (set! %codelet-count-graphics% #t)
+  (set! %highlight-last-codelet% #t)
+  (list (cons 'workspace *workspace-window*)
+        (cons 'slipnet *slipnet-window*)
+        (cons 'coderack *coderack-window*)
+        (cons 'top-themes *top-themes-window*)
+        (cons 'bottom-themes *bottom-themes-window*)
+        (cons 'vertical-themes *vertical-themes-window*)
+        (cons 'memory *memory-window*)
+        (cons 'commentary *comment-window*)
+        (cons 'trace *trace-window*)
+        (cons 'temperature *temperature-window*)
+        (cons 'EEG *EEG-window*)))
 
 ;; the visible part of a graphics window, as a bitmap
 (define (window->bitmap window)

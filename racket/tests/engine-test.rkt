@@ -147,9 +147,14 @@
 (for ([name '(make-answer-event make-snag-event monitor-new-rules abstract-answer-description
               compare-rule-clause-lists theme-pattern-entries-equal?)])
   (check-true (procedure? (engine name)) (symbol->string name)))
-;; early copies from the graphics files (engine/pending.rktl)
+;; the parts of the panel files the model uses are in the engine (item 14:
+;; engine/theme-, trace- and eeg-graphics.rktl)
 (check-equal? ((engine 'relation-name) #f) "diff")
 (check-equal? ((engine 'relation-name) (engine 'plato-successor)) "succ")
+(check-true (procedure? (engine 'group-event-pexp-text-string)))
+(check-equal? (tell (engine '*EEG*) 'object-type) 'EEG)
+(check-equal? (map car (engine '%EEG-table%)) '(0 1 2))
+(check-false (engine '%coderack-codelet-count-font%) "a view global, #f until views load")
 
 ;; the engine never requires racket/gui (CLAUDE.md, TASK.md): loading it
 ;; into a fresh namespace declares no racket/gui or racket/draw module
