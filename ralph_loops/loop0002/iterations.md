@@ -64,7 +64,7 @@
 - [x] **08 Bridges and breakers.** Translate `bridges.ss` and `breakers.ss`. Tests:
     `bridge-battery.scm`.
 
-- [ ] **09 Rules and answers.** Translate `rules.ss` and `answers.ss` (including
+- [x] **09 Rules and answers.** Translate `rules.ss` and `answers.ss` (including
     `transcribe-to-english`'s `caddr`-of-`#f` crash path). Tests: `rule-battery.scm`.
 
 - [ ] **10 Themes, justification, trace, jootsing, memory.** Translate `themes.ss`,

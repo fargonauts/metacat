@@ -1,0 +1,1 @@
+("Change letter-category of rightmost letter to predecessor" . ("Reverse directions of all objects in string" . ("Swap letter-categories and positions of rightmost letter and" . ("   letter `c'" . ()))))

@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 9/18 SOLVED
+- **Current**: 10/18 SOLVED
 
 ---
 
@@ -1037,3 +1037,126 @@ snag-period end with rule-battery.scm's fake Trace, `b:answered` set by `suspend
 over. rules.ss reaches `equivalent-workspace-objects?`, `find-next-space-position`, themes.ss's
 `diff` and the Themespace's `get-dominant-theme-pattern` (anomalies: "Rules and answers lean on
 later files"). Give them harness stand-ins as item 08 did for the themes helpers.
+
+---
+
+## Iteration 10 — 2026-10-03 22:28
+
+### Completed
+Item 09, rules and answers: **SOLVED**.
+- **Tests first.**
+  - `python/tests/codelet_harness.py` now has the rules setting of
+    `tests/diff/codelet-harness.scm`:
+    - `RULES`/`ANSWERED` (b:rules?, b:answered);
+    - `datum`, `rule_data`, `rule_entry`, with the rules in `structures`;
+    - `update_everything` with `check-if-rules-possible`, the end of a snag period through
+      the Trace and the original's `add-bottom-up-codelets`;
+    - a run that stops after the codelet that reports the first answer.
+  - `python/tests/test_rules.py` covers all 50 tests of `tests/diff/rule-battery.scm`:
+    - 36 problems × every seed, up to the first answer or 2500 codelets;
+    - `first-answers`, put together from the problems' runs in battery order;
+    - twelve rule matrices: apply-rule with ignore-snag, translate, and the generator state
+      after each rule.
+  - The battery's fakes are translated in the test: the Trace, Memory, answer and snag
+    events, abstract descriptions, monitor-new-rules, the Commentary window, suspend and
+    answer-justifier's procedure. So are verbatim copies of the later files' definitions
+    that the oracle has loaded: trace.ss's `equivalent-workspace-objects?`,
+    general-graphics.ss's `find-next-space-position` and themes.ss's `diff` (#f).
+  - Tiers: the slow tier runs the battery in a fork pool. The fast tier runs problem 0's
+    first seed for 300 codelets.
+  - Structural tests check:
+    - every `define` has its Python name;
+    - docstrings name their origin;
+    - there is no tkinter import;
+    - the codelet procedures are installed;
+    - `format-slipnode` is the top-level value;
+    - the load order;
+    - the fixtures reach every rule and answer codelet type, top and bottom rules, answers,
+      snags and both kinds of commentary.
+  - **The crash path.** The battery never crashes. The harness doesn't reach the crash on
+    abc ccbbaa ijk seed 3 either (I checked under Chez: no answer and no error in 2500
+    codelets). So I wrote a local battery first:
+    `python/oracle/batteries/rule-extra-battery.scm`, captured into
+    `python/fixtures/rule-extra/`. Its `transcribe-*` and `change-phrase-*` tests (13)
+    call `transcribe-to-english` and `get-change-phrase` on hand-made clauses over abc
+    ccbbaa ijk. Two of them are Chez's `caddr`-of-`#f` ERROR, which comes from
+    `(3rd BondFacet-change)` at rules.ss:1868 (from the backtrace of
+    `run.ss abc ccbbaa ijk --seed 3`). The others pin the phrases and the line breaking.
+  - Run before either module existed:
+    - fast and structural tier: **23 failed, 2 passed** (the two passing tests check that
+      every test is translated);
+    - slow battery: **50 failed, 1 passed** (`test_what_the_runs_reach`, which reads only
+      the fixtures).
+- **Code** (new): `metacat/rules.py` (2,707 lines) and `metacat/answers.py` (1,607 lines).
+  Two subagents translated them into a staging directory while I wrote the tests, and I
+  copied them in after the failing run. **All 50 battery cases matched Chez byte for byte
+  on the first run** (94 MB of traces, 38 s on 32 cores), and so did the crash cases.
+  Fix outside the item: test_coderack.py left coderack-battery's fake two-argument
+  `breaker` procedure installed. It now restores every codelet procedure when it ends
+  (new anomalies entry).
+- **Mutation checks** (`/tmp/mut9/mutate.py`, not kept; each mutant applied, then
+  test_rules.py run with `-x`, then the file restored; `git status` confirmed). 15 mutants:
+  - **caught by the frozen battery (10):**
+    - translate's `prob? 0.4` → 0.5;
+    - answer-finder's weights without `temp-adjusted-values`;
+    - process-snag not clamping the temperature;
+    - the maximum line length 60 → 50;
+    - the uniformity factor `exp(4(u − 1))` → 5;
+    - the verbatim rule type's pick list reversed;
+    - rule-scout not drawing its rule type;
+    - "also" after the first answer;
+    - "again" only after the second snag;
+    - two `punctuate` changes.
+  - **killed by the local battery (1):** compute-rule-intrinsic-quality's cohesion factor
+    5 → 4. The value is never read (new anomalies entry). I added `quality-*` tests (4) to
+    rule-extra-battery.scm after the code. They read uniformity, abstractness, succinctness,
+    intrinsic quality and quality from hand-made rules. Their Python cases passed at once,
+    and the mutant now fails.
+  - **equivalent (3):**
+    - answer-finder's support test `<` → `<=` (a tie needs coin = p exactly);
+    - the two `apply-slippages` order swaps in `apply-to-change` and
+      `apply-to-object-description`. A Chez probe (logged calls in a `list` inside a lambda,
+      `scheme --script`) gives left to right, which the Python follows. Only the descriptor
+      position ever draws or logs, so the swaps never change a run.
+- **Evaluation order.** No site needed reordering. That agrees with the Racket port, which
+  has no `port:` changes in rules.rktl or answers.rktl.
+  - Every `stochastic-if*` draws its coin first.
+  - Maps with effects use `chez.map_`: instantiate-rule-clause-template, transforms,
+    translate's clause, object-description and translator maps.
+  - The `(list ...)` sites above go left to right, as Chez does.
+  - rules.py has 33 `# chez:`/`# 1.2:` comments and answers.py 11.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`:
+    - an update to "`caddr` of `#f` in `transcribe-to-english`" (the exact site and the
+      Python pin);
+    - an update to "Rules and answers lean on later files" (the Python stand-ins);
+    - new entries: "A battery's fake codelet procedure outlives its test file" and "A rule's
+      intrinsic quality is computed and never read".
+  - `docs/python-translation-plan.md`: "As built (item 09)".
+  - `python/README.md`: the new modules and tests.
+  - `test_fixtures.py` now expects the local battery `rule-extra`.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (842 tests, 102 s).
+
+### Blockers
+None. Left for later items, by design:
+- Translated but not run yet:
+  - answers.ss's answer descriptions and comparisons (theme phrases, `theme-abstractness`,
+    `compare-answers`…), which justify.ss and memory.ss call;
+  - the rule graphics paths (`%workspace-graphics%`);
+  - `apply-transforms`'s `cadr` of `#f` on a GroupCtgy transform without a BondFacet
+    transform (the subagent kept it latent, as in the original).
+- The stand-ins live in test_rules.py: run.ss's `update-everything`, `suspend` and
+  `post-initial-codelets`; trace.ss's `*trace*`, events, `monitor-new-rules` and
+  `equivalent-workspace-objects?`; memory.ss's `*memory*` and abstract descriptions;
+  themes.ss's `diff`; general-graphics.ss's `find-next-space-position`.
+- The full-run crash on abc ccbbaa ijk seed 3 is for the golden-run items.
+
+### Next
+Item 10: themes, justify, trace, jootsing and memory. themes.py must define `diff` (#f),
+`bridge_type_to_theme_type`, `descriptions_affect_themespace_p`, `ignore_descriptions_p`,
+`bridge_theme_compatibility_sigmoid` and `g_themespace`. trace.py must define
+`equivalent_workspace_objects_p`, `make_answer_event`, `make_snag_event`,
+`monitor_new_rules` and `g_trace`. memory.py must define `g_memory` and
+`abstract_answer/snag_description`. Then the harness stand-ins for them can go (where the
+batteries' own fakes don't replace them). answers.py sets
+`_metacat.run.g_temperature_clamped_p`, so run.py (item 11) must define it.

@@ -1,0 +1,1 @@
+("Change position of rightmost letter to leftmost" . ())

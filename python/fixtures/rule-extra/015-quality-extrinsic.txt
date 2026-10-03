@@ -1,0 +1,1 @@
+(("Swap letter-categories and positions" . ("   of rightmost letter and letter `c'" . ("Change length of string to four" . ()))) . (17 . (66 . (67 . (5 . (11 . ()))))))

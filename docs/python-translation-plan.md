@@ -600,6 +600,39 @@ from symbols").
 - **Speed**: the 530 runs of 1000 codelets take 217 s of CPU, about 0.4 ms per codelet,
   14 s on 32 cores.
 
+### As built (item 09)
+
+- **Modules**: rules.py (`Rule`, the closure of make-rule, delegating to a
+  `WorkspaceStructure`; `ExtrinsicChangeDescription` and `IntrinsicChangeDescription`; the
+  three rule codelets; abstraction, application, quality and the English transcription)
+  and answers.py (answer-finder, `report-new-answer`, snags, the slippage log as a
+  `SlippageLog` class, `translate`, and the answer-description and comparison phrases that
+  justify.ss and memory.ss use). Each `load()` installs its codelet procedures. rules.py's
+  also makes `*rule-dimension-order*` and registers `format-slipnode` as a top-level value.
+- **Names from files not translated yet**, read through the package at call time:
+  run.ss (`update-everything`, `suspend`, `post-initial-codelets`,
+  `*temperature-clamped?*`, which process-snag sets); trace.ss (`*trace*`,
+  `make-answer-event`, `make-snag-event`, `monitor-new-rules`,
+  `equivalent-workspace-objects?`, `entries`); memory.ss (`*memory*`,
+  `abstract-answer/snag-description`); themes.ss (`*themespace*`, `diff`); justify.ss;
+  general-graphics.ss's `find-next-space-position` (every make-rule); and the graphics,
+  gated. test_rules.py supplies rule-battery.scm's fakes, plus verbatim copies of
+  `find-next-space-position`, `equivalent-workspace-objects?` and `diff`.
+- **Strings**: every English phrase, commentary line and format result is a
+  `chez.String`, so the battery's `(comment add-comment ("..." ...))` events and
+  get-concept-pattern's `(filter-out symbol? ...)` see strings, not symbols.
+- **Evaluation order**: no site needed reordering. answers.ss's `apply-to-change` and
+  `apply-to-object-description` call `apply-slippages` two or three times inside a
+  `(list ...)`; those calls can draw (coattail `prob?`) and log. A Chez probe (a `list` of
+  logged calls inside a lambda, under `scheme --script`) evaluates them left to right, and
+  the Python does the same. The battery can't tell them apart, because only the descriptor
+  position ever draws. Every `stochastic-if*` draws its coin first; maps with effects use
+  `chez.map_`; translate-rule-clause's `prob? 0.4` filter goes first to last.
+- **Crash path**: `get-change-phrase`'s `(3rd #f)` raises `chez.SchemeError("caddr", ...)`
+  (anomalies: "`caddr` of `#f` in `transcribe-to-english`").
+- **Speed**: the rule battery (36 problems, every seed, up to 2500 codelets or the first
+  answer, plus twelve matrices) takes about 9 min of CPU, 38 s on 32 cores.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

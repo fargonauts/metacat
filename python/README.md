@@ -133,3 +133,18 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   strength stays under 100. Until themes.py exists, the harness's `STAND_INS` carries
   copies of the themes.ss helpers that bridges call (`bridge-type->theme-type`,
   `descriptions-affect-themespace?`, `bridge-theme-compatibility-sigmoid`).
+- `metacat/rules.py`: rules.ss (rules, change descriptions, the rule scout, evaluator and
+  builder, rule abstraction, application and quality, and the English transcription,
+  including the `caddr`-of-`#f` crash).
+- `metacat/answers.py`: answers.ss (answer-finder, answers and snags with their
+  commentary, the slippage log, rule translation, and answer descriptions).
+
+  Tests: `tests/test_rules.py`, every test of `tests/diff/rule-battery.scm` through the
+  harness with bridges and rules on (`codelet_harness.RULES`): traces up to the first answer
+  of every problem and seed, the first-answers summary and twelve rule matrices. Slow tier,
+  fork pool (about 38 s on 32 cores); the fast tier runs the first 300 codelets of
+  problem 0. rule-battery.scm's fakes (Trace, Memory, events, Commentary, suspend) and
+  verbatim copies of `find-next-space-position`, `equivalent-workspace-objects?` and `diff`
+  are stand-ins until items 10 and 11. `oracle/batteries/rule-extra-battery.scm` pins
+  `transcribe-to-english` on hand-made clauses, the crash included, and rules' quality
+  values.

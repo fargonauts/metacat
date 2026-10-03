@@ -1,0 +1,1 @@
+("Reverse directions of all objects in string" . ("Change length of string to four" . ("Change lengths of all objects in string to two" . ())))

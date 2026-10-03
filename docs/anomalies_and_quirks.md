@@ -40,6 +40,17 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Update (iteration 11, item 10):** the port crashes at the same point, raising
   `caddr: contract violation ... given: #f`, after the same 1062 trace lines.
   racket/tests/golden-test.rkt runs the oracle on this problem and checks both.
+- **Update (loop0002 iteration 10, item 09):** the crash is `get-change-phrase`'s
+  `(3rd BondFacet-change)`, rules.ss line 1868: a `self` GroupCtgy change with no BondFacet
+  change among the rule's changes leaves `BondFacet-change` `#f` (Chez: "Exception in
+  caddr: incorrect list structure #f", frames rules.ss 71194 → 67689 → transcribe-to-english
+  → make-rule). The Python port raises `chez.SchemeError("caddr", ...)` at the same place.
+  `python/oracle/batteries/rule-extra-battery.scm` pins it from Chez on hand-made clauses
+  (`transcribe-group-category-without-bond-facet`, `change-phrase-group-category-crash`,
+  both ERROR), next to the same clause with a BondFacet change, which transcribes. The
+  rule-battery harness doesn't reach the crash on abc ccbbaa ijk seed 3 (no themes or
+  self-watching; no answer and no error in 2500 codelets), so the full run is left to the
+  golden runs.
 
 ### `bonds-equal?` calls `same-direction?`, which nothing defines
 - **Seen:** iteration 8 (item 07), compiling bonds.ss.
@@ -583,6 +594,17 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   slipnodes and the coderack when it ends. Later test files that change engine state should
   do the same.
 
+### A battery's fake codelet procedure outlives its test file
+- **Seen:** loop0002 iteration 10 (item 09), the first gate run with test_rules.py.
+- **What:** coderack-battery.scm gives `breaker` a fake two-argument procedure
+  (`define-codelet-procedure*`). test_coderack.py ran it in the shared engine and left it
+  installed, so test_rules.py, which runs later, failed the moment the real coderack chose
+  a breaker: `TypeError: breaker() missing 2 required positional arguments`. test_bridges.py
+  runs breakers too, but runs before test_coderack.py, so this had stayed hidden.
+- **Evidence:** `bash python/run-tests.sh` before the fix (test_rules.py passed alone).
+- **Status:** worked around: test_coderack.py's module fixture restores every codelet type's
+  procedure when it ends. This is the same trap as the entry above.
+
 ### Python's comparisons of `Fraction` with `float` are exact, like Chez's
 - **Seen:** loop0002 iteration 7 (item 06), formulas.py.
 - **What:** `Fraction(4, 5) >= 0.8` is `False` in Python, as `(>= 4/5 0.8)` is `#f` in
@@ -754,6 +776,18 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   a one-argument `*`, harmless.
 - **Status:** not a bug; ported verbatim.
 
+### A rule's intrinsic quality is computed and never read
+- **Seen:** loop0002 iteration 10 (item 09), a surviving mutant.
+- **What:** `set-quality-values` sets `intrinsic-quality` from
+  `compute-rule-intrinsic-quality` (both marked "temporary" in rules.ss), and the rule
+  answers `get-intrinsic-quality`, but no file sends that message. So the value can't
+  affect a run, and rule-battery.scm can't see it: a mutant of its cohesion factor
+  (`exp(5(u − 1))` → `exp(4(u − 1))`) passed the whole battery.
+- **Evidence:** `grep -n "get-intrinsic-quality" chez_scheme/original/*.ss` (only the
+  definition); `python/oracle/batteries/rule-extra-battery.scm`'s `quality-*` tests read it
+  directly, and they kill the mutant.
+- **Status:** not a bug (dead value); ported verbatim.
+
 ### A horizontal bridge's internal-coherence factor never shows in the batteries
 - **Seen:** loop0002 iteration 9 (Python item 08), mutation testing bridges.py.
 - **What:** `calculate-internal-strength` multiplies by 2.5 when a bridge is internally
@@ -791,6 +825,13 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around. engine/pending.rktl has early verbatim copies of the pure
   definitions (`find-next-space-position`, `equivalent-workspace-objects?`, `diff`),
   which items 10 and 12 move back; the colours are `#f` stand-ins until the GUI items.
+- **Update (loop0002 iteration 10, item 09):** the Python port reads all of them through
+  the package at call time (`_metacat.general_graphics.find_next_space_position`,
+  `_metacat.trace.equivalent_workspace_objects_p`, `_metacat.themes.diff`), and
+  `process-snag` sets `_metacat.run.g_temperature_clamped_p`. Until those modules exist,
+  python/tests/test_rules.py supplies verbatim test-side copies as stand-ins. The oracle has
+  the real definitions loaded, so these are the real ones there. Items 10 and 11 replace
+  them.
 - **Update (iteration 18, item 17):** done: `diff` and `equivalent-workspace-objects?`
   are in engine/themes.rktl and engine/trace.rktl (item 10), `find-next-space-position`
   in engine/general-graphics.rktl (item 13), and the colours are view globals

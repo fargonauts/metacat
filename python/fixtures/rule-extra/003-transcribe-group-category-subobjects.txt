@@ -1,0 +1,1 @@
+("Reverse starting and ending points of all objects in string" . ())

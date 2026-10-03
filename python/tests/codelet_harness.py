@@ -9,8 +9,8 @@ header explains the restrictions); `compact` is b:compact, the trace line printe
 Each definition below is the harness's definition of the same name (b:x → x).
 The procedures of workspace-dump.scm come from test_workspace.py, which translates
 them.  Item 07 uses the bonds-and-groups setting; item 08 adds the bridges
-setting (`enable_bridges`, b:enable-bridges!).  b:rules? (item 09) stays #f, and
-the code paths it enables are not translated here.
+setting (`enable_bridges`, b:enable-bridges!); item 09 the rules setting
+(`RULES`, b:rules?, with `ANSWERED`, b:answered), which test_rules.py turns on.
 
 `install()` makes the harness's top-level settings and fakes (b:set-global! ...):
 call it once, after engine.load(), inside the stand-ins of STAND_INS.
@@ -23,9 +23,9 @@ from contextlib import redirect_stdout
 from scheme_canon import canon
 from test_workspace import (PROBLEMS, deep_nm, dump_description, dump_object, get_global,
                             init_problem, nm, set_global, update_workspace_values)
-from metacat import chez, coderack, setup, slipnet, utilities
+from metacat import chez, coderack, setup, slipnet, sugar, utilities
 from metacat.chez import String
-from metacat.objects import Lambda, tell
+from metacat.objects import Lambda, procedure_p, tell
 
 # Settings and fakes ---------------------------------------------------------------------
 
@@ -214,7 +214,7 @@ def strings():
 
 
 def structures():
-    """codelet-harness.scm: b:structures (b:rules? is #f: no rules)"""
+    """codelet-harness.scm: b:structures"""
     out = []
     for s in strings():
         for b in tell(s, "get-bonds"):
@@ -229,7 +229,49 @@ def structures():
                     tell(b, "get-time-stamp"), cm_names(tell(b, "get-concept-mappings")),
                     cm_names(tell(b, "get-bond-concept-mappings")),
                     cm_names(tell(b, "get-symmetric-slippages"))])
+    if RULES[0]:
+        out.extend(rule_entry(r) for r in tell(get_global("*workspace*"), "get-all-rules"))
     return out
+
+
+def datum(x):
+    """codelet-harness.scm: b:datum (rule clauses, failure results, transforms as data)"""
+    if isinstance(x, list) and not isinstance(x, chez.Vector):
+        return [datum(y) for y in x]
+    if isinstance(x, chez.Pair):
+        a = datum(x.car)
+        return chez.Pair(a, datum(x.cdr))
+    if not procedure_p(x):
+        return x
+    if utilities.slipnode_p(x):
+        return nm(x)
+    if utilities.letter_p(x) or utilities.group_p(x):
+        return obj_id(x)
+    if utilities.workspace_string_p(x):
+        return ["string", tell(x, "get-string-type")]
+    if utilities.bridge_p(x):
+        return bridge_data(x)
+    if utilities.concept_mapping_p(x):
+        return ["cm", tell(x, "print-name")]
+    return "object"
+
+
+def rule_data(rule):
+    """codelet-harness.scm: b:rule-data"""
+    return ["rule", tell(rule, "get-rule-type"), tell(rule, "get-english-transcription"),
+            datum(tell(rule, "get-rule-clauses"))]
+
+
+def rule_entry(rule):
+    """codelet-harness.scm: b:rule-entry"""
+    return [rule_data(rule), tell(rule, "get-proposal-level"), tell(rule, "get-strength"),
+            tell(rule, "get-time-stamp"),
+            [tell(rule, "get-quality"), tell(rule, "get-relative-quality"),
+             tell(rule, "get-uniformity"), tell(rule, "get-abstractness"),
+             tell(rule, "get-succinctness")],
+            tell(rule, "supported?"),
+            datum(tell(rule, "get-tagged-supporting-horizontal-bridges")),
+            tell(rule, "get-theme-pattern")]
 
 
 def difference(after, before):
@@ -283,6 +325,8 @@ def dump_ws_object(obj):
 UNCLAMP_TIME = [0]          # b:unclamp-time
 BRIDGES = [False]           # b:bridges?
 BOTTOM_UP_TYPES: list = []  # b:bottom-up-types (set by enable_bridges)
+RULES = [False]             # b:rules?
+ANSWERED = [False]          # b:answered
 
 
 def bond_group_slipnodes():
@@ -344,12 +388,24 @@ def add_bottom_up_codelets():
 
 
 def update_everything():
-    """codelet-harness.scm: b:update-everything (b:rules? is #f)"""
+    """codelet-harness.scm: b:update-everything"""
+    if RULES[0]:
+        tell(get_global("*workspace*"), "check-if-rules-possible")
     update_workspace_values()
+    # run.ss's end of a snag period, with rule-battery.scm's fake Trace
+    if RULES[0]:
+        trace = get_global("*trace*")
+        if tell(trace, "within-snag-period?") is not False:
+            progress_achieved = tell(trace, "progress-since-last-snag")
+            sugar.stochastic_if_star(lambda: utilities.percent(progress_achieved),
+                                     lambda: tell(trace, "undo-snag-condition"))
     slipnet.update_slipnet_activations()
     import metacat.formulas as formulas
     formulas.update_temperature()
-    add_bottom_up_codelets()
+    if RULES[0]:
+        coderack.add_bottom_up_codelets()
+    else:
+        add_bottom_up_codelets()
     coderack.add_top_down_codelets()
     tell(coderack.g_coderack, "post-deferred-codelets")
 
@@ -379,12 +435,13 @@ def map_objects(f):
 def run_codelets(strings_, seed, k):
     """codelet-harness.scm: b:run-codelets, as a list of trace entries"""
     init_problem(strings_, seed)
+    ANSWERED[0] = False
     tell(coderack.g_coderack, "initialize")
     clamp_initial_slipnodes()
     post_initial_codelets()
     cycle_length = get_global("%update-cycle-length%")
     trace = [["start", strings_, seed, chez.random_seed(), map_objects(dump_ws_object)]]
-    while setup.g_codelet_count != k:
+    while setup.g_codelet_count != k and not ANSWERED[0]:
         entry = step()
         trace.append(entry)
         if setup.g_codelet_count == UNCLAMP_TIME[0]:

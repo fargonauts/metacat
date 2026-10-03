@@ -292,9 +292,14 @@ def battery_engine():
             stack.enter_context(engine_module(name, **attrs))
         # setup.ss's window globals are changed by setup-commands; restore them
         saved = {k: getattr(setup, k) for k in vars(setup) if k.startswith(("g_", "p_"))}
+        # the battery gives breaker a fake procedure (define-codelet-procedure*);
+        # later test files run the real codelets, so restore every procedure
+        procs = [(t, t.codelet_proc) for t in coderack.g_codelet_types]
         yield
         for k, v in saved.items():
             setattr(setup, k, v)
+        for t, proc in procs:
+            t.codelet_proc = proc
 
 
 # Section 1: setup.ss defaults, before anything changes them ---------------------------

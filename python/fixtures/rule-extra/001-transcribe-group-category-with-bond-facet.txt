@@ -1,0 +1,1 @@
+("Reverse starting and ending letter-categories of string" . ())
