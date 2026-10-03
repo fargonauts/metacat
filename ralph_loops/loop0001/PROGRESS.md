@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 16/18 SOLVED
+- **Current**: 17/18 SOLVED
 
 ---
 
@@ -1791,3 +1791,95 @@ resumed by a click on the Workspace, and Reset.
   Go resumes the stopped run. The original has no separate Pause button, so the port
   keeps its four buttons. The seed is typed after the problem ("abc abd xyz 7"), as in
   gui.ss.
+
+---
+
+## Iteration 17 — 2026-10-03 04:40
+Item 16 (Demos, packaging, README): **SOLVED**. The standalone program, built with
+`raco exe` + `raco distribute`, runs `abc abd xyz` from a clean directory, in a sandbox
+without Racket. It prints what racket/cli.rkt prints and writes the Run 7 golden trace
+byte for byte. It also opens the GUI.
+
+### Completed
+- **Demos.** demos.ss was already ported verbatim (`racket/engine/demos.rktl`, item 15).
+  - **The seed caveat**, written up in **`docs/demos.md`**: a table of every demo with
+    what demos.ss's comments or the dissertation's Chapter 5 document (answer, time
+    step, page), against what the oracle and the port do. A subagent read Chapter 5.
+  - **These replay:** Runs 1, 2, 3, 4, 5 and 7, Figs. 5.7/5.8, misc1/2/4/5/9.
+    - Run 4 was listed in item 01 as not replaying. It does: the dissertation's Run 4
+      also gives up at 3228.
+  - **These don't:** Run 6 (5976 vs 6196), Run 8 (qeeeq at 1013 vs no answer),
+    fig5.5-bottom (qxeeq vs qeeq), fig5.11 (a continuation of another run), eqe-qeeeq
+    (qcccb), misc3 and misc6–8.
+  - The anomalies entry and porting-notes are corrected. demos.md also explains why the
+    port follows the oracle, and repeats demos.ss's advice to clear the Memory first.
+- **The standalone program.**
+  - `racket/metacat.rkt`: no arguments (or a scale) opens the GUI; otherwise it is the
+    CLI (cli.rkt now provides `cli-main`); `--help`.
+  - `make-dist.sh [DEST]` (default `build/metacat`, gitignored) runs raco make, then
+    `raco exe --gui`, then `raco distribute`, and adds README and LICENSE. About 6 s,
+    70 MB.
+  - **Bug found:** main.rkt's `dynamic-require` of a runtime path isn't embedded by
+    raco exe, so the distributed GUI exited 1. main.rkt and metacat.rkt now use
+    `lazy-require`. Requiring them still doesn't load racket/gui.
+- **README.md** rewritten:
+  - what Metacat is (Copycat's successor, self-watching);
+  - credits (James Marshall; Melanie Mitchell's Copycat, FARG) and the GPL v2+;
+  - running the GUI (problem syntax, seeds, justify, buttons, Demos), the CLI and the
+    standalone program;
+  - the oracle method in five steps, tests and their requirements, layout, the loop;
+  - three screenshots in `docs/screenshots/`.
+- **Tests**:
+  - **`racket/gui-tests/dist-test.rkt`** (run by run-tests.sh under xvfb-run; about
+    10 s). It builds the distribution into a temporary directory and runs it from
+    another empty directory with a minimal environment. When `bwrap` exists (it does
+    here), the program runs in a sandbox where /usr/share/racket,
+    /usr/lib/x86_64-linux-gnu/racket, /home (so the repo) and /tmp are empty.
+    - `metacat abc abd xyz --seed 3852097033 --max-codelets 10000 --trace F`: exit 0,
+      stdout equal to cli.rkt's, F equal to the golden;
+    - `metacat abc abd xyz` with a clock seed answers;
+    - bad arguments exit 2;
+    - `metacat` with no arguments opens the control panel and the 10 other windows
+      (`xwininfo`), stays up and writes nothing to stderr.
+  - **`racket/tests/demos-test.rkt`** (about 2.5 s):
+    - the 35 demo problems equal the original's (read from demos.ss), and misc6–9 stay
+      undefined;
+    - every demo problem and seed is a golden run;
+    - 12 documented outcomes replay in the port through the CLI (answers with codelets,
+      and the final count).
+  - **control-panel-test.rkt** (now 211 checks): each of the 35 Demos menu items, in
+    gui.ss's order, loads its problem and seed (codelets 0, generator state = seed,
+    info label) and is the only item checked.
+- **Tests first, honestly:** no. metacat.rkt and make-dist.sh were spiked first, by
+  building and running the exe by hand. The tests came after, but each was checked to
+  fail against broken code:
+  - with HEAD's main.rkt, dist-test fails 2 of 3 ("the GUI is still up": actual 1);
+  - with the GUI dispatch disabled in metacat.rkt, it fails 1;
+  - one changed seed in demos.rktl fails demos-test (the GUI test reads the engine's
+    own value, so it doesn't catch that);
+  - Run 3's menu item loading run4 fails 2 GUI checks.
+  - My own first dist-test runs failed or hung on harness mistakes: a missing
+    `--max-codelets` for the golden, a sandboxed GUI that outlived its killed bwrap
+    (now `--die-with-parent`; anomalies), and a stdout check lost to SIGKILL buffering.
+- **What I saw** (Read on the PNGs): the full-screen Run 7 shot shows `wyz` with both
+  rules, crossed bridges, the Coderack, a commentary of snags and the answer, the
+  Slipnet, themes, a Trace of snags and clamps, and Memory with SNAG and wyz, as in
+  Figs. 5.10/5.11. The `abc abd mrrjjj` seed 1 Workspace at 513 codelets matches item
+  13's picture and the dissertation's p224 figure.
+- Docs: demos.md (new); anomalies (demo seeds revised; `dynamic-require` under raco
+  exe; bwrap orphan); porting-notes (item 16 section, run4 note); CLAUDE.md
+  (make-dist line).
+- `python3 ralph_loops/loop0001/gate.py`: **GATE PASSED** (`raco test racket/`: 2560
+  tests; GUI tests: 214). `chez_scheme/original/` and `tests/golden/` untouched.
+
+### Blockers
+- None. Only Linux was built and tested. On macOS and Windows, make-dist.sh's `raco exe
+  --gui` makes an app or exe whose layout differs, and the sandbox paths in dist-test
+  are Linux-only.
+
+### Next
+- Item 17 (final audit) in iterations.md. Notes:
+  - docs/demos.md lists the demos that don't replay; the audit may want to say this in
+    divergences.md (it is not a port divergence: the oracle agrees with the port).
+  - The gate is about 10 min. The GUI tests now include a 70 MB build (dist-test), in
+    a temporary directory that is deleted afterwards.

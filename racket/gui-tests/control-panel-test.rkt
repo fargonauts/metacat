@@ -272,6 +272,36 @@
   (check-true (send run7-item is-checked?) "the demo chosen is highlighted")
   (check-equal? (state) '(0 3852097033))
 
+  ;; --- item 16: every Demos menu item, submenus included, initializes its
+  ;; demos.ss problem with its seed, in gui.ss's order, and is the only one
+  ;; highlighted
+  (define (demo-items menu)
+    (apply append
+           (for/list ([i (send menu get-items)])
+             (cond [(is-a? i g:checkable-menu-item%) (list i)]
+                   [(is-a? i g:menu%) (demo-items i)]
+                   [else '()]))))
+  (define all-demo-items (demo-items demos))
+  (define demo-problems
+    (list run1 run2 run3 run4 run5 run6 run7 run8
+          abc-xyd abc-wyz abc-dyz rst-xyu rst-wyz rst-uyz abc-mrrkkk abc-mrrjjjj
+          xqc-mrrkkk xqc-mrrjjjj eqe-baaab eqe-aaabaaa eqe-qeeeq eqe-aaabccc
+          fig5.4-top fig5.4-bottom fig5.5-top fig5.5-bottom
+          fig5.7 fig5.8 fig5.10 fig5.11
+          misc1 misc2 misc3 misc4 misc5))
+  (check-equal? (length all-demo-items) (length demo-problems))
+  (for ([item all-demo-items] [problem demo-problems])
+    (send item command (new g:control-event% [event-type 'menu]))
+    (wait-idle)
+    (define label (send (W 'info-label) get-label))
+    (define seed (car (reverse problem)))
+    (check-equal? (state) (list 0 seed) (send item get-label))
+    (check-true (and (regexp-match? (regexp-quote (format "~a -> ~a" (car problem) (cadr problem)))
+                                    label)
+                     (regexp-match? (format "seed: +~a " seed) label))
+                (format "~a: ~s" (send item get-label) label))
+    (check-equal? (filter (lambda (i) (send i is-checked?)) all-demo-items) (list item)))
+
   ;; done: hide every window and stop the refresh timer, so that the
   ;; eventspace, and the process, can end
   (for ([w (g:get-top-level-windows)]) (send w show #f))

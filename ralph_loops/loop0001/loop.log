@@ -93,3 +93,9 @@
 [2026-10-03 03:28:10] claude session it16 (cap 3.00 h) -> session_it16.log
 [2026-10-03 04:08:32] session it16: ok (exit 0, 107 tool calls)
 [2026-10-03 04:16:09] tests passed: GATE PASSED
+[2026-10-03 04:16:09] committed 5444ff5: 15 The control panel and windows. Port `gui.ss` to `racket/gui`: the c
+[2026-10-03 04:16:11] pushed 5444ff5 to origin
+[2026-10-03 04:16:11] === iteration 17: 16 Demos, packaging, README. Port `demos.ss` (with the seed caveat from item
+[2026-10-03 04:16:11] claude session it17 (cap 3.00 h) -> session_it17.log
+[2026-10-03 04:37:04] session it17: ok (exit 0, 90 tool calls)
+[2026-10-03 04:43:58] tests passed: GATE PASSED

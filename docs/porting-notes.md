@@ -119,7 +119,9 @@ Chez 10 without SWL, and what that reveals for the port.
 - **Seeds that do not replay.** Besides misc3 (item 01), run4
   (`abc abd xyz dyz` 2836825623, documented answer dyz) gives up without
   an answer at codelet 3228 in the oracle. It is kept in the golden set:
-  the golden records what the oracle does.
+  the golden records what the oracle does. (Item 16: the dissertation's
+  Run 4 gives up at 3228 too, so run4 does replay. The full comparison is
+  in docs/demos.md.)
 
 ## The compatibility layer (item 03)
 `racket/compat.rkt` (syntactic-sugar.ss plus Chez built-ins) and
@@ -1526,3 +1528,60 @@ differ):
     equivalent, since `switch-to-input-mode` clears it too.
 - `tests/gui-screenshot.rkt OUT.png PROBLEM... [--break N]` grabs the whole virtual
   screen (Python PIL) after a run driven through the panel. It is not in the suite.
+
+## Demos, the standalone program, README (item 16)
+
+### Demos
+- demos.ss was already in the engine (`racket/engine/demos.rktl`, verbatim, item 15),
+  because the Demos menu reads it. Item 16 adds its tests and the seed caveat.
+- **The seed caveat**, `docs/demos.md`: a table of every demo with what demos.ss or the
+  dissertation documents (answer, time step, page), against what the oracle (and so
+  the port) does. A subagent read the dissertation's Chapter 5 for it.
+  - Replay: Runs 1–5 and 7, Figs. 5.7/5.8, misc1/2/4/5/9. Run 4 replays too: the
+    dissertation's run also gives up at 3228.
+  - Don't replay: Runs 6 and 8, fig5.5-bottom, fig5.11 (a continuation of another run),
+    eqe-qeeeq, misc3, misc6–8.
+  - The port follows the oracle wherever the two differ.
+- `racket/tests/demos-test.rkt`:
+  - all 35 demo problems in the engine equal the original demos.ss, read with `read`;
+    misc6–9 stay undefined;
+  - every demo problem and seed is a golden run in tests/problems.txt;
+  - 12 documented outcomes replay in the port through `racket/cli.rkt` (answers,
+    codelets and the final count), in parallel processes, in about 2.5 s.
+- control-panel-test.rkt: each of the 35 Demos menu items, submenus included, in gui.ss's
+  order, loads its problem and seed (codelets 0, generator state = seed, info label) and
+  is the only item checked (211 checks now).
+
+### The standalone program
+- `racket/metacat.rkt` is the executable's entry point. With no arguments, or with one
+  number (the scale), it opens the GUI as racket/main.rkt does. Anything else goes to
+  racket/cli.rkt's `main`, which cli.rkt now also provides as `cli-main`, with the same
+  output and exit codes.
+- **`lazy-require` instead of `dynamic-require`**: `raco exe` embeds only modules it can
+  see. main.rkt's `dynamic-require` of a `define-runtime-path` made the distributed GUI
+  exit 1 (anomalies). main.rkt and metacat.rkt now use `lazy-require`. Requiring either
+  module still doesn't load racket/gui.
+- `make-dist.sh [DEST]` (default `build/metacat`, gitignored) runs `raco make`, then
+  `raco exe --gui`, then `raco distribute`, and copies README.md and LICENSE. It takes
+  about 6 s and makes 70 MB: bin/metacat, the gracket CS runtime in lib/plt, and gui.ss's
+  help.txt, which `define-runtime-path` brings along.
+- `racket/gui-tests/dist-test.rkt` (run under xvfb-run with the GUI tests, about 10 s):
+  - It builds the distribution into a temporary directory and runs it from another
+    empty directory, with a minimal environment.
+  - When `bwrap` exists, the program runs in a sandbox where /usr/share/racket,
+    /usr/lib/x86_64-linux-gnu/racket, /home and /tmp are empty.
+  - `metacat abc abd xyz --seed 3852097033 --max-codelets 10000 --trace F` prints what
+    cli.rkt prints, and F equals the Run 7 golden byte for byte. Without a seed it
+    answers. Bad arguments exit 2.
+  - `metacat` with no arguments opens all 11 windows of `setup` and the control panel
+    (listed with `xwininfo`), stays up, and writes nothing to stderr.
+  - Mutations: HEAD's main.rkt (dynamic-require) fails 2 checks; GUI dispatch disabled
+    in metacat.rkt fails 1.
+
+### README and screenshots
+- README.md covers what Metacat is, the credits (Marshall; Mitchell's Copycat), the
+  GPL, the GUI, the CLI and the standalone program, the oracle, the tests and the
+  layout.
+- Screenshots in `docs/screenshots/`, taken on Xvfb with tests/gui-screenshot.rkt:
+  - `run7-wyz.png`: the whole screen after Run 7;
+  - crops of the Workspace for Run 7 and for `abc abd mrrjjj` seed 1 at 513 codelets.

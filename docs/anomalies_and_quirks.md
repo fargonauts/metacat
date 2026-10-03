@@ -141,24 +141,45 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 ## 🌀 Anomalies
 
 ### Most documented demo seeds replay exactly; a few don't
-- **Seen:** iteration 2 (item 01).
-- **What:** the seeds in `demos.ss` were chosen by Marshall around 1999–2003. These still
-  reproduce under Chez 10, with the same answers at the same codelet counts:
+- **Seen:** iteration 2 (item 01). Revised in iteration 17 (item 16), which compared every
+  demo with the dissertation's Chapter 5.
+- **What:** the seeds in `demos.ss` were chosen by Marshall around 1999–2003. Under Chez 10
+  most of them still give the same answers at the same codelet counts:
   - misc1: mmmrrj at 7794
   - misc2: abd at 1126
   - misc4: b at 453, y at 945
   - misc5: flz, dlz, hlz at 1721
   - misc9: dyz at 2257
+  - Run 2: mrrkkk at 1747
+  - Run 3: uyz at 3163
+  - Run 4: no answer; it gives up at 3228. Item 01 listed run4 as not replaying because
+    demos.ss names the answer dyz, but the dissertation's Run 4 never finds the rule
+    either, and a Jootser ends it at 3228 (p. 226). So it does replay.
+  - Run 5: gives up at 4493
+  - Run 7: wyz at 2170
+  - Figs. 5.7/5.8: ijll at 1172, hjkk at 733
 
   These don't reproduce:
-  - misc3
-  - the "not used" misc6–8
-  - run4 (`abc abd xyz dyz` 2836825623; documented answer dyz): it gives up without an
-    answer at codelet 3228
-- **Evidence:** `chez_scheme/oracle/tests/demo-replay-check.ss`.
+  - misc3, and the "not used" misc6–8;
+  - Run 6: aaabccc at 5976, where the dissertation gives up at 6196;
+  - Run 8: qeeeq at 1013, where the dissertation never answers and a Jootser ends the run
+    at 5933;
+  - fig5.5-bottom: qxeeq, where the figure shows qeeq;
+  - the eqe-qeeeq demo: it answers qcccb;
+  - fig5.11: xyd, where the dissertation shows yyz. The dissertation says that run
+    continues the one in Fig. 4.12, so a seed alone can't reproduce it.
+
+  Also, fig5.4-bottom (seed 175910650) and fig5.5-bottom (seed 4109591222) both stop at
+  codelet 2899, with different traces and different answers (qeeq and qxeeq). This looks
+  like a coincidence.
+- **Evidence:** `chez_scheme/oracle/tests/demo-replay-check.ss` (the original);
+  `racket/tests/demos-test.rkt` (the port); the table in `docs/demos.md`; the goldens of
+  every demo seed.
 - **Status:** open. Chez's global `random` has evidently been the same 32-bit LCG for
-  decades. Why the few misses? It could be the evaluation-order changes below, a different
-  original version, or a lost setting.
+  decades, and the replaying runs include long ones (misc1 runs 7794 codelets), so most of
+  the program's draws are unchanged. The misses could come from code changes between the
+  dissertation (1999) and version 1.2, from changes in Chez's argument evaluation order,
+  or from a lost setting.
 
 ### A string image's `reset` forgets its original direction
 - **Seen:** iteration 6 (item 05).
@@ -359,6 +380,26 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `critical-section`.
 - **Status:** explained and fixed: a receive is now atomic, and `critical-section` runs
   in Racket's atomic mode.
+
+### `dynamic-require` of a runtime path breaks under `raco exe`
+- **Seen:** iteration 17 (item 16), building the standalone program.
+- **What:** racket/main.rkt loaded the GUI with `(dynamic-require gui-path 'setup)`, where
+  `gui-path` came from `define-runtime-path`. That works with `racket`, but `raco exe` does
+  not embed a module that is only reached that way. The distributed `metacat` then exits
+  with status 1 as soon as it opens the GUI. Headless runs were not affected, because they
+  never reach that module.
+- **Evidence:** with HEAD's racket/main.rkt, `racket/gui-tests/dist-test.rkt` fails 2 of 3
+  checks ("the GUI is still up": actual 1).
+- **Status:** worked around. main.rkt and racket/metacat.rkt use `lazy-require`, which
+  registers the module with `raco exe` and still loads racket/gui only when the GUI starts.
+
+### A process in a bubblewrap sandbox outlives its killed `bwrap`
+- **Seen:** iteration 17 (item 16), in the first version of dist-test.rkt.
+- **What:** killing `bwrap` left the sandboxed GUI running, re-parented to the session.
+  It kept the test's stdout pipe open, so the test hung on reading it.
+- **Evidence:** `ps` showed `/opt/metacat/bin/../lib/plt/gracketcs-8.18 ...` with parent
+  4284 (the session) after the test had killed bwrap.
+- **Status:** worked around. The test passes `--die-with-parent --unshare-pid` to bwrap.
 
 ## 🔗 Hidden couplings
 

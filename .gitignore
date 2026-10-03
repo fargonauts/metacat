@@ -6,3 +6,4 @@ __pycache__/
 ralph_loops/*/session_*.jsonl
 ralph_loops/*/status.json
 ralph_loops/*/nohup.out
+build/

@@ -23,19 +23,20 @@
 ;; its control panel, as typing (setup) after loading metacat.ss did.  Type a
 ;; problem such as "abc abd xyz" (optionally an answer and a seed: "abc abd
 ;; xyz 7") and press Enter, then Go or Step.  racket/gui is loaded only when
-;; main runs (dynamic-require), so requiring this module stays headless.
+;; main runs (lazy-require), so requiring this module stays headless.
+;; lazy-require also tells raco exe to embed gui/gui.rkt (the standalone
+;; executable, racket/metacat.rkt).
 
-(require racket/runtime-path)
+(require racket/lazy-require)
+
+(lazy-require ["gui/gui.rkt" (setup)])
 
 (provide metacat-version main)
-
-(define-runtime-path gui-path "gui/gui.rkt")
 
 (define metacat-version "1.2")
 
 (define (main . args)
-  (let ((setup (dynamic-require gui-path 'setup))
-        (scale (if (null? args) 1 (or (string->number (car args)) 1))))
+  (let ((scale (if (null? args) 1 (or (string->number (car args)) 1))))
     (setup scale)))
 
 (module+ main

@@ -113,7 +113,7 @@
     Tests: drive the GUI headlessly (or in an `xvfb-run` session) through a full run,
     step mode and a stop/restart; screenshot the whole window and inspect it.
 
-- [ ] **16 Demos, packaging, README.** Port `demos.ss` (with the seed caveat from item
+- [x] **16 Demos, packaging, README.** Port `demos.ss` (with the seed caveat from item
     01), build a standalone executable with `raco exe` + `raco distribute`, and write
     `README.md`: what Metacat is, credit to James Marshall and Melanie Mitchell's
     Copycat, the GPL, how to run the GUI and CLI, how the oracle works, screenshots.

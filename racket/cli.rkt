@@ -31,6 +31,9 @@
          "utilities.rkt"
          "headless.rkt")
 
+;; racket/metacat.rkt (the standalone executable) runs the CLI as cli-main
+(provide (rename-out (main cli-main)))
+
 (define (usage)
   (eprintf "usage: cli.rkt INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE]\n")
   (exit 2))
