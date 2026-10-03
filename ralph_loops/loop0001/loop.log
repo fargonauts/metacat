@@ -99,3 +99,10 @@
 [2026-10-03 04:16:11] claude session it17 (cap 3.00 h) -> session_it17.log
 [2026-10-03 04:37:04] session it17: ok (exit 0, 90 tool calls)
 [2026-10-03 04:43:58] tests passed: GATE PASSED
+[2026-10-03 04:43:58] committed 5847261: 16 Demos, packaging, README. Port `demos.ss` (with the seed caveat fro
+[2026-10-03 04:44:01] pushed 5847261 to origin
+[2026-10-03 04:44:01] === iteration 18: 17 Final audit. Re-read `docs/divergences.md` and `porting-notes.md` against
+[2026-10-03 04:44:01] claude session it18 (cap 3.00 h) -> session_it18.log
+[2026-10-03 04:58:28] session it18: ok (exit 0, 177 tool calls)
+[2026-10-03 04:58:28] item not marked by the agent (ok); marking - [!] so the loop advances
+[2026-10-03 05:05:45] tests passed: GATE PASSED

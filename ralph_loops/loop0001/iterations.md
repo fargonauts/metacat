@@ -119,7 +119,7 @@
     Copycat, the GPL, how to run the GUI and CLI, how the oracle works, screenshots.
     Tests: the distributed executable runs `abc abd xyz` from a clean directory.
 
-- [ ] **17 Final audit.** Re-read `docs/divergences.md` and `porting-notes.md` against
+- [!] **17 Final audit.** Re-read `docs/divergences.md` and `porting-notes.md` against
     the code; run the full suite; run every golden problem with 20 extra seeds in both
     the oracle and the port and confirm identical traces; check that no engine module
     requires `racket/gui`; list any follow-ups for a second loop (idiomatic clean-up,

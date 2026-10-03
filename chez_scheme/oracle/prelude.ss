@@ -229,6 +229,10 @@
         (else (errorf 'headless-window
                       "text window received unexpected message ~s" msg))))))
 
+;; Verbose mode (gui.ss's Options > Verbose mode checkbox): when #t, the
+;; model's vprintf/vprint output is printed (run.ss --verbose).
+(define $verbose? #f)
+
 (define install-headless-windows!
   (lambda ()
     (set! %workspace-graphics% #f)
@@ -269,8 +273,9 @@
     (set! *control-panel*
       (lambda (self . msg)
         (case (car msg)
-          ;; as in gui.ss with the verbose checkbox off
-          ((set-verbose-step-mode) (set! %verbose% (cadr msg)) 'done)
+          ;; as in gui.ss, with the verbose checkbox off unless run.ss's
+          ;; --verbose set $verbose?
+          ((set-verbose-step-mode) (set! %verbose% (or (cadr msg) $verbose?)) 'done)
           (else (errorf 'headless-window
                         "control panel received unexpected message ~s" msg)))))
     (set! *comment-window*

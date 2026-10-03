@@ -29,9 +29,10 @@
 ;; and utilities.ss, the first two files loaded).  See docs/porting-notes.md,
 ;; item 04.
 ;;
-;; Names that model files refer to but whose files are not ported yet are
-;; defined, for now, in engine/pending.rktl; each item that ports a file
-;; deletes its names there (a name defined twice is a compile error).
+;; engine/pending.rktl defines the names the original refers to but never
+;; defines (until item 15 it also held stand-ins for files not ported yet;
+;; a name defined twice is a compile error).  engine/view-globals.rktl
+;; declares, as #f, what the model reads but the graphics files define.
 ;;
 ;; engine-lang.rkt discards the values of module-level expressions, which
 ;; Chez's top level drops and racket/base would print.
@@ -59,6 +60,10 @@
 (include "engine/slipnet.rktl")        ; slipnet.ss
 (include "engine/images.rktl")         ; images.ss
 (include "engine/rules.rktl")          ; rules.ss
+;; port: utilities.ss's reveal-obj names slipnodes with rules.ss's
+;; format-slipnode, which utilities.rkt (loaded first, a module of its own)
+;; looks up as a top-level value (porting-notes.md, items 03 and 17)
+(define-top-level-value 'format-slipnode format-slipnode)
 (include "engine/answers.rktl")        ; answers.ss
 (include "engine/themes.rktl")         ; themes.ss
 (include "engine/justify.rktl")        ; justify.ss
@@ -77,7 +82,7 @@
 (include "engine/eeg-graphics.rktl")   ; eeg-graphics.ss (the EEG object, without the window)
 (include "engine/demos.rktl")          ; demos.ss
 (include "engine/view-globals.rktl")   ; colours and fonts the views install
-(include "engine/pending.rktl")        ; stand-ins for the files not ported yet
+(include "engine/pending.rktl")        ; names the original never defines
 
 ;; (set-global! 'name value): set! one of the engine's global variables from
 ;; outside the module (a run's driver, the GUI, the tests).  The original's
@@ -117,7 +122,8 @@
     monitor-new-concept-mappings monitor-new-rules
     make-answer-event make-snag-event
     abstract-answer-description abstract-snag-description
-    ;; never defined by the original (engine/pending.rktl); not ported yet
+    ;; never defined by the original (engine/pending.rktl), and the EEG
+    ;; (engine/eeg-graphics.rktl)
     *temperature-clamped?* *EEG*
     ;; groups.ss
     contains?
@@ -153,6 +159,6 @@
     %irrelevant-group-length-font% %relevant-concept-mapping-font%
     %irrelevant-concept-mapping-font% %concept-mapping-list-superscript-font%
     restore-current-state %coderack-codelet-count-font%
-    ;; gui.ss's speed settings (engine/pending.rktl), read by the windows
+    ;; gui.ss's speed settings (engine/view-globals.rktl), read by the windows
     %num-of-flashes% %flash-pause% %snag-pause% %codelet-highlight-pause%
     %text-scroll-pause%))

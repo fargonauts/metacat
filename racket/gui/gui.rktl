@@ -712,6 +712,7 @@
 		  (options-menu . ,options-menu) (memory-menu . ,memory-menu)
 		  (self-watching-mode-menu-item . ,self-watching-mode-menu-item)
 		  (window-controllers . ,window-controllers)))
+	      ;; port: the info label's message, for tests
 	      (get-info-title () info-title)
 	      (problem-exists? () (exists? problem))
 	      (get-current-problem () problem)

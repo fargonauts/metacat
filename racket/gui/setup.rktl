@@ -52,8 +52,9 @@
       ;; port: the engine thread stands for the REPL thread
       (set! *repl-thread* (make-engine-thread (current-output-port)))
       (enable-resizing)
+      ;; port: SWL 0.9x's waiter prompt workaround is left out; the windows'
+      ;; refresh timer starts instead (racket/gui/gui.rkt)
       (start-gui-refresh!)
-      ;; port: SWL 0.9x's waiter prompt workaround is left out
       (printf "done~%"))))
 
 (define enable-resizing

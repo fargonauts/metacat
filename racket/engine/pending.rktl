@@ -1,21 +1,15 @@
 ;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 ;;
-;; Stand-ins for names that the ported files refer to but that are defined
-;; in files not ported yet.  Each item that ports a file deletes its names
-;; here; a name left here and also defined by the port is a duplicate
-;; definition, which Racket rejects at compile time.  Procedures raise an
-;; error when called; variables hold #f, as setup.ss's globals do before
-;; (setup).
+;; Names that the original refers to but never defines.  Until item 15 this
+;; file also held stand-ins for names defined in files not ported yet; each
+;; item deleted its names as it ported a file, and since item 15 every file
+;; is ported (docs/porting-notes.md, item 04 and item 17).  What is left is
+;; not pending on any item: Chez's top level tolerates these names (set! of
+;; an unbound variable, or a reference that is never evaluated), Racket's
+;; module system does not.
 ;;
-;; Nothing here runs at load time: in the original these names are
-;; referenced only inside procedure bodies by the files ported so far.
+;; Nothing here runs at load time.
 
-(define-syntax-rule (pending-procedures name ...)
-  (begin
-    (define (name . args) (error 'name "not ported yet")) ...))
-
-(define-syntax-rule (pending-variables name ...)
-  (begin (define name #f) ...))
 ;; *temperature-clamped?* and *initial-slipnode-unclamp-time* have no
 ;; definition in the original: init-mcat (run.ss) creates them by set! on
 ;; the top level (formulas.ss reads the first, run-mcat the second).  Not

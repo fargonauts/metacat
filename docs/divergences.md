@@ -34,9 +34,11 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
     `set-window-host-maker!`). `reposition-vertical-scrollbar` scrolls the viewport
     itself, rather than waiting for a Tk scrollbar to appear.
   - Text is drawn aliased (`'unsmoothed`). Item 12 used greyscale antialiasing.
-  - `attach-workspace-view!` sets gui.ss's speed settings as at full speed with no
-    flashing (`%flash-pause%` 0, `%snag-pause%` 0, `%num-of-flashes%` 1). The original
-    set them from the speed slider when the control panel was made.
+  - `attach-views!` (and item 13's `attach-workspace-view!`) set gui.ss's speed settings
+    as at full speed with no flashing (`%num-of-flashes%` 1, `%flash-pause%` 0,
+    `%snag-pause%` 0, `%codelet-highlight-pause%` 0, `%text-scroll-pause%` 0). The
+    original set them from the speed slider when the control panel was made; with the
+    control panel (item 15) the slider sets them as in the original.
 - **Why:**
   - Hosts: racket/gui is not available to engine-side tests, and pictures of the views
     must be possible without a display.
@@ -84,3 +86,19 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
 - **Tests:** racket/gui-tests/control-panel-test.rkt drives the panel's own widgets on
   Xvfb. Its full, stepped, stopped and resumed, breakpointed and reset runs all end at
   the golden's codelet count and generator state.
+
+## Entry points: a command line, a headless CLI and a standalone program (items 11, 15–16)
+- **What:** the original was used from the Chez/SWL REPL: `(setup)` opened the windows,
+  and `(run ...)`/`(mcat ...)` or the control panel ran problems. The port has no REPL.
+  - `racket racket/main.rkt [SCALE]` does what `(setup)` did.
+  - `racket racket/cli.rkt INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K]
+    [--keep-going] [--trace FILE] [--verbose]` runs a problem headless. It is the port's
+    counterpart of the oracle's `chez_scheme/oracle/run.ss`, which is not part of the
+    original either. It prints the commentary, answers and a summary, and the run ends
+    where the original would wait for Go, unless `--keep-going`.
+  - The standalone `metacat` program (make-dist.sh) opens the GUI with no arguments or a
+    scale, and is the CLI otherwise.
+- **Why:** there is no SWL REPL to type into; batch runs and tests need a program.
+- **Tests:** racket/tests/cli-test.rkt (the CLI against the oracle's run.ss, output and
+  exit codes, including `--verbose`), racket/gui-tests/dist-test.rkt (the standalone
+  program), racket/gui-tests/control-panel-test.rkt (the GUI).

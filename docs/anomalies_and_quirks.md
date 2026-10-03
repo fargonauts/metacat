@@ -470,6 +470,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `init-mcat` and `clamp-initial-slipnodes` `set!` it, and no file defines it. Racket
   rejected run.rktl at compile time ("unbound identifier"). engine/pending.rktl now
   defines both, as never-defined names (not pending on any item).
+- **Update (iteration 18, item 17):** still so. engine/pending.rktl now holds only the
+  original's never-defined names (these two, `same-direction?`,
+  `complement-codelet-pattern`); every file is ported.
 
 ### Fonts the model reads but nothing defines
 - **Seen:** iteration 8 (item 07), compiling groups.ss.
@@ -479,6 +482,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   they rely on Chez's top level accepting `set!` of an unbound variable.
 - **Status:** worked around: engine/pending.rktl defines them as `#f`; the Workspace
   panel item must define them.
+- **Update (iteration 18, item 17):** since item 13 they are view globals,
+  `#f` in engine/view-globals.rktl until views.rkt's workspace-graphics.rktl `set!`s
+  them through `set-global!`.
 
 ### Concept mappings are only made through bridges
 - **Seen:** iteration 8 (item 07).
@@ -506,6 +512,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: engine/pending.rktl has early verbatim copies of the four
   pure themes.ss helpers (item 10 moves them back); `monitor-new-concept-mappings` is a
   settable stand-in until trace.ss is ported.
+- **Update (iteration 18, item 17):** done in item 10: the helpers are in
+  engine/themes.rktl and `monitor-new-concept-mappings` in engine/trace.rktl, the
+  original's own definitions; pending.rktl has neither.
 
 ### Dead code in bridges.ss
 - **Seen:** iteration 9 (item 08).
@@ -537,6 +546,10 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around. engine/pending.rktl has early verbatim copies of the pure
   definitions (`find-next-space-position`, `equivalent-workspace-objects?`, `diff`),
   which items 10 and 12 move back; the colours are `#f` stand-ins until the GUI items.
+- **Update (iteration 18, item 17):** done: `diff` and `equivalent-workspace-objects?`
+  are in engine/themes.rktl and engine/trace.rktl (item 10), `find-next-space-position`
+  in engine/general-graphics.rktl (item 13), and the colours are view globals
+  (engine/view-globals.rktl), installed by racket/gui/views.rkt.
 
 ### Rules are never removed
 - **Seen:** iteration 10 (item 09).
@@ -606,6 +619,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: scrollbars are shown before the windows become resizable,
   so the frames grow around them and the windows keep their sizes. The original's
   queue is unchanged.
+
+### Verbose mode reached an unregistered `format-slipnode` (port bug, fixed)
+- **Seen:** iteration 18 (item 17), auditing porting-notes.md against the code.
+- **What:** utilities.ss's `reveal-obj` names slipnodes with rules.ss's
+  `format-slipnode`. utilities.rkt is a module loaded before the engine, so it looks the
+  name up with `(top-level-value 'format-slipnode)`. Item 03's notes said the rules port
+  must register it, and item 09 didn't. The only caller is jootsing.ss, inside a
+  `vprintf`: `(reveal entry)`, evaluated only when `%verbose%` is on. So the 109 goldens,
+  which run with verbose mode off, never reached it, but a jootser in the GUI with
+  Options > Verbose mode on (or in verbose step mode) would have raised "not a top-level
+  value" in the port, where the original prints `(<stringpos> <identity>) entry: ...`.
+  No test had ever turned verbose mode on.
+- **Evidence:** `racket racket/cli.rkt a b z --seed 1 --max-codelets 1000 --keep-going
+  --verbose` against the oracle's run.ss with the same arguments (racket/tests/cli-test.rkt);
+  the `reveal-slipnodes` test in tests/diff/slipnet-battery.scm. Both failed before the
+  fix.
+- **Status:** explained and fixed: racket/engine.rkt registers `format-slipnode` after
+  including rules.rktl (marked `port:`). Verbose output of all 109 golden runs (1.55
+  million lines; 10 runs reach the `reveal` line) is now byte-identical to the oracle's.
+  Both run.ss and cli.rkt got a `--verbose` option for this.
+
+### racket/draw imports a racket/gui module
+- **Seen:** iteration 18 (item 17), writing racket/tests/no-gui-test.rkt.
+- **What:** walking the transitive imports of racket/gui/sgl.rkt finds
+  `racket/gui/dynamic`, imported by racket/draw's PostScript dc. It is a small module in
+  the base collection that only asks whether racket/gui is loaded; it does not load it.
+- **Evidence:** racket/tests/no-gui-test.rkt (it exempts that one module).
+- **Status:** not a bug. The engine and the headless driver reach neither racket/gui nor
+  racket/draw; the views modules reach racket/draw and, through it, only that module.
 
 ## 🛸 UFO sightings
 

@@ -129,7 +129,7 @@
        ((char=? first-char #\newline) (read-char) 'nothing)
        (else (read))))))
 
-;; Chez's clear-input-port discards buffered input
+;; port: Chez's clear-input-port, which Racket lacks, discards buffered input
 (define clear-input-port
   (lambda ()
     (let loop ()
@@ -949,6 +949,7 @@
 (define x-coord real-part)
 (define y-coord imag-part)
 
+;; port: SWL's thread-sleep (milliseconds) is Racket's sleep (seconds)
 (define pause
   (lambda (ms)
     (sleep (/ ms 1000))))

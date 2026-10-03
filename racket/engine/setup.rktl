@@ -53,8 +53,8 @@
 
 ;; port: (setup) and enable-resizing create and arrange the windows, which
 ;; the engine cannot do (engine modules never require racket/gui).  They
-;; move to the GUI layer (racket/gui/) when the panels are ported; it sets
-;; the window globals above through set-global! (racket/engine.rkt).
+;; are in the GUI layer, racket/gui/setup.rktl (item 15), which sets the
+;; window globals above through set-global! (racket/engine.rkt).
 
 ;;------------------------------------------------------------------
 ;; User-interface commands

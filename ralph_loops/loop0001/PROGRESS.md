@@ -1883,3 +1883,13 @@ byte for byte. It also opens the GUI.
     divergences.md (it is not a port divergence: the oracle agrees with the port).
   - The gate is about 10 min. The GUI tests now include a 70 MB build (dist-test), in
     a temporary directory that is deleted afterwards.
+
+## Iteration 18 — 2026-10-03 04:58:28
+### Completed
+- (driver) session ended with outcome `ok` without marking the item
+### Blockers
+- see session_it18.log
+### Next
+- revisit or re-open this item
+
+---

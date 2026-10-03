@@ -24,6 +24,8 @@ port (`tests/golden/`).
   `Stopped:` says why the run ended: `suspend`, `cap` or `halt` (the
   original called `report-error-and-halt`). `--trace FILE` also writes the
   JSON-lines trace (`docs/trace-format.md`) without changing the run.
+  `--verbose` turns on the original's verbose mode (gui.ss's Options menu
+  checkbox), so the model's `vprintf` output is printed too (item 17).
   The port's `racket racket/cli.rkt` takes the same arguments and prints the
   same output; `racket/tests/golden-test.rkt` and `cli-test.rkt` run this
   script live to check it.
@@ -31,6 +33,9 @@ port (`tests/golden/`).
   (`build-bond`, `break-group`, `update-temperature`, …), forwards
   `*coderack*` and `*workspace*` through closures that note codelets and
   rules, and records the Temporal Trace's events from the Trace window.
+- `tests/extra-seeds.py` (item 17, outside the test suite) runs every problem
+  of `tests/problems.txt` with 20 other seeds in this script and in the port's
+  CLI and compares traces and output (`docs/extra-seeds.md`).
 - `make-golden.ss` writes `tests/golden/*.jsonl`, one trace per problem and
   seed in `tests/problems.txt`, running them in parallel; with `--check`
   it regenerates into a temporary directory and compares byte for byte.

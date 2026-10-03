@@ -98,7 +98,7 @@
 
 ;; port: metacat.ss and setup.ss define these for the whole program; the
 ;; interpreter only reads them in graphics-dash-pattern
-(define *platform* 'unix)
+(define *platform* 'linux)          ; as engine/general-graphics.rktl
 (define *tcl/tk-version-8_3?* #t)
 (define %nice-graphics% #t)
 

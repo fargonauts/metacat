@@ -80,8 +80,8 @@
            (lambda () ((engine 'same-direction?) 'a 'b)))
 (check-true (procedure? (engine 'group-graphics)))
 
-;; names from files not ported yet are #f (no pending procedures are left
-;; since item 13)
+;; view globals are #f until views are loaded (engine/view-globals.rktl;
+;; no pending procedures are left since item 13)
 (check-false (engine '%coderack-codelet-count-font%))
 
 ;; the graphics files' pexp builders (item 13) are the engine's; the colours
@@ -110,9 +110,9 @@
                     (engine '*break-time*) (engine '*step-mode?*) (engine '%step-cycles%))
               '(15 50 100 #f #f #f 1))
 
-;; rules.ss and answers.ss (item 09), and the early copies in
-;; engine/pending.rktl of general-graphics.ss's find-next-space-position;
-;; themes.ss's diff, now themes.ss's own (item 10)
+;; rules.ss and answers.ss (item 09), general-graphics.ss's
+;; find-next-space-position (an early copy in engine/pending.rktl until item
+;; 13, now engine/general-graphics.rktl) and themes.ss's diff (item 10)
 (for ([name '(make-rule rule-describable-bridge? verbatim-clause? apply-rule
               transcribe-to-english translate report-new-answer give-up
               make-translated-string make-slippage-log)])

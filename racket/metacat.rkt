@@ -44,7 +44,7 @@
    "Metacat 1.2 (James B. Marshall), ported to Racket.\n"
    "usage: metacat [SCALE]                 open the GUI\n"
    "       metacat INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K]\n"
-   "               [--keep-going] [--trace FILE]   run headless\n"))
+   "               [--keep-going] [--trace FILE] [--verbose]   run headless\n"))
 
 (define (run args)
   (cond

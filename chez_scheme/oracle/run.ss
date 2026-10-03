@@ -3,7 +3,7 @@
 ;;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
 ;;;
 ;;;   scheme --script chez_scheme/oracle/run.ss INITIAL MODIFIED TARGET [ANSWER]
-;;;          [--seed N] [--max-codelets K] [--keep-going] [--trace FILE]
+;;;          [--seed N] [--max-codelets K] [--keep-going] [--trace FILE] [--verbose]
 ;;;
 ;;; Loads chez_scheme/original/metacat.ss unmodified through prelude.ss, sets
 ;;; up the problem with the display off (init-mcat, as the Control Panel's
@@ -18,6 +18,9 @@
 ;;; until K codelets have run.  --max-codelets K uses the original's own
 ;;; breakpoint (runtil K): the run stops after codelet K.  Without it there
 ;;; is no cap.
+;;;
+;;; --verbose turns on the original's verbose mode (gui.ss's Options menu
+;;; checkbox, %verbose%): the model's vprintf output is printed too.
 ;;;
 ;;; The summary says why the run stopped: suspend (the original paused for
 ;;; Go, after an answer or giving up), cap (--max-codelets reached) or halt
@@ -43,7 +46,7 @@
 
 (define usage
   (lambda ()
-    (display "usage: run.ss INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE]\n"
+    (display "usage: run.ss INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE] [--verbose]\n"
              (current-error-port))
     (exit 2)))
 
@@ -74,6 +77,9 @@
                     (loop (cddr args) strings seed max keep?))))
         ((string=? (car args) "--keep-going")
          (loop (cdr args) strings seed max #t))
+        ((string=? (car args) "--verbose")
+         (set! $verbose? #t)
+         (loop (cdr args) strings seed max keep?))
         ((and (> (string-length (car args)) 0)
               (char-alphabetic? (string-ref (car args) 0)))
          (loop (cdr args) (cons (string->symbol (car args)) strings) seed max keep?))
@@ -86,6 +92,7 @@
 
 (load-metacat)
 (install-headless-windows!)
+(set! %verbose% $verbose?)
 
 (define seed
   (or (cadr options)

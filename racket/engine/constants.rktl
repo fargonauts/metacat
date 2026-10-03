@@ -18,7 +18,7 @@
 ;;=============================================================================
 ;; Ported to Racket, 2026: included by racket/engine.rkt (see docs/porting-notes.md,
 ;; item 04).  Only the model's constants are here; the graphics constants
-;; (window sizes, colours, fonts, titles) wait for the GUI items.
+;; (window sizes, colours, fonts, titles) are in racket/gui/constants.rktl.
 ;;=============================================================================
 
 ;;----------------------------------------------------------------------

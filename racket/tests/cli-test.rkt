@@ -65,6 +65,23 @@
   (define r4 (same-as-oracle "eqe" "qeq" "abbba" "aaabaaa" "--seed" "3" "--max-codelets" "17000"))
   (check-true (regexp-match? #rx"\nOoops: bad message .*\nStopped: halt\n" (cadr r4)))
 
+  ;; --verbose (item 17): the original's verbose mode prints the model's
+  ;; vprintf output.  These runs reach jootsing.ss's (reveal entry), which
+  ;; needs format-slipnode as a top-level value; the trace is unchanged.
+  (define v1 (same-as-oracle "a" "b" "z" "--seed" "1" "--max-codelets" "1000" "--keep-going"
+                             "--verbose"))
+  (check-true (> (length (string-split (cadr v1) "\n")) 5000) "verbose output is long")
+  (check-true (regexp-match? #rx"\n[(]<[a-z]+> <[a-z]+>[)] entry: overlap = " (cadr v1))
+              "jootsing's reveal names slipnodes")
+  (define v-trace (make-temporary-file "metacat-cli-~a.jsonl"))
+  (define v2 (same-as-oracle "abc" "abd" "xyz" "--seed" "3009318743" "--max-codelets" "10000"
+                             "--verbose" "--trace" (path->string v-trace)))
+  (check-true (regexp-match? #rx"entry: overlap = " (cadr v2)))
+  (check-equal? (file->string v-trace)
+                (file->string (build-path golden-dir "abc-abd-xyz_3009318743.jsonl"))
+                "--verbose does not change the trace")
+  (delete-file v-trace)
+
   ;; --trace writes the golden trace
   (define trace-file (make-temporary-file "metacat-cli-~a.jsonl"))
   (define r5 (port-run "abc" "abd" "xyz" "--seed" "3852097033" "--max-codelets" "10000"

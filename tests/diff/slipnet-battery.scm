@@ -797,3 +797,11 @@
              (list plato-m #f 2)
              (list plato-one plato-successor 5)
              (list plato-one plato-successor 6))))
+
+;; utilities.ss's reveal (jootsing.ss calls it in a vprintf, so only in
+;; verbose mode) names slipnodes with rules.ss's format-slipnode (item 17)
+(test reveal-slipnodes
+  (list (reveal plato-length)
+        (reveal (list plato-length (list plato-successor plato-a) 'x 3))
+        (reveal (list (list plato-letter-category plato-identity)
+                      (list plato-string-position-category plato-opposite)))))

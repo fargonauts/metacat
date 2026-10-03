@@ -92,9 +92,10 @@ Chez 10 without SWL, and what that reveals for the port.
   `*workspace*`'s `add-rule`. The forwarding closures pass the original
   object as `self`. Note that top-down codelets receive `*workspace*` as
   their scope argument (slipnet.ss), so they hold the forwarder; only
-  `tell` is ever applied to it. The port has no need for any of this: it
-  emits the same events from the same places directly (through a trace
-  hook that a run without tracing leaves empty).
+  `tell` is ever applied to it. (Written before the port had traces. In
+  the end the port does the same: racket/headless.rkt's `install-trace!`
+  installs the same wrappers and forwarders, with `set-global!` instead of
+  `set!`; item 10.)
 - **Exact rationals.** Codelet urgencies are often exact non-integer
   rationals (`(* (% conceptual-depth) activation)` and friends: 3601 of the
   golden codelet lines, e.g. `102/5`). Racket's numeric tower keeps them
@@ -189,7 +190,9 @@ compares the outputs line for line.
   `symbol->letter-categories` reads `plato-a` etc. with `eval`; the port
   reads them with `top-level-value`. `reveal-obj` (a debugging aid) calls
   `format-slipnode` (rules.ss) through `(top-level-value 'format-slipnode)`,
-  so the rules port must register it there.
+  so the rules port must register it there. (Item 09 missed this; item 17
+  found it and registers it in racket/engine.rkt. jootsing.ss calls
+  `reveal` in verbose mode.)
 
 **The 22 macros.** Written with `syntax-case` rather than `syntax-rules`
 where they must build identifiers (`plato-` + name, `a-b-link`) or check
@@ -231,7 +234,9 @@ rather than `(define scheme-round round)`, because a module-level
 `(define round …)` shadows the import for the whole module; `ask` peeks the
 first character (no `unread-char`) and gets a `clear-input-port`;
 `symbol->letter-categories` and `reveal-obj` use `top-level-value` (above);
-`pause` uses `sleep`; and **`pairwise-map` evaluates its recursive call
+`pause` uses `sleep`; `clear-input-port` is defined here (Racket has none);
+`set-report-error-and-halt!` lets headless drivers replace
+`report-error-and-halt` (item 10); and **`pairwise-map` evaluates its recursive call
 before the `map`**, as Chez evaluates `(append (map …) (pairwise-map …))`.
 
 **Evaluation order, more observations.** Under `scheme --script`, Chez's
@@ -1133,7 +1138,7 @@ fonts.ss's `make-mfont`, `get-actual-font-values`, `get-actual-font-size`,
   `my-screen->canvas-x/y` (an SWL 0.9u workaround) have no counterpart.
 - `*flush-event-queue*` was `swl:sync-display`; it is `void` until a GUI sets
   it with `set-flush-event-queue!`.
-- `*platform*` (`'unix`), `*tcl/tk-version-8_3?*` and `%nice-graphics%` are
+- `*platform*` (`'linux`; `'unix` until item 17), `*tcl/tk-version-8_3?*` and `%nice-graphics%` are
   module constants; `graphics-dash-pattern` is their only reader and gives
   `"- "` on Unix either way.
 - fonts.ss: SWL's `<font>` → `swl-font%` (face, size, style list; methods
@@ -1585,3 +1590,74 @@ differ):
 - Screenshots in `docs/screenshots/`, taken on Xvfb with tests/gui-screenshot.rkt:
   - `run7-wyz.png`: the whole screen after Run 7;
   - crops of the Workspace for Run 7 and for `abc abd mrrjjj` seed 1 at 513 codelets.
+
+## Final audit (item 17)
+
+### What was checked
+- **Extra seeds**: every problem line of tests/problems.txt with 20 seeds that are not
+  golden seeds, oracle against port: **720/720 identical** traces, printed output and
+  exit codes (2.15 million codelets, one `report-error-and-halt`). Script:
+  `tests/extra-seeds.py`; results: docs/extra-seeds.md.
+- **Verbose mode**: all 109 golden runs with `%verbose%` on, oracle against port: 1.55
+  million lines of `vprintf` output, byte-identical once the bug below was fixed. Both
+  `chez_scheme/oracle/run.ss` and `racket/cli.rkt` take `--verbose` now (gui.ss's
+  verbose checkbox: the headless control panel answers `set-verbose-step-mode` with
+  `(or value verbose?)`, as gui.ss does). cli-test.rkt compares two verbose runs that
+  reach jootsing.ss's `reveal` line, and checks that `--verbose` leaves the trace equal
+  to the golden.
+- **No racket/gui in the engine**: racket/tests/no-gui-test.rkt walks the transitive
+  imports (all phases) of compat, utilities, engine-lang, engine, headless, cli, main
+  and metacat: none reaches racket/gui (or mred/mrlib) or racket/draw. The views modules
+  (gui/sgl, fonts, colors, engine-route, views) reach racket/draw but not racket/gui. As
+  controls, the walk finds racket/draw from views.rkt and racket/gui from gui.rkt, and
+  adding `(require racket/gui/base)` to headless.rkt fails 4 checks. No
+  `racket/engine/*.rktl` has a `require` of its own. engine-test.rkt keeps its
+  `module-declared?` check.
+- **Docs against the code**: this file, divergences.md and the stale statuses in
+  anomalies_and_quirks.md, read by three subagents and checked by hand, plus a `diff`
+  of every verbatim `.rktl` against its `.ss`. Every non-header difference is marked
+  `port:` and described here.
+
+### Fixed
+- **`format-slipnode` was not a top-level value** (anomalies). Item 03 noted that the
+  rules port must register it for utilities.rkt's `reveal-obj`; item 09 didn't. Verbose
+  jootsers raised in the port. racket/engine.rkt now registers it right after
+  rules.rktl. Tests first: the `reveal-slipnodes` test in slipnet-battery.scm and the
+  verbose cli-test runs failed (`ERROR`, then a differing output) before the fix.
+- Unmarked port changes now carry `port:` comments: utilities.rkt's `pause` and
+  `clear-input-port`, gui.rktl's `get-info-title`, setup.rktl's `start-gui-refresh!`.
+  rule-graphics.rktl's header no longer says "verbatim" without its one port change.
+- sgl.rkt's `*platform*` is `'linux`, like engine/general-graphics.rktl's. It was
+  `'unix`, which metacat.ss doesn't list. Only `'windows` is ever tested, so nothing
+  changes.
+- engine/pending.rktl: its header and two unused macros dated from when it held
+  stand-ins. It now says what it holds: the four names the original never defines.
+  Stale comments in racket/engine.rkt, engine-test.rkt, engine/setup.rktl and
+  engine/constants.rktl are updated.
+
+### Corrections to earlier sections
+The sections above are a per-item log, true when written. These statements are out of
+date (the sections are left as written, except where marked):
+- **pending.rktl stand-ins** (items 04–11): every stand-in and early copy listed there is
+  gone. The files that define them are ported, and the colours, fonts and
+  `restore-current-state` are view globals in engine/view-globals.rktl (item 13).
+  pending.rktl holds only `*temperature-clamped?*`, `*initial-slipnode-unclamp-time*`,
+  `same-direction?` and `complement-codelet-pattern`. In particular, `*temperature-clamped?*`
+  (item 06) was never moved to run.rktl. Item 14's "pending.rktl now only holds gui.ss's
+  speed settings" was true only until item 15, and even then it held these four names.
+- **group-graphics.ss** (item 07): "the rest waits for the Workspace panel". Item 13
+  ported the whole file into engine/group-graphics.rktl.
+- **`group-event-pexp-text-string` and `relation-name`** (item 10): no longer early copies,
+  but the original's definitions in engine/trace-graphics.rktl and
+  engine/theme-graphics.rktl (item 14).
+- **rule-graphics.ss's `set-car!`** (item 03, "the GUI port must restructure it"): done in
+  the engine file engine/rule-graphics.rktl (item 13), not in the GUI layer.
+- **The port's traces** (item 02, corrected inline): racket/headless.rkt wraps and
+  forwards as trace.ss does.
+- **Item 13's `racket/tests/workspace-view-test.rkt`** is now views-test.rkt (item 14),
+  and its hook is `attach-views!`. `attach-workspace-view!` still exists.
+- **Battery counts**: sgl-battery.scm, graphics-battery.scm and panels-battery.scm hold
+  48, 48 and 36 tests. The 50, 50 and 38 quoted in items 12–14 include the two checks
+  that `check-battery` adds per battery.
+- **The crash run** (item 10: "after the same 1062 trace lines"): golden-test.rkt checks
+  an identical prefix of more than 1000 lines, not the exact count.

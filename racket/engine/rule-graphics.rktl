@@ -16,7 +16,8 @@
 ;; FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
 ;; details.
 ;;=============================================================================
-;; Ported to Racket, 2026: verbatim; part of the engine (racket/engine.rkt),
+;; Ported to Racket, 2026: verbatim but for one port: change (update-rule-pexps!
+;; returns a copy instead of set-car!); part of the engine (racket/engine.rkt),
 ;; since the model calls it when %workspace-graphics% is on.  It builds SGL
 ;; expressions and sends them to *workspace-window*; see
 ;; docs/porting-notes.md, item 13.

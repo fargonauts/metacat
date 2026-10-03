@@ -247,8 +247,10 @@
   (set-global! '*control-panel*
                (lambda (self . msg)
                  (case (car msg)
-                   ;; as in gui.ss with the verbose checkbox off
-                   [(set-verbose-step-mode) (set-global! '%verbose% (cadr msg)) 'done]
+                   ;; as in gui.ss, with the verbose checkbox off unless
+                   ;; run-problem's #:verbose? is true
+                   [(set-verbose-step-mode) (set-global! '%verbose% (or (cadr msg) verbose?))
+                                            'done]
                    [else (error 'headless-window "control panel received unexpected message ~s"
                                 msg)])))
   (set-global! '*comment-window* (make-headless-comment-window)))
@@ -416,11 +418,17 @@
 (define the-partial-trace #f)
 (define (partial-trace) the-partial-trace)
 
+;; verbose mode (gui.ss's Options > Verbose mode checkbox): the model's
+;; vprintf output is printed (cli.rkt --verbose, the oracle's run.ss --verbose)
+(define verbose? #f)
+
 ;; strings: 3 or 4 symbols; seed: 1 to 2^32-1; cap: a codelet count or #f.
+;; verbose: #t turns verbose mode on, as the oracle's run.ss --verbose does.
 ;; views: #f, or a thunk that attaches views (racket/gui/views.rkt) to the
 ;; run once the headless windows are installed; watching must not change
 ;; the run.  Returns why the run stopped: suspend, cap or halt.
-(define (run-problem strings seed cap keep? [trace-port #f] #:views [views #f])
+(define (run-problem strings seed cap keep? [trace-port #f] #:views [views #f]
+                     #:verbose? [verbose #f])
   (unless installed?
     (install-headless-windows!)
     (install-trace!)
@@ -429,6 +437,8 @@
     (set! installed? #t))
   (when views (views))
   (install-recorders!)
+  (set! verbose? verbose)
+  (set-global! '%verbose% verbose)
   (set! out trace-port)
   (set! last-themes #f)
   (set! answers '())

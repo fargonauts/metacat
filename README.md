@@ -72,12 +72,13 @@ menu loads the runs of Marshall's dissertation, with their seeds (see the caveat
 
 ```bash
 racket racket/cli.rkt abc abd xyz --seed 7
-racket racket/cli.rkt INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE]
+racket racket/cli.rkt INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE] [--verbose]
 ```
 
 A run stops at its first answer, as the GUI does, unless `--keep-going` is given.
 `--trace FILE` writes a JSON-lines trace of every codelet, structure, temperature, theme and
-event ([`docs/trace-format.md`](docs/trace-format.md)).
+event ([`docs/trace-format.md`](docs/trace-format.md)). `--verbose` prints the model's own
+running commentary on each codelet, as the original's verbose mode did.
 
 **The standalone program** doesn't need Racket installed:
 
