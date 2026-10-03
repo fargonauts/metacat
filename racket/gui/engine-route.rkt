@@ -24,6 +24,17 @@
              (and (path? name)
                   (regexp-match? #rx"[/\\\\]racket[/\\\\]engine[.]rkt$" (path->string name))))))))
 
+;; is id imported from racket/gui/views.rkt?  (gui.rktl, the control panel,
+;; set!s a few variables of the graphics files: item 15)
+(begin-for-syntax
+  (define (views-binding? id)
+    (let ([b (identifier-binding id)])
+      (and (list? b)
+           (let ([name (resolved-module-path-name (module-path-index-resolve (car b)))])
+             (and (path? name)
+                  (regexp-match? #rx"[/\\\\]racket[/\\\\]gui[/\\\\]views[.]rkt$"
+                                 (path->string name))))))))
+
 (define-syntax (view-define stx)
   (syntax-case stx ()
     [(_ (name . formals) body ...)
@@ -37,7 +48,11 @@
 (define-syntax (view-set! stx)
   (syntax-case stx ()
     [(_ name value)
-     (if (engine-binding? #'name)
-         (with-syntax ([set-global! (datum->syntax #'name 'set-global!)])
-           #'(set-global! 'name value))
-         #'(set! name value))]))
+     (cond
+       [(engine-binding? #'name)
+        (with-syntax ([set-global! (datum->syntax #'name 'set-global!)])
+          #'(set-global! 'name value))]
+       [(views-binding? #'name)
+        (with-syntax ([set-view-global! (datum->syntax #'name 'set-view-global!)])
+          #'(set-view-global! 'name value))]
+       [else #'(set! name value)])]))

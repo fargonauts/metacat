@@ -34,7 +34,7 @@
 
 (provide swl-font swl-font% swl:font-families
          make-mfont get-actual-font-values get-actual-font-size make-fixed-font
-         *hidden-canvas* *scrollbar-width* *scrollbar-height*
+         *hidden-canvas* *scrollbar-width* *scrollbar-height* set-scrollbar-size!
          *serif-faces* *sans-serif-faces* *fancy-faces* select-face
          serif sans-serif fancy
          tk-points->pixels)
@@ -124,6 +124,7 @@
 ;; port: set by the control panel's create-mcat-logo (racket/gui)
 (define *scrollbar-width* #f)
 (define *scrollbar-height* #f)
+(define (set-scrollbar-size! w h) (set! *scrollbar-width* w) (set! *scrollbar-height* h))
 
 ;; positive size value indicates font size in points, negative value
 ;; indicates font size in pixels

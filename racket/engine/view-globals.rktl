@@ -53,3 +53,8 @@
 ;; made (select-coderack-fonts), never defined; coderack.ss's codelet types
 ;; draw their counts with it
 (view-variables %coderack-codelet-count-font%)
+;; gui.ss: the speed settings, read by the windows (flashes, pauses) and set
+;; by the control panel's speed slider (racket/gui/gui.rktl); views.rkt's
+;; attach-views! sets them as at full speed for offscreen views
+(view-variables %num-of-flashes% %flash-pause% %snag-pause%
+                %codelet-highlight-pause% %text-scroll-pause%)

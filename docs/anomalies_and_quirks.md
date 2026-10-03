@@ -324,6 +324,42 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** not a bug, as far as anyone can tell: Tk sized the box the same way. Item 12
   ported sgl-interpreter.ss's arithmetic verbatim. Kept.
 
+### GTK ignores Xvfb when `WAYLAND_DISPLAY` is set
+- **Seen:** iteration 16 (item 15), the first GUI runs under `xvfb-run`.
+- **What:** the owner's session is Wayland (`WAYLAND_DISPLAY=wayland-0`). GTK prefers
+  Wayland over `DISPLAY`, so `xvfb-run racket ...` opened the windows on the owner's
+  screen instead of the virtual display. The root window of Xvfb had no children and a
+  screen grab was black. Three short scratch runs (a few seconds each) showed windows on
+  the owner's screen before this was noticed.
+- **Evidence:** `env | grep WAYLAND`; `xwininfo -root -tree` inside `xvfb-run` lists no
+  windows unless `WAYLAND_DISPLAY` is unset.
+- **Status:** worked around. Every GUI run uses
+  `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a ...` (tests/run-tests.sh,
+  tests/gui-screenshot.rkt's header), and racket/gui-tests/control-panel-test.rkt
+  refuses to run while `WAYLAND_DISPLAY` is set.
+
+### A racket/gui canvas's `on-size` does not see its scrollbars
+- **Seen:** iteration 16 (item 15), the Commentary window.
+- **What:** showing a manual scrollbar shrinks a canvas's client area, but `on-size`
+  reports the whole canvas, so no resize happened. The Commentary's first paragraph ran
+  under its vertical scrollbar. Also, a canvas's minimum client size counts only the
+  scrollbars shown when it is set.
+- **Evidence:** the screenshot steps in PROGRESS.md (iteration 16).
+- **Status:** worked around in racket/gui/gui.rkt's `screen-host%`: the refresh tick
+  compares the client size with the viewport's, and `set-resizable!` shows the
+  scrollbars and sets the minimum size again before the window becomes resizable.
+
+### The SWL message-queue stand-in deadlocked the GUI thread
+- **Seen:** iteration 16 (item 15), the first on-screen run.
+- **What:** views.rkt's stand-in for SWL's `thread-receive-msg` took the semaphore and
+  the message in two steps. When the resize listener thread ran between them, the
+  resize handler (in the GUI thread, inside `critical-section`) saw a waiting message,
+  waited on the semaphore, and blocked forever.
+- **Evidence:** a GUI run hung with a backtrace in `thread-receive-msg` under
+  `critical-section`.
+- **Status:** explained and fixed: a receive is now atomic, and `critical-section` runs
+  in Racket's atomic mode.
+
 ## 🔗 Hidden couplings
 
 ### Model state that only a window can provide
@@ -516,6 +552,19 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `update-rule-pexps!` returns an updated copy and the window stores it in the
   description. tests/diff/graphics-battery.scm checks the result against the
   original's mutated pexp.
+
+### One resize queue for every window
+- **Seen:** iteration 16 (item 15), at setup.
+- **What:** general-graphics.ss's resize handler drops a waiting resize from the single
+  `*resize-message-queue*` before queueing its own, whichever window the waiting one
+  was for. When several windows get a configure at once, only the last one redraws.
+  Under Tk this happened only during user drags. In the port, every scrolling window
+  got one at startup as its scrollbars appeared, and the Commentary kept its creation
+  width and scroll position.
+- **Evidence:** eprintf in the handler and listener showed 5 handler calls and 2 thunks.
+- **Status:** worked around: scrollbars are shown before the windows become resizable,
+  so the frames grow around them and the windows keep their sizes. The original's
+  queue is unchanged.
 
 ## 🛸 UFO sightings
 

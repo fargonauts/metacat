@@ -50,3 +50,37 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
 - **Tests:** racket/tests/views-test.rkt (item 13's workspace-view-test.rkt) runs all 109
   golden runs with every window attached (item 14) and requires identical traces; its pixel snapshots and
   racket/tests/sgl-test.rkt's pin the rendering.
+
+## The control panel and windows on racket/gui (item 15)
+- **What:**
+  - gui.ss's widgets are racket/gui's (racket/gui/gui.rktl). The actions, the control
+    panel object's messages and their effects, and the window controllers are the
+    original's. These differ:
+    - racket/gui gives no colours to panels, buttons or menu items, and no fonts to
+      menu items. The control panel keeps its fonts and the labels' colours. The
+      command line's run mode is "running..." on a green field (the original:
+      green bold italic on black). Highlighted menu items (the last demo, the
+      commentary font) are checked items.
+    - Help and Clear Memory were commands in SWL's menu bar; racket/gui's menu bar only
+      holds menus, so they are in a Help menu and a Memory menu.
+    - `display-error` and the input dialogs' "Invalid input!" turn red for 700 ms on a
+      timer instead of `(pause 700)` in the event thread.
+    - Dialogs are frames, not modal; their `destroy` runs the destroy-request handler,
+      as SWL's did.
+    - The speed slider's initial value sets the speed when the panel is made (Tk's scale
+      command did it).
+  - An error in the model, which stopped the original at the REPL with the panel still
+    in run mode, returns the panel to input mode and shows "Error: ..." in it.
+  - Windows are tiled on the screen (racket/gui/gui.rkt's `arrange-windows!`); the
+    original left placement to the window manager. Aspect-ratio bounds are not enforced
+    (racket/gui has none); resizing still goes through the original resize handler and
+    listener.
+  - `create-mcat-logo` measures nothing: scrollbars are Tk's X11 size (15 pixels), and
+    fonts measure on a private bitmap (item 12).
+  - The REPL thread is an engine thread that runs the thunks the control panel hands it
+    with `thread-break`. There is no REPL: `racket racket/main.rkt` opens the windows as
+    `(setup)` did.
+- **Why:** racket/gui's widget set; a display-free test suite for everything else.
+- **Tests:** racket/gui-tests/control-panel-test.rkt drives the panel's own widgets on
+  Xvfb. Its full, stepped, stopped and resumed, breakpointed and reset runs all end at
+  the golden's codelet count and generator state.

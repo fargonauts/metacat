@@ -1441,3 +1441,88 @@ differ):
 - EEG: average activity in yellow and temperature in red on black, with the title
   "Average Workspace Activity (yellow) and Temperature (red)". A crop confirmed pure
   red verticals where the downscaled image looked grey. No figure shows it.
+
+## The control panel and windows (item 15)
+
+### Where the code went
+- `racket/gui/gui.rkt` (requires racket/gui) holds what SWL and Tk gave the
+  original. It includes `gui.rktl` (gui.ss) and `setup.rktl` (setup.ss's `setup` and
+  `enable-resizing`; the rest of setup.ss is in the engine).
+  - `screen-host%`: an on-screen window host, a frame with a canvas that paints the
+    viewport's display list. `setup` installs it with views.rkt's
+    `set-window-host-maker!`, so every graphics window from items 13–14 is a frame on
+    the screen with no change to the window code. A 50 ms timer
+    (`start-gui-refresh!`) repaints windows whose display list changed. It also keeps
+    the manual scrollbars in step with the viewport's scroll region (shown only when
+    needed, like Tk's scrollframe) and watches the client size, which `on-size` does not
+    report when scrollbars appear (anomalies). Mouse presses go to the viewport's
+    `mouse-press`, i.e. the original press handlers.
+  - The engine thread stands for the REPL thread (`*repl-thread*`). views.rkt's
+    `thread-break` now calls a handler (`set-thread-break-handler!`); gui.rkt's sends
+    the thunk to the engine thread. The thread runs each thunk inside a prompt, with
+    compat's reset handler *set* (not parameterized) to an escape back to its loop, so
+    `break`/`quiet-break` → `(reset)` end the thunk and a later `go`, which re-enters
+    the captured continuation, ends the same way (item 11's notes).
+    `engine-busy?`/`engine-idle-evt` let tests wait.
+  - `create-mcat-logo` (fonts.ss): a Logo frame; it sets fonts.rkt's scrollbar sizes
+    (`set-scrollbar-size!`, new) to Tk's 15 pixels.
+  - `arrange-windows!` tiles the windows (divergences.md); `setup` calls it before and
+    after making the control panel.
+- `racket/engine/demos.rktl`: demos.ss, verbatim, in the engine after the graphics
+  files (it needs no graphics).
+- gui.ss's speed settings moved from engine/pending.rktl to engine/view-globals.rktl;
+  pending.rktl now holds only names the original never defines.
+- engine-route.rkt also routes `set!` of views.rkt variables (`%comment-window-font%`,
+  `*theme-edit-mode?*`) to views.rkt's new `set-view-global!`.
+- `racket/main.rkt` runs `setup` (dynamic-require, so requiring main.rkt stays
+  headless). `racket racket/main.rkt [SCALE]`.
+
+### gui.rktl against gui.ss
+- Verbatim: `tokenize-string`, `char-noise?`, the button actions, the breakpoint,
+  step-interval and save-commentary actions, `speed-slider-action`, `figure`,
+  `clamp-codelets-menu-item`'s pattern logic, and every message of the control panel
+  object except the widget calls in them.
+- Rewritten (marked port:): widget creation (racket/gui creates widgets in their
+  parent, in display order, so `pack` and the spacers go), menus (created in their
+  parent menu, so the menu procedures take the parent first; `get-demos-button` & co.
+  became the menus themselves), dialogs (`swl-dialog%`, `input-field%`), the help
+  window (a text% editor), `set-menu-item-color` (checks the item).
+  `make-control-panel` uses `letrec` because a menu item's action may name an item
+  created after it.
+- New messages, marked port:: `get-widgets` (tests), `get-info-title`,
+  `get-theme-edit-dialog`, `get-clearmem-dialog`, `engine-error`; the window
+  controller gets `make-menu-item` and `visible?`.
+- A faithful detail worth knowing: entering a problem (Enter, or Go/Reset with text in
+  the command line) only initializes it and stops (`quiet-break`); the run starts
+  with Go, Step or a click on the Workspace. The buttons start disabled; Enter is the
+  first way in.
+
+### Threads
+- GUI callbacks run in the eventspace thread. The engine thread sends the control
+  panel `switch-to-run-mode`/`switch-to-input-mode` and draws into display lists.
+  racket/gui methods may be called from any Racket thread, and display lists are
+  replaced by consing, so painting reads a consistent list.
+- Stop sets `*interrupt?*` (the original's action). The run loop sees it after the
+  current codelet, and `break` returns the engine thread to its loop.
+- views.rkt's SWL message queue had a race that deadlocked the GUI thread (anomalies);
+  a receive is now atomic.
+
+### Tests
+- `racket/gui-tests/control-panel-test.rkt` (105 checks, about 9 s), run by
+  tests/run-tests.sh as
+  `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a -s "-screen 0 1920x1200x24" raco test racket/gui-tests/*.rkt`.
+  racket/info.rkt omits `gui-tests` from plain `raco test racket/`.
+  - It covers setup's windows, layout, invalid input and the speed slider. A full run
+    (`abc abd ijk` seed 1) ends at the golden's 395 codelets and generator state. So do
+    a run in step mode (interval set through the Options dialog) and a run stopped at
+    a breakpoint and resumed by a click on the Workspace. Run 7 (2170 codelets) stopped
+    by Stop and resumed with Go, and again after Reset, matches its golden. It also
+    covers Save commentary (file = the window's lines), Clear Memory through its
+    dialog, the Windows menu, self-watching off/on, resizing the Workspace frame and a
+    Demos item.
+  - Mutations (each restored): Stop doing nothing (3 failures); no `quiet-break` after
+    init (18); speed 100 → 2 flashes (1); no `configure` on resize (3); demo item not
+    highlighted (1). Not clearing the command line in `update-current-problem` is
+    equivalent, since `switch-to-input-mode` clears it too.
+- `tests/gui-screenshot.rkt OUT.png PROBLEM... [--break N]` grabs the whole virtual
+  screen (Python PIL) after a run driven through the panel. It is not in the suite.

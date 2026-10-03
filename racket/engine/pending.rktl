@@ -35,8 +35,4 @@
     [_ (error 'complement-codelet-pattern
               "variable complement-codelet-pattern is not bound")]))
 
-;; Graphics (the GUI items)
-;; gui.ss
-(pending-variables %num-of-flashes% %flash-pause% %snag-pause%
-                   %codelet-highlight-pause% %text-scroll-pause%)
 

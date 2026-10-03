@@ -19,16 +19,24 @@
 ;;=============================================================================
 ;; Ported to Racket, 2026.
 
-;; Entry point: `racket racket/main.rkt` will open the racket/gui window.
-;; Item 00 stub: the GUI (racket/gui/) does not exist yet. racket/gui is
-;; never required at module level here, so this module loads headless.
+;; Entry point: `racket racket/main.rkt [SCALE]` opens Metacat's windows and
+;; its control panel, as typing (setup) after loading metacat.ss did.  Type a
+;; problem such as "abc abd xyz" (optionally an answer and a seed: "abc abd
+;; xyz 7") and press Enter, then Go or Step.  racket/gui is loaded only when
+;; main runs (dynamic-require), so requiring this module stays headless.
+
+(require racket/runtime-path)
 
 (provide metacat-version main)
+
+(define-runtime-path gui-path "gui/gui.rkt")
 
 (define metacat-version "1.2")
 
 (define (main . args)
-  (printf "Metacat ~a (Racket port): the GUI is not implemented yet.~%" metacat-version))
+  (let ((setup (dynamic-require gui-path 'setup))
+        (scale (if (null? args) 1 (or (string->number (car args)) 1))))
+    (setup scale)))
 
 (module+ main
-  (main))
+  (apply main (vector->list (current-command-line-arguments))))

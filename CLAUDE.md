@@ -16,7 +16,8 @@ bash tests/run-tests.sh                    # every test: raco test racket/, then
 raco test racket/tests/skeleton-test.rkt   # one Racket test file
 scheme --script chez_scheme/oracle/tests/reader-check.ss   # one Chez check (fails by exiting non-zero)
 python3 ralph_loops/loop0001/gate.py       # the regression gate: original untouched + run-tests.sh
-racket racket/main.rkt                     # GUI entry point
+racket racket/main.rkt                     # GUI entry point (control panel + windows)
+env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a -s "-screen 0 1920x1200x24" raco test racket/gui-tests/*.rkt   # GUI tests, never on the real screen
 racket racket/cli.rkt abc abd xyz --seed 7 # headless entry point (same output as the oracle's run.ss)
 scheme --script chez_scheme/oracle/run.ss abc abd xyz --seed N --max-codelets K   # the original, headless (loop item 01)
 ```

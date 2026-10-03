@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 15/18 SOLVED
+- **Current**: 16/18 SOLVED
 
 ---
 
@@ -1660,3 +1660,134 @@ byte.
   - Mouse handlers: views-harness.rkt shows how to click through the original
     handlers. `thread-break` in views.rkt still raises: the engine thread is item 15's.
   - views-test.rkt now takes about 70 s, and the gate about 8 min.
+
+---
+
+## Iteration 16 — 2026-10-03 04:10
+Item 15 (The control panel and windows): **SOLVED**. `racket racket/main.rkt` opens the
+control panel and every window on the screen. Runs driven through the panel's own widgets
+on a virtual display match the goldens: a full run, step mode, Stop and Go, a breakpoint
+resumed by a click on the Workspace, and Reset.
+
+### Completed
+- **gui.ss → `racket/gui/gui.rktl`**, included by the new **`racket/gui/gui.rkt`**
+  (the only module besides tests that requires racket/gui).
+  - Verbatim: the command-line parser, the button, breakpoint, step-interval,
+    save-commentary and speed actions, every message of the control panel object, the
+    window controllers and the clamp menu logic.
+  - Rewritten on racket/gui (marked port:): the widgets, the menus (Help, Demos,
+    Windows, Options, Memory), the dialogs (confirm, input) and the help window.
+  - Widget colours and menu-item fonts are left out (divergences.md).
+- **setup.ss's `setup` and `enable-resizing` → `racket/gui/setup.rktl`**, and
+  `create-mcat-logo` in gui.rkt. **demos.ss → `racket/engine/demos.rktl`**, verbatim.
+  `racket/main.rkt` runs `setup`, taking an optional scale argument.
+- **On-screen windows**: `screen-host%` is a frame with a canvas painting the viewport's
+  display list, installed through views.rkt's window-host maker, so items 13–14's window
+  code is unchanged.
+  - A 50 ms timer repaints changed windows and keeps Tk-style scrollbars (shown only
+    when needed) in step with the scroll region.
+  - Mouse presses go to the original press handlers.
+  - Resizing a frame goes through the original resize handler and listener thread.
+  - `arrange-windows!` tiles the windows (the original left that to the window manager).
+- **The engine thread** stands for the REPL thread. `thread-break` hands it thunks
+  (init-mcat + run-mcat, `go`); each runs inside a prompt until `break` → `(reset)`.
+  Model errors return the panel to input mode.
+- **Bugs found and fixed on the way**:
+  1. **GTK ignored Xvfb** because the owner's session sets `WAYLAND_DISPLAY`. My first
+     three scratch runs (a few seconds each) opened windows **on the owner's screen**
+     before I noticed: `xwininfo` showed an empty Xvfb root and the screen grab was
+     black. Every GUI run now uses `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run`
+     (tests/run-tests.sh, CLAUDE.md), and the GUI test refuses to run if
+     `WAYLAND_DISPLAY` is set. Logged in anomalies, and saved in my memory notes.
+  2. views.rkt's SWL message-queue stand-in **deadlocked the GUI thread**: a receive
+     took the semaphore and the message in two steps. A receive is now atomic, and
+     `critical-section` runs in atomic mode.
+  3. Scrollbars appearing after layout overlapped the Commentary's text: racket/gui's
+     `on-size` doesn't report them. Also, the original's single resize queue keeps only
+     the last of simultaneous resizes, so the Commentary never reflowed and kept a stale
+     scroll position. Now the tick watches the client size, and scrollbars are shown
+     before windows become resizable, so frames grow around them.
+- **Tests**:
+  - **`racket/gui-tests/control-panel-test.rkt`** (105 checks, about 9 s on Xvfb, run
+    by tests/run-tests.sh; racket/info.rkt omits gui-tests from plain `raco test`). It
+    drives the panel's real widgets: Enter in the command line, the Step/Go/Stop/Reset
+    buttons, the slider, menu items, dialogs, and clicks on the Workspace canvas.
+    - Setup: 12 window controllers, with EEG and Logo hidden. Every window is a visible
+      on-screen frame and none overlaps the control panel.
+    - Invalid input turns the label red and restores it after 700 ms. The speed slider
+      at Fast gives the original's settings.
+    - **Full run** (`abc abd ijk` seed 1): Enter initializes and stops at 0 (the
+      original's `quiet-break`), Go runs to **395 codelets with the golden's generator
+      state**. Printed output and commentary checked.
+    - **Step mode**: Step gives 1 codelet; the step interval is set to 50 through the
+      Options dialog; then 50, 100, and Go finishes at the golden state.
+    - **Breakpoint** 300 set through its dialog: Go stops with "Codelets run: 300",
+      Clear breakpoint works, and a **click on the Workspace resumes** (the original's
+      handler calls `go`) to the golden state.
+    - **Stop and restart** (run 7, 2170 codelets): the panel is in run mode ("running...",
+      Stop enabled), Stop interrupts mid-run, Go resumes to the golden state; **Reset**
+      re-initializes (0 codelets, seed state) and Go matches the golden again.
+    - Clear Memory through its confirm dialog (the panel is disabled while it's up).
+      Save commentary to file writes exactly the window's lines.
+    - Windows menu hide/show; Self-watching off and on (the warning label and the theme
+      windows follow); resizing the Workspace frame resizes the window; a Demos item
+      initializes Run 7 and is checked.
+  - Mutation checks, each restored afterwards:
+
+    | Mutation | Failures |
+    | --- | --- |
+    | Stop does nothing | 3 |
+    | init without `quiet-break` | 18 |
+    | speed 100 gives 2 flashes | 1 |
+    | resize without `configure` | 3 |
+    | demo item not highlighted | 1 |
+    | command line not cleared on a new problem | 0 (equivalent: `switch-to-input-mode` clears it) |
+
+  - Tests first, honestly: no. A scratch script drove the first on-screen run (it found
+    bugs 1 and 2) before the test existed, and the test was written against working
+    code. Without the port the test cannot load (`racket/gui/gui.rkt` does not exist).
+    Its first run failed 7 checks, all harness mistakes (output capture, a racy
+    run-mode check, a too-strict layout check), and it hung at exit until the refresh
+    timer was stopped.
+- **What I saw** (screenshots of the whole 1920×1200 virtual screen with
+  `tests/gui-screenshot.rkt`, read with the Read tool and cropped):
+  - `abc abd mrrjjj` seed 1 with a breakpoint at 513: the Workspace is the same as item
+    13's offscreen `mrrjjj-513`.
+    - The control panel (top left) shows the menu bar, " abc -> abd; mrrjjj -> ?  seed: 1",
+      an azure command line, the Slow/Speed/Fast slider, and Step/Go/Reset enabled
+      with Stop disabled.
+    - Temperature under the panel; Coderack and Commentary to the right of the
+      Workspace; Slipnet, the theme windows and Memory in the second row; the Temporal
+      Trace with its horizontal scrollbar in the third row.
+  - First shot: the Commentary's first line ran under the scrollbar ("wha|t"), which led
+    to fix 3. After it, run 7's `wyz` screen shows the commentary wrapped inside the
+    window and scrolled to the newest paragraph. The Trace shows Identity, x-y-z, a-b-c,
+    Top Rule, SNAG, Clamp and Opposite events, and the Memory shows "SNAG" and "wyz",
+    as in Figs. 5.10/5.11.
+  - Xvfb has no window manager, so there are no title bars. The Vertical Themes window
+    (590 px tall) ends about 30 px below a 1200-px screen.
+- Docs: porting-notes.md (item 15 section); divergences.md (the racket/gui control
+  panel, layout, logo, engine thread); anomalies_and_quirks.md (Wayland vs Xvfb,
+  `on-size` and scrollbars, the queue deadlock, one resize queue for all windows);
+  CLAUDE.md (the GUI test command).
+- `python3 ralph_loops/loop0001/gate.py`: **GATE PASSED** (`raco test racket/`: 2557 tests;
+  GUI tests: 105). `chez_scheme/original/` and `tests/golden/` untouched.
+
+### Blockers
+- None. Not done: theme edit mode (Clamp theme pattern) has no automated test beyond
+  compiling; its dialog and the press handlers are ported. Colours of native widgets
+  can't be set in racket/gui.
+
+### Next
+- Item 16 in iterations.md. Notes:
+  - Run anything that loads racket/gui as
+    `env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a -s "-screen 0 1920x1200x24" ...`.
+  - `tests/gui-screenshot.rkt OUT.png abc abd xyz 7 [--break N]` grabs the screen.
+  - The control panel answers `get-widgets` for driving it.
+  - The gate is about 8–9 min.
+  - demos.ss is already ported (`racket/engine/demos.rktl`, needed by the Demos menu);
+    item 16 needs only its tests and the seed caveat.
+- Naming: the item's Run and Pause are the original's Go and Stop. Stop interrupts, and
+  Go resumes the stopped run. The original has no separate Pause button, so the port
+  keeps its four buttons. The seed is typed after the problem ("abc abd xyz 7"), as in
+  gui.ss.

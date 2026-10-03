@@ -39,6 +39,7 @@
 
 (require racket/class
          racket/include
+         (only-in ffi/unsafe/atomic start-atomic end-atomic)
          (only-in racket/draw make-bitmap bitmap-dc%)
          "engine-route.rkt"
          "../compat.rkt"
@@ -51,7 +52,7 @@
 
 (provide (except-out (all-defined-out) window-host%)
          attach-workspace-view! attach-views! window->bitmap save-window-png
-         make-window-host set-window-host-maker!)
+         make-window-host set-window-host-maker! set-thread-break-handler!)
 
 ;;-----------------------------------------------------------------------------
 ;; port: the parts of SWL the window code uses
@@ -65,31 +66,49 @@
 (define swl:screen-width (lambda () 1280))
 (define swl:screen-height (lambda () 1024))
 
-;; SWL thread message queues (general-graphics.ss's resize listener)
+;; SWL thread message queues (general-graphics.ss's resize listener).  A
+;; receive takes the semaphore and the message in one atomic step, so that
+;; thread-msg-waiting? (a message is queued) and the semaphore agree: the
+;; resize handler, in a critical section, receives a waiting message without
+;; blocking.  (Taking them in two steps deadlocked the GUI thread when the
+;; listener thread ran between them.)
 (define thread-make-msg-queue
   (lambda (name) (vector name '() (make-semaphore 0))))
 (define thread-send-msg
   (lambda (q msg)
+    (start-atomic)
     (vector-set! q 1 (append (vector-ref q 1) (list msg)))
-    (semaphore-post (vector-ref q 2))))
+    (semaphore-post (vector-ref q 2))
+    (end-atomic)))
 (define thread-msg-waiting?
   (lambda (q) (pair? (vector-ref q 1))))
 (define thread-receive-msg
   (lambda (q)
-    (semaphore-wait (vector-ref q 2))
-    (let ((msg (car (vector-ref q 1))))
-      (vector-set! q 1 (cdr (vector-ref q 1)))
-      msg)))
+    (let loop ()
+      (start-atomic)
+      (if (semaphore-try-wait? (vector-ref q 2))
+          (let ((msg (car (vector-ref q 1))))
+            (vector-set! q 1 (cdr (vector-ref q 1)))
+            (end-atomic)
+            msg)
+          (begin
+            (end-atomic)
+            (sync (semaphore-peek-evt (vector-ref q 2)))
+            (loop))))))
 (define thread-fork (lambda (thunk) (thread thunk)))
 (define thread-sleep (lambda (ms) (sleep (/ ms 1000.0))))
-(define critical-section-lock (make-semaphore 1))
+;; SWL's critical-section: no other Racket thread runs inside it
 (define-syntax-rule (critical-section e ...)
-  (call-with-semaphore critical-section-lock (lambda () e ...)))
+  (dynamic-wind start-atomic (lambda () e ...) end-atomic))
 ;; the Workspace window's mouse handler interrupts the REPL thread to (go);
-;; the engine thread is the control panel's (item 15)
-(define thread-break
+;; the control panel (racket/gui/gui.rkt) installs a handler that hands the
+;; thunk to its engine thread; without one (offscreen views) it raises
+(define thread-break-handler
   (lambda (thread ignore k)
-    (error 'thread-break "no engine thread to interrupt yet")))
+    (error 'thread-break "no engine thread to interrupt")))
+(define (set-thread-break-handler! h) (set! thread-break-handler h))
+(define thread-break
+  (lambda (thread ignore k) (thread-break-handler thread ignore k)))
 
 ;; The window host: SWL's <toplevel> and its <frame> or <scrollframe>, with
 ;; the methods make-graphics-window sends them.  Offscreen by default (it
@@ -215,3 +234,12 @@
 
 (define (save-window-png window file)
   (send (window->bitmap window) save-file file 'png))
+
+;; port: (set-view-global! 'name value), set! of a variable of the graphics
+;; files from the control panel (racket/gui/gui.rkt, whose set! routes here
+;; through engine-route.rkt), as gui.ss set!s them on the shared top level
+(define (set-view-global! sym value)
+  (case sym
+    [(%comment-window-font%) (set! %comment-window-font% value)]
+    [(*theme-edit-mode?*) (set! *theme-edit-mode?* value)]
+    [else (error 'set-view-global! "not a settable view global: ~s" sym)]))

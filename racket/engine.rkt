@@ -75,6 +75,7 @@
 (include "engine/theme-graphics.rktl") ; theme-graphics.ss (relation-name only)
 (include "engine/trace-graphics.rktl") ; trace-graphics.ss (group-event-pexp-text-string only)
 (include "engine/eeg-graphics.rktl")   ; eeg-graphics.ss (the EEG object, without the window)
+(include "engine/demos.rktl")          ; demos.ss
 (include "engine/view-globals.rktl")   ; colours and fonts the views install
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 

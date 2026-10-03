@@ -23,6 +23,13 @@ find racket -name '*.rkt' -not -path '*/compiled/*' -print0 | xargs -0 raco make
 echo "== raco test racket/"
 raco test racket/
 
+# GUI tests open racket/gui windows: only on a virtual display.  GTK prefers
+# Wayland when WAYLAND_DISPLAY is set and would then ignore Xvfb and use the
+# owner's screen, so it is unset and the X11 backend forced.
+echo "== raco test racket/gui-tests (xvfb-run)"
+env -u WAYLAND_DISPLAY GDK_BACKEND=x11 \
+  xvfb-run -a -s "-screen 0 1920x1200x24" raco test racket/gui-tests/*.rkt
+
 echo "== Chez oracle checks"
 shopt -s nullglob
 checks=(chez_scheme/oracle/tests/*.ss)

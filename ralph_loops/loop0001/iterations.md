@@ -106,7 +106,7 @@
     `memory-graphics.ss`, `commentary-graphics.ss` and `eeg-graphics.ss`. Tests: as in 13,
     per panel.
 
-- [ ] **15 The control panel and windows.** Port `gui.ss` to `racket/gui`: the control
+- [x] **15 The control panel and windows.** Port `gui.ss` to `racket/gui`: the control
     panel (problem entry, seed, Run, Step, Pause, Stop, Reset, step size, speed), the
     menus (including "Save commentary to file"), the panel windows and their layout, and
     window resizing. The engine runs in its own thread; the GUI drives it by messages.
