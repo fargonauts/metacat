@@ -20,7 +20,7 @@ from metacat import chez
 
 def b_num(x) -> str:
     """helpers.scm: b:num"""
-    if isinstance(x, complex):
+    if isinstance(x, (complex, chez.ExactComplex)):
         return "C" + b_num(x.real) + "," + b_num(x.imag)
     if isinstance(x, (int, Fraction)):
         return str(x)
@@ -52,7 +52,7 @@ def canon(x, strings: bool = False) -> str:
         return '"' + x + '"'
     if isinstance(x, str):
         return "'" + x
-    if isinstance(x, (int, float, Fraction, complex)):
+    if isinstance(x, (int, float, Fraction, complex, chez.ExactComplex)):
         return b_num(x)
     if isinstance(x, chez.Pair):
         return "(" + canon(x.car, strings) + " . " + canon(x.cdr, strings) + ")"

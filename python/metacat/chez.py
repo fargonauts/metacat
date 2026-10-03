@@ -28,14 +28,15 @@ import unicodedata
 from fractions import Fraction
 
 __all__ = [
-    "String", "Char", "Pair", "Vector",
+    "String", "Char", "Pair", "Vector", "ExactComplex",
     "SchemeError", "UnboundVariable", "error",
     "random", "random_seed",
     "norm", "add", "sub", "mul", "div", "max_", "min_", "abs_", "quotient", "remainder", "modulo",
     "exact_p", "inexact_p", "integer_p", "rational_p", "number_p", "zero_p", "positive_p",
     "negative_p", "add1", "sub1", "exact", "inexact", "round_", "floor_", "ceiling", "truncate",
     "exact_round", "exact_floor", "exact_ceiling", "exact_truncate",
-    "sqrt", "exp", "log", "tanh", "expt",
+    "sqrt", "exp", "log", "tanh", "expt", "atan", "make_rectangular", "real_part", "imag_part",
+    "string_to_number", "make_vector",
     "map_", "for_each", "andmap", "ormap", "sort", "remq", "remv", "remove",
     "memq", "memv", "member", "assq", "assv", "assoc", "eq_p", "eqv_p", "equal_p",
     "TOP_LEVEL", "define_top_level_value", "top_level_value", "set_top_level_value_bang",
@@ -84,6 +85,22 @@ class Vector(list):
     __slots__ = ()
 
 
+class ExactComplex:
+    """An exact non-real number such as 3+4i, which Python's complex (two
+    floats) cannot hold: utilities.ss's coord is make-rectangular, and the
+    graphics build coordinates from exact integers.  Only construction, the
+    parts, eqv? and printing are implemented (item 03); arithmetic on
+    coordinates is for the graphics items."""
+    __slots__ = ("real", "imag")
+
+    def __init__(self, real, imag):
+        self.real = real
+        self.imag = imag
+
+    def __repr__(self):
+        return f"ExactComplex({self.real!r}, {self.imag!r})"
+
+
 def _is_exact(x) -> bool:
     t = type(x)
     return t is int or t is Fraction
@@ -91,7 +108,7 @@ def _is_exact(x) -> bool:
 
 def _is_number(x) -> bool:
     t = type(x)
-    return t is int or t is float or t is Fraction or t is complex
+    return t is int or t is float or t is Fraction or t is complex or t is ExactComplex
 
 
 # ---------------------------------------------------------------------------
@@ -611,6 +628,69 @@ def tanh(x):
     return math.tanh(inexact(x))
 
 
+def atan(y, x=None):
+    """Chez: atan, one or two arguments (flonum results; (atan 0) is exact 0)"""
+    if x is None:
+        if type(y) is int and y == 0:
+            return 0
+        _check(y, "atan")
+        return math.atan(inexact(y))
+    _check(y, "atan")
+    _check(x, "atan")
+    return math.atan2(inexact(y), inexact(x))
+
+
+def make_rectangular(re, im):
+    """Chez: make-rectangular.  An exact zero imaginary part gives the real
+    part itself ((make-rectangular 1.5 0) is 1.5); two exact parts give an
+    ExactComplex; otherwise both parts become flonums (1.0+2.0i)."""
+    _check(re, "make-rectangular")
+    _check(im, "make-rectangular")
+    if _is_exact(im) and im == 0:
+        return re
+    if _is_exact(re) and _is_exact(im):
+        return ExactComplex(re, im)
+    return complex(inexact(re), inexact(im))
+
+
+def real_part(z):
+    """Chez: real-part"""
+    t = type(z)
+    if t is ExactComplex:
+        return z.real
+    if t is complex:
+        return z.real
+    _check(z, "real-part")
+    return z
+
+
+def imag_part(z):
+    """Chez: imag-part (exact 0 for every real, flonums included)"""
+    t = type(z)
+    if t is ExactComplex:
+        return z.imag
+    if t is complex:
+        return z.imag
+    _check(z, "imag-part")
+    return 0
+
+
+def string_to_number(s):
+    """Chez: string->number (radix 10): integers, n/d, decimals with
+    exponents; #f for anything else.  Only gui.ss uses it (the seed field)."""
+    import re as _re
+    if _re.fullmatch(r"[+-]?\d+", s):
+        return int(s)
+    m = _re.fullmatch(r"([+-]?\d+)/(\d+)", s)
+    if m:
+        if int(m.group(2)) == 0:
+            return False
+        return norm(Fraction(int(m.group(1)), int(m.group(2))))
+    if _re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?", s):
+        return float(s)
+    return False
+
+
 # ---------------------------------------------------------------------------
 # 5. Lists
 
@@ -837,7 +917,7 @@ def eqv_p(a, b) -> bool:
         if a != a:
             return b != b
         return a == b and math.copysign(1.0, a) == math.copysign(1.0, b)
-    if ta is complex:
+    if ta is complex or ta is ExactComplex:
         return eqv_p(a.real, b.real) and eqv_p(a.imag, b.imag)
     return False
 
@@ -869,6 +949,11 @@ def equal_p(a, b) -> bool:
             return pa is None and pb is None and not a and not b
         return equal_p(pa[0], pb[0]) and equal_p(pa[1], pb[1])
     return False
+
+
+def make_vector(n, fill=0):
+    """Chez: make-vector (filled with 0 by default)"""
+    return Vector([fill] * n)
 
 
 def remq(x, ls):
@@ -1048,6 +1133,9 @@ def number_to_string(z) -> str:
         re, im = z.real, z.imag
         sign = "" if (im < 0.0 or math.copysign(1.0, im) < 0 or im != im or im == math.inf) else "+"
         return _flonum_to_string(re) + sign + _flonum_to_string(im) + "i"
+    if t is ExactComplex:
+        im = str(z.imag)
+        return str(z.real) + ("" if im[0] == "-" else "+") + im + "i"
     raise SchemeError("number->string", "~s is not a number", z)
 
 
@@ -1158,7 +1246,7 @@ def _print(x, out: list, write: bool):
                 _write_symbol(x, out)
             else:
                 out.append(x)
-        elif t is int or t is float or t is Fraction or t is complex:
+        elif t is int or t is float or t is Fraction or t is complex or t is ExactComplex:
             out.append(number_to_string(x))
         elif t is String:
             if write:

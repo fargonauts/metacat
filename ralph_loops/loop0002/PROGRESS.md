@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 3/18 SOLVED
+- **Current**: 4/18 SOLVED
 
 ---
 
@@ -279,3 +279,150 @@ utilities tests. Use `chez.map_` for `tell-all` and every `map` with effects, an
 `chez.format_`/`printf`. Use `chez.mul`/`div`/`max_`/`min_` wherever an operand can be a
 flonum, `chez.expt`/`sqrt`/`exp`/`tanh` everywhere. `scheme_canon.canon` replaces the
 prototype tests' minimal canon. Move `name_mapping.py` into `metacat/names.py`.
+
+---
+
+## Iteration 4 — 2026-10-03 19:28
+
+### Completed
+Item 03, objects, sugar and utilities: **SOLVED**.
+- **Tests first.** `python/tests/test_utilities.py` has one case for each of the 197 tests
+  of `tests/diff/utilities-battery.scm`. `CASES` maps each test name to a Python
+  rebuild of the battery expression, with the same order of draws and effects, and
+  compares its `b:canon` text with the frozen fixture (`ERROR` fixtures must raise
+  `chez.SchemeError`). `test_every_battery_test_is_translated` checks that the names
+  equal the MANIFEST's 197. The battery's own definitions (`make-fake`, the stand-ins
+  for `make-slipnode`, `establish-link`, `make-codelet-type`, `*coderack*`,
+  `*control-panel*`, `%verbose%`) are translated in the test. `engine_module(...)` puts
+  them on `metacat.setup`/`slipnet`/`coderack`: on the real module once it exists, on a
+  temporary one until then. I wrote the whole file, with the API it expects, before any
+  of the three modules existed. Run: collection failed with `ImportError: cannot import
+  name 'objects' from 'metacat'`, so all 197 cases failed. Structural tests are in the
+  same file: every `define` of utilities.ss and syntactic-sugar.ss, and each of the 22
+  extend-syntax forms, has its mapped Python function; every public function's docstring
+  names its origin; there are no tkinter imports; `self` is the receiver through
+  delegation; forwarders; `report_error_and_halt` can be replaced; an escape is caught
+  only by its own `continuation-point*`, and fails after the form returns.
+- **Code.**
+  - `python/metacat/objects.py`: candidate C3 (`SchemeObject`, `@message`, `tell`,
+    `delegate(self, msg, args, *parents)`, `delegate_to_all`, `tell_all`,
+    `base_object`, `Lambda`, `Forwarder`, `procedure_p`, `INVALID`, `Reset`).
+  - `python/metacat/sugar.py`: every extend-syntax form as a function, with thunks for
+    delayed bodies. `stochastic_if_star` draws exactly one `(random 1.0)`, before the
+    probability. A form with several patterns is one function per pattern. Free names
+    are read from the engine modules at call time.
+  - `python/metacat/utilities.py`: utilities.ss function for function, in the file's
+    order.
+  - `name_mapping.py` moved into the package as `python/metacat/names.py`; the test
+    helper keeps only `original_names()`.
+  - `chez.py` additions: `ExactComplex`, `make_rectangular`/`real_part`/`imag_part`
+    (exact `3+4i`, needed by `coord`), `make_vector`, `string_to_number`, `atan`.
+    `scheme_canon` prints `ExactComplex`.
+
+  After the first full write, all 197 cases passed on the first run. The two
+  non-fixture tests that failed were wrong expectations in my own tests:
+  - the no-GUI check grepped the source text, and the module docstring says "never
+    imports tkinter" (it now walks the AST, as test_chez.py does);
+  - the delegation test expected a parent *without* an `else` clause to answer invalid.
+    It answers void, as in Chez, and the test now checks both kinds.
+- **Mutation checks** (`/tmp/mutate.py`, not kept; each mutation applied to the module,
+  then the file run, then restored). 40 mutations, all caught except one equivalent
+  mutant:
+
+  | Mutation | Failing |
+  |---|---|
+  | pairwise-map: map before the recursion | 3 |
+  | cross-product: l1 first to last | 6 |
+  | partition: insert first to last | 2 |
+  | bounded-random-partition: insert in pick order | 2 |
+  | tell-all left to right | 1 |
+  | delegate passes the parent as self | 1 |
+  | delegate-to-all left to right | 1 |
+  | `~` draws the sign first | 1 |
+  | `prob?` with `>=` | 1 (after utilities-extra, below; 0 before) |
+  | `exists?` by Python truthiness | 1 |
+  | remove-duplicates keeps the first | 2 |
+  | weighted-index with `<=` | 1 |
+  | average with Python `/` | 2 |
+  | log10 without the 1e-15 nudge | 2 |
+  | round-to-100ths with Python `round` | 1 |
+  | all-same? by `==` | 1 |
+  | map-leaves maps `'()` as a list | 1 |
+  | flatmap / select-extreme map left to right | 1 / 1 |
+  | sort-by-method with `sorted()` | 1 |
+  | stochastic-pick without `exact->inexact` | 2 |
+  | `sgn` 0 → 0 | 3 |
+  | make-table default 0 | 2 |
+  | rotate counterclockwise | 2 |
+  | `event?` returns `#t` | 1 |
+  | stochastic-if*: probability before the coin | 1 |
+  | stochastic-if* with `<=` | 1 |
+  | for* from/to exclusive | hangs (`(ascending-index-list 0)`, the faithful loop): caught by timeout |
+  | for* returns void | 3 |
+  | repeat* times returns a value | 1 |
+  | continuation-point* catches any escape | 1 |
+  | fizzle not reset | 1 |
+  | say ignores `%verbose%` | 1 |
+  | mcat without its fender | 3 |
+  | link: label before length | 1 |
+  | valid-number? accepts 0 | 2 |
+  | tell does not halt on invalid | 2 |
+  | make-rectangular keeps an exact 0 imaginary part | 1 |
+  | select-extreme `assv` → `assoc` | 0: equivalent (both compare numbers by `eqv?`) |
+
+  To kill the `prob?` survivor I added a local battery,
+  `python/oracle/batteries/utilities-extra-battery.scm` (4 tests: `prob?-ties`,
+  `stochastic-if*-ties`, `select-extreme-ties`, `misc`). It is captured into
+  `python/fixtures/utilities-extra/` through the unedited diff-eval.ss and covered by the
+  slow re-capture test. Unlike the 197, it was written *after* the code, and its Python
+  cases passed at once. `test_fixtures.py` now expects the local batteries `chez` and
+  `utilities-extra`.
+- **Evaluation-order audit** of utilities.ss and syntactic-sugar.ss (calls or `let`s with
+  two effectful parts):
+  - `pairwise-map`'s `append`: the recursion first (fixture);
+  - `stochastic-if*`: the coin, then the probability;
+  - `for*` from/to: `exp1`, then `exp2`;
+  - `~`: the size (`let`), then the sign;
+  - `cross-product-filter-map`/`-map-filter`, `map-leaves` and `filter-map`: `cons` goes
+    left to right; the recursion on the rest of l1 comes first (fixtures);
+  - `partition`/`bounded-random-partition`: every pick, then the inserts in reverse;
+  - `tell-all`, `delegate-to-all`, `flatmap`, `select-extreme`, `adjacency-map` and
+    `weighted-average`: `chez.map_` order;
+  - `sort-by-method`: two `tell`s as one predicate's arguments. Python goes left to right;
+    they are pure for every sort key in the model (noted in the docstring).
+
+  Every site carries a `# chez:` or `# 1.2:` comment (20 in the three modules).
+- **Re-grep that the plan asked for** (`symbol?`, `string?`, `eq?` on string literals,
+  `~s`). New finding: the graphics (`string?` in sgl-interpreter.ss:386/398/432,
+  general-graphics.ss:418, fonts.ss:93, gui.ss:363) and rules.ss:269
+  (`filter-out symbol?`) do tell strings from symbols. I logged it as an open hidden
+  coupling, so the items for those files keep the distinction. No `eq?` on a string
+  literal; `~s` only in run.ss's `no-prompt` error and fonts.ss's debugging.
+- **Docs.**
+  - `docs/anomalies_and_quirks.md`: three new entries: Python interns only
+    identifier-like string constants (so `INVALID` must be one shared object; checked
+    with two modules), Python's `complex` can't hold Chez's exact complex numbers, and
+    the strings-vs-symbols coupling above.
+  - `docs/python-translation-plan.md`: a new "As built (item 03)" subsection with the
+    objects/sugar/utilities API decisions; the Names section points to `metacat/names.py`.
+  - `python/README.md`: the new modules.
+- Speed (for item 12): `tell` 135 ns, delegated once 247 ns, twice 367 ns, child+parent
+  creation 111 ns, `prob_p` 0.64 µs, `stochastic_if_star` 0.75 µs.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (379 tests, 36 s).
+
+### Blockers
+None. Deliberately left for later items:
+- arithmetic on `ExactComplex` and complex coordinates (`magnitude`, `+` on coords);
+  the graphics need it;
+- `ask` (the REPL prompt; no run uses it) is translated minimally: symbols and numbers on
+  one line, not a full Scheme reader.
+
+### Next
+Item 04 onwards: model modules import `from metacat.utilities import tell, prob_p, ...`
+and `from metacat import sugar`, and always call `sugar.fizzle()` qualified. setup.py
+must define `p_verbose` and `g_control_panel`, coderack.py `g_coderack` and
+`make_codelet_type`, slipnet.py `make_slipnode` and `establish_link` (sugar reads them
+there). `slipnet_node_list_star(specs, module=slipnet)` and
+`codelet_type_list_star(specs, module=coderack)` also set the module attributes.
+Objects return `objects.INVALID` (never a spelled-out string) from `otherwise`. Run
+drivers replace `objects.report_error_and_halt`.

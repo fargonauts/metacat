@@ -46,5 +46,15 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   `random`/`random-seed`, exact arithmetic (`add`, `mul`, `div`, `max_`, `expt`, ...),
   rounding, `map_` (Chez's order), `for_each`, `sort` (Chez's merge sort), `remq` and
   friends, `eq_p`/`eqv_p`/`equal_p`, the top-level value table, and the printer
-  (`number_to_string`, `display`, `write`, `format_`, `printf`). Tests:
-  `tests/test_chez.py`.
+  (`number_to_string`, `display`, `write`, `format_`, `printf`), `make_rectangular`
+  (with `ExactComplex`). Tests: `tests/test_chez.py`.
+- `metacat/objects.py`: Metacat's objects (record-case closures as `SchemeObject`
+  subclasses with `@message` methods), `tell`, `delegate`, `delegate_to_all`,
+  `tell_all`, `base_object`, `Lambda`, `Forwarder`, `INVALID`, `Reset`.
+- `metacat/sugar.py`: syntactic-sugar.ss, every extend-syntax form as a function.
+- `metacat/utilities.py`: utilities.ss, function for function.
+- `metacat/names.py`: the Scheme → Python name mapping.
+
+  Tests: `tests/test_utilities.py`, every test of `tests/diff/utilities-battery.scm` plus
+  `oracle/batteries/utilities-extra-battery.scm` (ties, `select-extreme` ties, a few
+  mixed-exactness cases).

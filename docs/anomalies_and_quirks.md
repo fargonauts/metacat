@@ -480,7 +480,48 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around in chez.py (`div`, `expt`, `log`, `inexact`, `exp`, `round_`).
   Plain Python operators on model floats must not meet these cases.
 
+### Python interns only identifier-like string constants, so `'invalid-message-indicator` needs one shared object
+- **Seen:** loop0002 iteration 4 (item 03), writing objects.py.
+- **What:** two modules that each write the literal `"invalid-message-indicator"` get two
+  different objects: `a.X is b.Y` is `False`. Python interns string constants
+  automatically only when they look like identifiers, and the hyphens rule that out. The
+  same goes for a symbol built at run time (`"-".join(...)`). `tell` and `delegate` test
+  the indicator with `is`, so a producer that spells it out would not halt where Chez
+  halts.
+- **Evidence:** `python3 -c 'import a, b; print(a.X is b.Y)'` with the literal in a.py and
+  b.py prints `False`.
+- **Status:** worked around: every producer uses `objects.INVALID` (a `sys.intern`ed
+  constant), and other symbols are compared with `==`, never `is`
+  (docs/python-translation-plan.md, "eq? and identity").
+
+### Python's `complex` cannot hold Chez's exact complex numbers
+- **Seen:** loop0002 iteration 4 (item 03), utilities battery `coords`.
+- **What:** `(coord 3 4)` (`make-rectangular`) is the exact `3+4i` in Chez, and
+  `(x-coord c)` gives back the exact 3. Python's `complex` holds two floats. Also,
+  `(make-rectangular 1.5 0)` is the real `1.5` (an exact zero imaginary part vanishes),
+  `(make-rectangular 1 2.0)` is `1.0+2.0i`, and `(imag-part 1.5)` is the exact `0`.
+- **Evidence:** fixtures `coords` and `number->string-exact` of the utilities battery.
+- **Status:** worked around: `chez.ExactComplex` and `chez.make_rectangular`,
+  `real_part`, `imag_part`, printed by `number_to_string`. Arithmetic on coordinates
+  (the graphics: `magnitude`, `+` on coords) isn't there yet; the graphics items add it.
+
 ## 🔗 Hidden couplings
+
+### The graphics and rules.ss tell strings from symbols
+- **Seen:** loop0002 iteration 4 (item 03), the grep that docs/python-translation-plan.md
+  asked item 03 to repeat.
+- **What:** the plan makes symbols and Scheme strings both Python `str`, because the model
+  never tells them apart. It does in a few places. `string?` picks strings out in
+  sgl-interpreter.ss:386, 398 and 432, general-graphics.ss:418, fonts.ss:93 and gui.ss:363
+  (text versus symbolic arguments, colour names versus colour objects, font faces).
+  rules.ss:269 runs `(filter-out symbol? (flatten rule-clauses))`, so a string in a
+  rule clause would survive where a symbol is dropped. `symbol?` at answers.ss:140,
+  themes.ss:595, trace.ss:83, justify.ss:242/245 and gui.ss:743/749 only tells a symbol
+  from a list or a number, which `str` handles. There is still no `eq?` on a string
+  literal, and `~s` is only used in run.ss's `no-prompt` error and fonts.ss's debugging
+  output.
+- **Status:** open. The items that translate those files must keep the distinction there:
+  `chez.String` for the strings those tests see, or an explicit tag.
 
 ### Model state that only a window can provide
 - **Seen:** iteration 2 (item 01).

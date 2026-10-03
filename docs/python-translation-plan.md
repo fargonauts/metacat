@@ -409,9 +409,69 @@ def make_bond(from_object, to_object, bond_category, bond_facet,
 Item 12 may speed up dispatch further (local aliases of `tell` in hot loops, caching the
 parent's table), keeping every trace identical.
 
+### As built (item 03)
+
+`python/metacat/objects.py` is C3, with these details fixed by the utilities battery:
+- `delegate(self, msg, args, *parents)` and `delegate_to_all(self, msg, args, *objects)`
+  take the message split into its parts, as they are called from `otherwise(this, self,
+  msg, args)`. `delegate` passes `self` on; `delegate_to_all` gives each object itself
+  as self and runs in `chez.map_` order. A parent whose record-case has no `else`
+  answers void (`None`), which `delegate` returns as an answer, as in Chez.
+- `Lambda(fn)` wraps a plain `(lambda msg ...)` object, `fn(self, msg, *args)`, for
+  stand-ins and objects that dispatch by hand. `Forwarder`, `base_object` (also
+  `BASE_OBJECT`), `procedure_p` (`callable`), `Reset` and `INVALID` are as planned.
+- `MESSAGES` also collects `@message` methods from SchemeObject base classes, so a Python
+  subclass may share clauses. Delegation to a separate object is still `delegate`.
+- `tell` calls `report_error_and_halt` through the module global, so a run's driver
+  replaces `objects.report_error_and_halt` (run.ss's `set!`). utilities.py re-exports the
+  object procedures, but replacing them there would not reach `tell`.
+- Measured (this machine): `tell` 135 ns, delegated once 247 ns, twice 367 ns, creating
+  a child and its parent 111 ns.
+
+`python/metacat/sugar.py` makes every extend-syntax form a function:
+- bodies the macro would delay are thunks (`stochastic_if_star(prob_thunk, exps_thunk)`
+  draws the coin, then calls `prob_thunk`; `if_star`; `repeat_star_*`;
+  `continuation_point_star(body)` passes the escape to `body`);
+- a form with several patterns is one function per pattern: `for_star(f, *lists)` and
+  `for_star_from_to(lo, hi, f)` (the caller evaluates `lo` then `hi`),
+  `repeat_star_times`/`_forever`/`_until`, `category_links_star(instances, c, len)` and
+  `instance_links_star(c, instances, len)` for the `all-lengths:` forms, keyword
+  arguments `length=`, `label=` and `two_way=` for `lateral-link*` and
+  `lateral-sliplink*`;
+- `mcat`'s validity test is a fender in the original, so bad tokens raise
+  `chez.SchemeError` (a syntax error) without telling the control panel;
+- the names a macro leaves free are read at call time from the engine module that
+  defines them: `metacat.setup.p_verbose` and `.g_control_panel`,
+  `metacat.coderack.g_coderack` and `.make_codelet_type`,
+  `metacat.slipnet.make_slipnode` and `.establish_link`. Those modules don't exist yet;
+  tests provide them with `engine_module(...)` in test_utilities.py, which patches the real
+  module once it exists;
+- `slipnet_node_list_star(specs, module=None)` and `codelet_type_list_star(specs,
+  module=None)` define top-level values, and also module attributes (through
+  `names.scheme_to_python`) when given the module;
+- `define_codelet_procedure_star(name, proc)` looks the codelet type up as a top-level
+  value and sets `sugar.fizzle` while the codelet runs. Codelet code calls
+  `sugar.fizzle()`, always qualified;
+- in model code, `for*`, `if*` and `stochastic-if*` are usually written inline
+  (`for x in l:`; `coin = chez.random(1.0)` then `if coin < p:`). The functions are for
+  sites that use the form's value.
+
+`python/metacat/utilities.py` has one function per definition, under the mapped name
+(`1st` → `first`, `~` → `rough`, `filter` → `filter_` ...); a test checks that every
+`define` of utilities.ss and syntactic-sugar.ss has its Python name. Vectors and tables
+are `chez.Vector`. `coord` is `chez.make_rectangular`, which needs `chez.ExactComplex` for
+exact coordinates (anomalies entry); coordinate arithmetic is left to the graphics
+items. `(ascending-index-list 0)` loops forever, as in the original and the Racket port.
+
+**Strings vs symbols, re-checked (item 03).** The graphics (`string?` in
+sgl-interpreter.ss, general-graphics.ss, fonts.ss, gui.ss) and rules.ss:269
+(`filter-out symbol?`) *do* tell strings from symbols. The items that translate those
+files must keep the distinction there (anomalies: "The graphics and rules.ss tell strings
+from symbols").
+
 ## Names
 
-`python/tests/name_mapping.py` (moved into the package by item 03) maps every name the
+`python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the
 original defines (about 1,300) to a valid, non-reserved Python identifier, and
 `test_name_mapping.py` checks that the mapping is injective on all of them.
 

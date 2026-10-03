@@ -35,7 +35,7 @@
     top-level value table. Expected values come from small Chez capture scripts in
     `python/oracle/`. Tests: those vectors, written first.
 
-- [ ] **03 Objects, sugar and utilities.** `objects.py` (as decided in item 01),
+- [x] **03 Objects, sugar and utilities.** `objects.py` (as decided in item 01),
     `sugar.py` (every macro in syntactic-sugar.ss as a Python function, decorator or
     explicit pattern, with `stochastic-if*` drawing exactly one `(random 1.0)`), and
     `utilities.py` (utilities.ss, function for function). Tests: **every test of
