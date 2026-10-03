@@ -1,0 +1,19 @@
+("Coderack:
+  Coderack bin #0 (16 codelets, bin urgency = 1)
+  Coderack bin #1 (4 codelets, bin urgency = 9)
+  Coderack bin #2 (4 codelets, bin urgency = 34)
+  Coderack bin #3 (4 codelets, bin urgency = 84)
+  Coderack bin #4 (5 codelets, bin urgency = 172)
+  Coderack bin #5 (3 codelets, bin urgency = 309)
+  Coderack bin #6 (4 codelets, bin urgency = 506)
+" . ("Codelets in coderack bin #2:
+bottom-up-description-scout codelet of urgency 42 (time-stamp 77)
+answer-justifier codelet of urgency 35 (time-stamp 38)
+description-evaluator codelet of urgency 33 (time-stamp 26)
+important-object-bridge-scout codelet of urgency 42 (time-stamp 17)
+" . ("Codelets in coderack bin #6:
+bottom-up-bond-scout codelet of urgency 100 (time-stamp 48)
+jootser codelet of urgency 100 (time-stamp 44)
+top-down-description-scout codelet of urgency 99 (time-stamp 24)
+bottom-up-description-scout codelet of urgency 91 (time-stamp 23)
+" . ())))

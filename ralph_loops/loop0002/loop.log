@@ -1,0 +1,5 @@
+[2026-10-03 18:20:07] loop start: up to 30 iterations, cap 3.0 h each, model default
+[2026-10-03 18:20:07] === iteration 1: 00 Skeleton and the fixture pipeline. Create `python/` as in TASK.md's layout:
+[2026-10-03 18:20:07] claude session it01 (cap 3.00 h) -> session_it01.log
+[2026-10-03 18:26:41] session it01: ok (exit 0, 22 tool calls)
+[2026-10-03 18:27:32] tests passed: GATE PASSED

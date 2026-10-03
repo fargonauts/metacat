@@ -1,0 +1,1 @@
+('done . ((('establish-link . ('x-z-link . ('node-x . ('node-z . ('lateral . ()))))) . (('x-z-link . ('set-label-node . ('node-succ . ()))) . (('establish-link . ('z-x-link . ('node-z . ('node-x . ('lateral . ()))))) . (('z-x-link . ('set-label-node . ('node-succ . ()))) . ())))) . ()))

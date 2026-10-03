@@ -1,0 +1,1 @@
+("LetterCtgy" . ("Length" . ("StringPos" . ("GroupCtgy" . ("Direction" . ("AlphaPos" . ("ObjectCtgy" . ("BondFacet" . ()))))))))

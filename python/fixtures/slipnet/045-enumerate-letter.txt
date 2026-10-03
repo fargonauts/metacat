@@ -1,0 +1,1 @@
+(('plato-a . ('plato-b . ('plato-c . ()))) . (('plato-x . ('plato-y . ('plato-z . ()))) . ('failed . (('plato-c . ('plato-b . ('plato-a . ()))) . ('failed . (('plato-m . ('plato-m . ('plato-m . ('plato-m . ('plato-m . ()))))) . (('plato-m . ()) . ('failed . (('plato-one . ('plato-two . ('plato-three . ('plato-four . ('plato-five . ()))))) . ('failed . ()))))))))))

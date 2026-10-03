@@ -1,0 +1,1 @@
+(('plato-c . ('plato-b . ('plato-a . ()))) . ((('image . ('plato-a . ())) . (('image . ('plato-b . ())) . (('image . ('plato-c . ())) . ()))) . ((('image . ('plato-c . ())) . (('image . ('plato-b . ())) . (('image . ('plato-a . ())) . ()))) . ('plato-three . ()))))

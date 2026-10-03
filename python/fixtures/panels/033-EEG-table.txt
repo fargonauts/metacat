@@ -1,0 +1,1 @@
+((0 . ("Workspace Activity" . ("white" . (100 . (#f . ()))))) . ((1 . ("Average Workspace Activity" . ("yellow" . (100 . (#t . ()))))) . ((2 . ("Temperature" . ("red" . (100 . (#t . ()))))) . ())))

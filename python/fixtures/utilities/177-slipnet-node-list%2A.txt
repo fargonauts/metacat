@@ -1,0 +1,1 @@
+(((('node . ('plato-p . ())) . (('node . ('plato-q . ())) . ())) . (('node . ('plato-p . ())) . (('node . ('plato-q . ())) . ()))) . ((('make-slipnode . ('plato-p . ("p" . (10 . ())))) . (('make-slipnode . ('plato-q . ("q" . (20 . ())))) . ())) . ()))

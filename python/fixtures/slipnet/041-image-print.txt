@@ -1,0 +1,33 @@
+("swapped-image? = #f
+start-letter: a
+" . ("swapped-image? = #f
+start-letter: a
+direction: right
+>letters: successor (a b c)
+ lengths: identity (1 1 1)
+" . ("swapped-image? = #f
+start-letter: c
+direction: left
+>letters: predecessor (c b a)
+ lengths: identity (1 1 1)
+" . ("swapped-image? = #f
+start-letter: x
+direction: right
+>letters: successor (x y z)
+ lengths: identity (1 1 1)
+" . ("swapped-image? = #f
+start-letter: a
+direction: right
+>letters: successor (a b c)
+ lengths: identity (2 2 2)
+" . ("swapped-image? = #f
+start-letter: a
+direction: right
+ letters: successor (a b c)
+>lengths: successor (1 2 3)
+" . ("swapped-image? = #f
+start-letter: a
+direction: right
+>letters: none (a q)
+ lengths: identity (1 1)
+" . ())))))))

@@ -1,0 +1,1 @@
+('done . ((('establish-link . ('z-x-link . ('node-z . ('node-x . ('instance . ()))))) . (('z-x-link . ('set-link-length . (70 . ()))) . (('establish-link . ('z-y-link . ('node-z . ('node-y . ('instance . ()))))) . (('z-y-link . ('set-link-length . (70 . ()))) . ())))) . ()))

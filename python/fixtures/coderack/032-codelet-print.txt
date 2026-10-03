@@ -1,0 +1,9 @@
+("bond-evaluator codelet of urgency 20 (time-stamp 3)
+Codelet argument:
+<fake bond 7>
+" . ("top-down-bond-scout:category codelet of urgency 33 (time-stamp #f)
+Codelet argument:
+<fake slipnode 8>
+(scope is string).
+" . ("breaker codelet of urgency 7 (time-stamp 3)
+" . ())))

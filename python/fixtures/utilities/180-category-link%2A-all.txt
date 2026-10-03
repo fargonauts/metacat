@@ -1,0 +1,1 @@
+('done . ((('establish-link . ('x-z-link . ('node-x . ('node-z . ('category . ()))))) . (('x-z-link . ('set-link-length . (60 . ()))) . (('establish-link . ('y-z-link . ('node-y . ('node-z . ('category . ()))))) . (('y-z-link . ('set-link-length . (60 . ()))) . ())))) . ()))

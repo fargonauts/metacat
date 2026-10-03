@@ -1,0 +1,1 @@
+('plato-letter-category . ('plato-string-position-category . ('plato-alphabetic-position-category . ('plato-direction-category . ('plato-bond-category . ('plato-group-category . ('plato-length . ('plato-object-category . ('plato-bond-facet . ())))))))))

@@ -1,0 +1,1 @@
+("Identity" . ("succ" . ("pred" . ("Opposite" . (#f . ())))))

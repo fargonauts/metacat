@@ -1,0 +1,4 @@
+("Slipnode "a"
+" . ("Slipnode "LetterCtgy"
+" . ("Sliplink a-->b
+" . ())))

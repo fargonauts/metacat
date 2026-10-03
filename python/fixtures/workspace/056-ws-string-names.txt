@@ -1,0 +1,3 @@
+(""abc"" . ("initial string" . ("Workspace string "abc"
+" . ('done . ("translated initial string" . ("Translated Workspace string "abc"
+" . ('workspace-string . ("c:2" . ("c" . ())))))))))

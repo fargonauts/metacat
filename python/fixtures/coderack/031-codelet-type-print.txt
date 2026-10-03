@@ -1,0 +1,4 @@
+("Codelet type: rule-scout (clamped at urgency 65)
+" . ('done . ("Codelet type: rule-scout
+" . ("Codelet type: bottom-up-description-scout
+" . ()))))

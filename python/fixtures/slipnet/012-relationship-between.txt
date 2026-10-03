@@ -1,0 +1,1 @@
+('plato-successor . ('plato-predecessor . ('plato-identity . (#f . (#f . ('plato-successor . ('plato-predecessor . (#f . ('plato-opposite . ('plato-opposite . ()))))))))))

@@ -1,0 +1,2 @@
+"Ooops: bad message "no-such-message" sent to object of type thing
+"

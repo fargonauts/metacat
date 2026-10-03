@@ -1,0 +1,1 @@
+('<length> . (('<length> . (('<succ> . ('<a> . ())) . ('x . (3 . ())))) . ((('<letterctgy> . ('<identity> . ())) . (('<stringpos> . ('<opposite> . ())) . ())) . ())))

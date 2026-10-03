@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metacat"
+version = "1.2.0"
+description = "Metacat 1.2 (James B. Marshall), translated to Python from the Chez Scheme original"
+readme = "README.md"
+license = { text = "GPL-2.0-or-later" }
+requires-python = ">=3.12"
+dependencies = []                  # the standard library only (tkinter for the GUI)
+
+[project.optional-dependencies]
+test = ["pytest>=7.4"]
+
+[tool.setuptools]
+packages = ["metacat"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "slow: runs Chez or full golden runs; skipped by run-tests.sh --fast",
+]

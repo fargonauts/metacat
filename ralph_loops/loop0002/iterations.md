@@ -1,6 +1,6 @@
 # loop0002 — Metacat 1.2 to Python, by test-driven translation: items
 
-- [ ] **00 Skeleton and the fixture pipeline.** Create `python/` as in TASK.md's layout:
+- [x] **00 Skeleton and the fixture pipeline.** Create `python/` as in TASK.md's layout:
     `pyproject.toml` (package `metacat`, stdlib only, pytest as a test extra), a stub
     `metacat/__init__.py`, `README.md`, and `run-tests.sh`, which runs pytest and fails on
     the first error. Build the pipeline that every later item uses:

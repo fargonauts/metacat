@@ -1,0 +1,1 @@
+(('plato-one . ('plato-two . ('plato-three . ('plato-four . ('plato-five . (#f . (#f . ()))))))) . ((1 . (2 . (3 . (4 . (5 . ()))))) . ()))
