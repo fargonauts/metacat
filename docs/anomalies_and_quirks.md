@@ -739,6 +739,13 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   engine/themes.rktl and `monitor-new-concept-mappings` in engine/trace.rktl, the
   original's own definitions; pending.rktl has neither.
 
+- **Update (loop0002 iteration 9, Python item 08):** the Python port meets the same
+  coupling. Until themes.py and trace.py exist, python/tests/codelet_harness.py's
+  `STAND_INS` gives `metacat.themes` translated copies of `bridge-type->theme-type`,
+  `descriptions-affect-themespace?` (with `ignore-descriptions?`) and
+  `bridge-theme-compatibility-sigmoid`, and `metacat.trace` a recording
+  `monitor-new-concept-mappings`. The headless driver (items 10–11) needs the real ones.
+
 ### Dead code in bridges.ss
 - **Seen:** iteration 9 (item 08).
 - **What:** `propose-singleton-group` and `try-to-propose-singleton-group` are never
@@ -746,6 +753,21 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   under it). `calculate-external-strength` computes `(round (* (min 100 total-support)))`,
   a one-argument `*`, harmless.
 - **Status:** not a bug; ported verbatim.
+
+### A horizontal bridge's internal-coherence factor never shows in the batteries
+- **Seen:** loop0002 iteration 9 (Python item 08), mutation testing bridges.py.
+- **What:** `calculate-internal-strength` multiplies by 2.5 when a bridge is internally
+  coherent, then caps at 100. Coherence needs at least two supporting relevant
+  distinguishing mappings (factor 1.2 or more), so a coherent bridge stays under the cap
+  only if its mappings average under about 33, i.e. with low-association slippages and
+  no identity. For horizontal bridges (initial to modified string) that never happened:
+  changing the factor to 2.0 left every bridge-battery trace identical, and a search over
+  every problem and seed of tests/problems.txt at seven points of the run (100 to 1500
+  codelets) found no fresh coherent horizontal bridge under 100. Vertical ones exist:
+  abc abd glz, seed 2, 1500 codelets, a–z with first=>last and lmost=>rmost (strengths 27
+  and 23, internal strength 75). python/oracle/batteries/bridge-extra-battery.scm pins it.
+- **Status:** explained; the horizontal factor stays unpinned by tests (faithful by
+  reading).
 
 ### Rules and answers lean on later files and on a REPL abbreviation
 - **Seen:** iteration 10 (item 09).

@@ -575,6 +575,31 @@ from symbols").
   59 cases run in a fork pool (about 6 s on 32 cores); about 1.5 ms per codelet,
   harness dumps included.
 
+### As built (item 08)
+
+- **Modules**: bridges.py (`HorizontalBridge` and `VerticalBridge`, the two closures of
+  make-horizontal-bridge and make-vertical-bridge; the clauses they share word for word sit
+  once in a private `_BridgeClauses` base, and both delegate the rest to a
+  `WorkspaceStructure`; the four bridge codelets; `propose-bridge`, `build-bridge`,
+  `break-bridge` and the predicates) and breakers.py (the breaker). Each `load()` installs
+  its codelet procedures.
+- **Names from files not translated yet**, read at call time: themes.ss's
+  `bridge-type->theme-type` (every bridge made), `bridge-theme-compatibility-sigmoid` (every
+  strength update), `descriptions-affect-themespace?` and `*themespace*` (every bridge
+  built), plus `check-descriptions` & co. (only with an active theme); trace.ss's
+  `monitor-new-concept-mappings` and `entries`; justify.ss's
+  `remove-whole/single-concept-mappings`; bridge-graphics.ss (graphics on only). The test
+  harness supplies the three ungated themes.ss helpers as stand-ins until item 10's
+  themes.py (anomalies: "Bridges call themes.ss on every bridge").
+- **Evaluation order**: no site needed reordering. Every draw (the stochastic-picks of
+  bridge type and objects, `stochastic-if*`, `random-pick`, the fights) sits in a `let*`,
+  a body or an `and`/`cond`; the multi-argument calls and multi-binding `let`s (the appends
+  of the incompatible-bridge lists, `wins-all-fights?`'s arguments, `make-concept-mapping`'s)
+  only read. Maps use `chez.map_`; `cross-product-for-each` (boost-themes) and
+  `all-possible-bridge-CMs` keep utilities.ss's order.
+- **Speed**: the 530 runs of 1000 codelets take 217 s of CPU, about 0.4 ms per codelet,
+  14 s on 32 cores.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

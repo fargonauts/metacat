@@ -119,3 +119,17 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   battery runs in a fork pool and is in the slow tier; the fast tier runs the first seed
   of problem 0. `oracle/batteries/codelet-extra-battery.scm` adds local densities and
   supports (rounded, not floored) and group-builder flipping several bonds in map's order.
+- `metacat/bridges.py`: bridges.ss (horizontal and vertical bridges, which share their
+  common clauses in a private base class; the bridge scouts, evaluator and builder,
+  `propose-bridge`, `build-bridge`/`break-bridge`, the incompatibility and support
+  predicates).
+- `metacat/breakers.py`: breakers.ss (the breaker codelet).
+
+  Tests: `tests/test_bridges.py`, every test of `tests/diff/bridge-battery.scm` through the
+  harness with the bridges setting on (`codelet_harness.enable_bridges`): 1000-codelet
+  traces of every problem and seed, and nine bridge matrices. Slow tier, fork pool (about
+  14 s on 32 cores); the fast tier runs the first 300 codelets of problem 0.
+  `oracle/batteries/bridge-extra-battery.scm` adds a coherent vertical bridge whose internal
+  strength stays under 100. Until themes.py exists, the harness's `STAND_INS` carries
+  copies of the themes.ss helpers that bridges call (`bridge-type->theme-type`,
+  `descriptions-affect-themespace?`, `bridge-theme-compatibility-sigmoid`).

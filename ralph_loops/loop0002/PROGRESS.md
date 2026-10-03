@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 8/18 SOLVED
+- **Current**: 9/18 SOLVED
 
 ---
 
@@ -918,3 +918,122 @@ top-down nodes, the bridge part of `b:structures` and `b:proposed-counts`). Its
 (read through the package by groups/bonds/workspace), and the harness's stand-in trace
 module already has `monitor_new_concept_mappings`. The fork-pool pattern of
 test_codelets.py carries over to the bridge battery.
+
+---
+
+## Iteration 9 — 2026-10-03 21:57
+
+### Completed
+Item 08, bridges and breakers: **SOLVED**.
+- **Tests first.**
+  - `python/tests/codelet_harness.py` now has the bridges setting of
+    `tests/diff/codelet-harness.scm`:
+    - `enable_bridges` (b:enable-bridges!): the bridge, description and breaker bottom-up
+      types, plus *top-down-slipnodes* with StrPosCtgy, AlphaPosCtgy and Length;
+    - bridge scouts among the initial codelets;
+    - `proposed_counts` with the proposed bridges and `description_counts`.
+  - `python/tests/test_bridges.py` covers all 46 tests of `tests/diff/bridge-battery.scm`:
+    - 36 problems × every seed × 1000 codelets;
+    - nine bridge matrices (`b:fresh-bridge-data`, `b:direction-cm-data`,
+      `b:bridge-pair-data` translated).
+
+    The full battery runs in a fork pool in the slow tier (14 s on 32 cores). The fast tier
+    runs the first 300 codelets of problem 0.
+
+    Structural tests check:
+    - every `define` has its Python name;
+    - docstrings name their origin;
+    - there is no tkinter import;
+    - the five codelet procedures are installed;
+    - the load order;
+    - the fixtures reach every bridge, description and breaker type, plus bridges built,
+      broken and flipped, `add-theme` and `new-cms`.
+
+    I wrote both before either module existed and ran them: the fast and structural tier
+    gave **9 failed, 1 passed** (`ModuleNotFoundError: metacat.bridges`; the codelet run
+    hit `TypeError: 'bool' object is not callable`, a codelet type without a procedure).
+    The battery gave **45 failed, 1 passed** (`bridges-problem-count`). The item-07 fast
+    tier still passed with the extended harness.
+- **Code** (new): `metacat/bridges.py` and `metacat/breakers.py`. A subagent translated them
+  into a staging directory while I wrote the tests, and I copied them in after the failing
+  run. The first run then stopped at `metacat.themes` having no `bridge_type_to_theme_type`.
+  Every bridge calls three themes.ss helpers ungated (anomalies: "Bridges call themes.ss on
+  every bridge"), so the harness's `STAND_INS["themes"]` now carries test-side translations
+  of `bridge-type->theme-type`, `descriptions-affect-themespace?` (with
+  `ignore-descriptions?`) and `bridge-theme-compatibility-sigmoid`. They are the real
+  definitions in the oracle, and themes.py replaces them later. After that, **all 46 battery
+  cases matched Chez byte for byte on the first run** (47 MB of traces). A spot check
+  confirmed that `bridges-05` is 1,436,094 characters, equal to the fixture.
+- **Mutation checks** (`/tmp/mut8/mutate.py`, not kept; each mutant applied, then
+  test_bridges.py run with `-x`, then the file restored; `cmp` with the staged copy
+  confirmed). 16 mutants:
+  - **caught by the frozen battery (13):**
+    - the number-of-mappings factors (0.8 → 0.9, 1.6 → 1.5);
+    - the singleton-letter factor 0.1 → 0.2;
+    - the scout's slippage product without `1-`;
+    - the evaluator's probability without `1-`;
+    - the bond fight weights 3/2 swapped;
+    - no ObjCtgy mapping added in build-bridge;
+    - break-bridge leaving the bridge in the Workspace;
+    - a bridge's letter span counting only object1;
+    - the external strength cap 100 → 99;
+    - the breaker picking the first structure, using p1 instead of p1·p2, and an inverted
+      temperature test.
+  - **killed by a new local battery (1):** the vertical bridge's internal-coherence factor
+    2.5 → 2.0. `python/oracle/batteries/bridge-extra-battery.scm` (1 test,
+    `fresh-bridges-abc-abd-glz-2`) loads the unedited codelet-harness.scm with bridges on,
+    runs abc abd glz with seed 2 for 1500 codelets, and dumps every fresh vertical bridge's
+    relevant distinguishing mappings, coherence and internal strength. The a–z bridge is
+    coherent at 75. I found the case with a Python search first. The battery is captured
+    into `python/fixtures/bridge-extra/` through the unedited diff-eval.ss and covered by
+    the slow re-capture test. I wrote it *after* the code: its Python case passed at once,
+    and the mutant now fails.
+  - **not killed (2):**
+    - the *horizontal* coherence factor: a search of every problem and seed at seven points
+      (100–1500 codelets) found no coherent horizontal bridge under the cap (new anomalies
+      entry);
+    - the spanning-bridge theme boost ×2 → ×1: the harness's fake Themespace never returns
+      a theme, so there is nothing to boost. The themes item (10) covers it.
+- **Evaluation order.** No site needed reordering. The subagent's audit agrees with the
+  Racket port, which has no `port:` changes in bridges.rktl or breakers.rktl:
+  - every draw sits in a `let*`, a body or an `and`/`cond`. The draws are the
+    stochastic-picks of the bridge type and objects, `stochastic-if*` (coin first: bridges.ss
+    935, 1029, 1166, 1432; breakers.ss 22, 38, 41), `random-pick` and the fights;
+  - the multi-argument calls and multi-binding `let`s only read (the appends of the
+    incompatible bridges, `wins-all-fights?`'s and `make-concept-mapping`'s arguments, the
+    breaker's p1/p2);
+  - maps use `chez.map_`;
+  - `cross-product-for-each` in `boost-themes` keeps utilities.ss's order.
+
+  bridges.py has 16 `# chez:`/`# 1.2:` comments and breakers.py 3.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: an update to "Bridges call themes.ss on every bridge"
+    (the Python harness's stand-ins) and a new entry, "A horizontal bridge's
+    internal-coherence factor never shows in the batteries";
+  - `docs/python-translation-plan.md`: "As built (item 08)";
+  - `python/README.md`: the new modules and tests;
+  - `test_fixtures.py` now expects the local battery `bridge-extra`.
+- Speed, for item 12: the 530 runs of 1000 codelets take 217 s of CPU, about 0.4 ms per
+  codelet including the harness's dumps.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (759 tests, 63 s).
+
+### Blockers
+None. Left for later items, by design:
+- Translated but not run yet:
+  - the theme paths of bridges (`incompatible-with-theme?`, `supported-by-theme?`,
+    `supports-theme-pattern?` through `_metacat.trace.entries` and
+    `_metacat.justify.remove_whole_or_single_concept_mappings`), the spanning boost;
+  - the graphics paths (`bridge_graphics`, `draw_bridge_grope`, `new_bridge_label_number`,
+    `activate-concept-mapping-graphics`), all behind `%workspace-graphics%`.
+- The themes.ss helpers live in the test harness's stand-ins. themes.py (item 10) must define
+  `bridge_type_to_theme_type`, `descriptions_affect_themespace_p`, `ignore_descriptions_p`
+  and `bridge_theme_compatibility_sigmoid`, and the headless driver needs them.
+
+### Next
+Item 09 (rules and answers, per iterations.md). Extend `codelet_harness.py` with the
+`b:rules?` setting (`check-if-rules-possible`, the original `add-bottom-up-codelets`, the
+snag-period end with rule-battery.scm's fake Trace, `b:answered` set by `suspend`, and
+`b:rule-entry`/`b:datum` in `structures`). The fork-pool pattern of test_bridges.py carries
+over. rules.ss reaches `equivalent-workspace-objects?`, `find-next-space-position`, themes.ss's
+`diff` and the Themespace's `get-dominant-theme-pattern` (anomalies: "Rules and answers lean on
+later files"). Give them harness stand-ins as item 08 did for the themes helpers.

@@ -8,8 +8,9 @@ run-mcat loop restricted to the bond and group codelet types (the harness's own
 header explains the restrictions); `compact` is b:compact, the trace line printer.
 Each definition below is the harness's definition of the same name (b:x → x).
 The procedures of workspace-dump.scm come from test_workspace.py, which translates
-them.  Item 07 uses only the bonds-and-groups setting: b:bridges? and b:rules?
-(items 08 and 09) stay #f, and the code paths they enable are not translated here.
+them.  Item 07 uses the bonds-and-groups setting; item 08 adds the bridges
+setting (`enable_bridges`, b:enable-bridges!).  b:rules? (item 09) stays #f, and
+the code paths it enables are not translated here.
 
 `install()` makes the harness's top-level settings and fakes (b:set-global! ...):
 call it once, after engine.load(), inside the stand-ins of STAND_INS.
@@ -89,11 +90,50 @@ def monitor_new_concept_mappings(cms, bridge):
     return event(["new-cms", cm_names(cms), bridge_data(bridge)])
 
 
+# themes.ss's helpers that bridges.ss calls, translated here until themes.py exists
+# (the oracle has the whole original loaded, so they are the real ones there).
+
+def bridge_type_to_theme_type(theme_type):
+    """themes.ss: bridge-type->theme-type"""
+    return {"top": "top-bridge", "bottom": "bottom-bridge",
+            "vertical": "vertical-bridge"}.get(theme_type)
+
+
+def ignore_descriptions_p(d1, d2):
+    """themes.ss: ignore-descriptions?"""
+    from metacat import workspace_objects as wo
+    return (tell(d1, "relevant?") is False
+            or tell(d2, "relevant?") is False
+            or (tell(d1, "description-type?", slipnet.plato_object_category) is not False
+                and wo.both_spanning_groups_p(tell(d1, "get-object"),
+                                              tell(d2, "get-object")) is not False)
+            or (tell(d1, "description-type?", slipnet.plato_string_position_category)
+                is not False
+                and wo.both_spanning_objects_p(tell(d1, "get-object"),
+                                               tell(d2, "get-object")) is not False)
+            or (tell(d1, "get-descriptor") is slipnet.plato_middle
+                and tell(d2, "get-descriptor") is slipnet.plato_middle))
+
+
+def descriptions_affect_themespace_p(d1, d2):
+    """themes.ss: descriptions-affect-themespace?"""
+    return (tell(d1, "description-type?", tell(d2, "get-description-type")) is not False
+            and not ignore_descriptions_p(d1, d2))
+
+
+def bridge_theme_compatibility_sigmoid(x):
+    """themes.ss: bridge-theme-compatibility-sigmoid (beta is 4)"""
+    return chez.sub1(chez.div(2, chez.add1(chez.exp(chez.mul(-2, 4, x)))))
+
+
 # Globals of files not translated yet that the harness sets or the engine reads.
 STAND_INS = {
     "run": {"p_update_cycle_length": 15, "g_temperature_clamped_p": False,
             "g_step_mode_p": False, "p_step_cycles": 1, "g_display_mode_p": False},
-    "themes": {"g_themespace": Lambda(fake_themespace_fn)},
+    "themes": {"g_themespace": Lambda(fake_themespace_fn),
+               "bridge_type_to_theme_type": bridge_type_to_theme_type,
+               "descriptions_affect_themespace_p": descriptions_affect_themespace_p,
+               "bridge_theme_compatibility_sigmoid": bridge_theme_compatibility_sigmoid},
     "eeg_graphics": {"g_EEG": Lambda(fake_eeg_fn)},
     "trace": {"monitor_slipnode_activation_change": monitor_slipnode_activation_change,
               "monitor_new_groups": monitor_new_groups,
@@ -111,6 +151,8 @@ def install():
     set_global("%verbose%", False)
     set_global("%self-watching-enabled%", False)
     set_global("*top-down-slipnodes*", bond_group_slipnodes())
+    BRIDGES[0] = False
+    BOTTOM_UP_TYPES[:] = [coderack.bottom_up_bond_scout, coderack.group_scout__whole_string]
     window = Lambda(null_coderack_window_fn)
     for type_ in coderack.g_codelet_types:
         tell(type_, "set-graphics-parameters", window, False, False, False, False, False,
@@ -172,8 +214,7 @@ def strings():
 
 
 def structures():
-    """codelet-harness.scm: b:structures (bridges.ss and rules.ss are not enabled:
-    the Workspace has no bridge, and b:rules? is #f)"""
+    """codelet-harness.scm: b:structures (b:rules? is #f: no rules)"""
     out = []
     for s in strings():
         for b in tell(s, "get-bonds"):
@@ -197,9 +238,20 @@ def difference(after, before):
     return [entry for entry in after if canon(entry[0]) not in keys]
 
 
+def description_counts():
+    """codelet-harness.scm: b:description-counts"""
+    return map_objects(lambda obj: len(tell(obj, "get-descriptions")))
+
+
 def proposed_counts():
-    """codelet-harness.scm: b:proposed-counts (b:bridges? is #f)"""
-    return [[len(tell(s, "get-all-bonds")), len(tell(s, "get-all-groups"))] for s in strings()]
+    """codelet-harness.scm: b:proposed-counts"""
+    counts = [[len(tell(s, "get-all-bonds")), len(tell(s, "get-all-groups"))] for s in strings()]
+    if BRIDGES[0]:
+        ws = get_global("*workspace*")
+        counts = counts + [len(tell(ws, "get-proposed-bridges", "top")),
+                           len(tell(ws, "get-proposed-bridges", "vertical")),
+                           description_counts()]
+    return counts
 
 
 def activations():
@@ -229,6 +281,8 @@ def dump_ws_object(obj):
 # The run loop ----------------------------------------------------------------------------
 
 UNCLAMP_TIME = [0]          # b:unclamp-time
+BRIDGES = [False]           # b:bridges?
+BOTTOM_UP_TYPES: list = []  # b:bottom-up-types (set by enable_bridges)
 
 
 def bond_group_slipnodes():
@@ -246,19 +300,40 @@ def clamp_initial_slipnodes():
 
 
 def post_initial_codelets():
-    """codelet-harness.scm: b:post-initial-codelets (b:bridges? is #f)"""
+    """codelet-harness.scm: b:post-initial-codelets"""
     cr = coderack.g_coderack
     i = 2 * len(tell(get_global("*workspace*"), "get-objects"))
     while i > 0:
         tell(cr, "add-deferred-codelet",
              tell(coderack.bottom_up_bond_scout, "make-codelet", coderack.p_very_low_urgency))
+        if BRIDGES[0]:
+            tell(cr, "add-deferred-codelet",
+                 tell(coderack.bottom_up_bridge_scout, "make-codelet",
+                      coderack.p_very_low_urgency))
         i -= 1
     tell(cr, "post-deferred-codelets")
 
 
+def enable_bridges(on):
+    """codelet-harness.scm: b:enable-bridges!"""
+    BRIDGES[0] = on
+    c = coderack
+    if on:
+        BOTTOM_UP_TYPES[:] = [c.bottom_up_bond_scout, c.group_scout__whole_string,
+                              c.bottom_up_bridge_scout, c.important_object_bridge_scout,
+                              c.bottom_up_description_scout, c.breaker]
+        set_global("*top-down-slipnodes*",
+                   bond_group_slipnodes() + [slipnet.plato_string_position_category,
+                                             slipnet.plato_alphabetic_position_category,
+                                             slipnet.plato_length])
+    else:
+        BOTTOM_UP_TYPES[:] = [c.bottom_up_bond_scout, c.group_scout__whole_string]
+        set_global("*top-down-slipnodes*", bond_group_slipnodes())
+
+
 def add_bottom_up_codelets():
     """codelet-harness.scm: b:add-bottom-up-codelets over b:bottom-up-types"""
-    for codelet_type in [coderack.bottom_up_bond_scout, coderack.group_scout__whole_string]:
+    for codelet_type in BOTTOM_UP_TYPES:
         if utilities.prob_p(coderack.post_codelet_probability(codelet_type)):
             urgency = coderack.bottom_up_urgency(codelet_type)
             i = coderack.num_of_codelets_to_post(codelet_type)
@@ -337,6 +412,7 @@ CODELET_CAP = 400
 
 
 def trace_lines(strings_, seed, k):
+    """codelet-battery.scm and bridge-battery.scm: b:trace-lines"""
     prefix = compact(strings_) + " " + str(seed) + " "
     return "".join(prefix + compact(entry) + "\n" for entry in run_codelets(strings_, seed, k))
 

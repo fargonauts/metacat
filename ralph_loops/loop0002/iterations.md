@@ -61,7 +61,7 @@
     `concept-mappings.ss`. Tests: `codelet-battery.scm` through the Python equivalent of
     `codelet-harness.scm`.
 
-- [ ] **08 Bridges and breakers.** Translate `bridges.ss` and `breakers.ss`. Tests:
+- [x] **08 Bridges and breakers.** Translate `bridges.ss` and `breakers.ss`. Tests:
     `bridge-battery.scm`.
 
 - [ ] **09 Rules and answers.** Translate `rules.ss` and `answers.ss` (including
