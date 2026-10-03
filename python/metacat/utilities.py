@@ -238,7 +238,20 @@ def sort_by_method(method_name, pred_p, l):
     arguments of one call: Python makes them left to right, which only matters
     for methods with effects, and the model's sort keys have none."""
     # chez: Chez's sort algorithm and predicate calls (anomalies: "sort, remq, for-each and one-armed if differ")
-    return chez.sort(lambda v1, v2: pred_p(tell(v1, method_name), tell(v2, method_name)), l)
+    # speed (item 12): each element's key is asked once, when the original first
+    # asks it, and remembered (the keys are pure); the sort runs on positions
+    keys = {}
+
+    def key(i):
+        k = keys.get(i, _NO_KEY)
+        if k is _NO_KEY:
+            k = keys[i] = tell(l[i], method_name)
+        return k
+    order = chez.sort(lambda i, j: pred_p(key(i), key(j)), list(range(len(l))))
+    return [l[i] for i in order]
+
+
+_NO_KEY = object()
 
 
 def ascending_index_list(n):
@@ -502,14 +515,15 @@ def stochastic_pick_by_method(object_list, *message):
 
 def weighted_index(w, weights):
     """utilities.ss: weighted-index.  An error past the end (car of '())."""
+    # speed (item 12): an index, not a copy of the rest at each step
+    n = len(weights)
     i = 0
     while True:
-        if not weights:
-            _car_error(weights)
-        if w < weights[0]:
+        if i >= n:
+            _car_error([])
+        if w < weights[i]:
             return i
-        w = sub(w, weights[0])
-        weights = weights[1:]
+        w = sub(w, weights[i])
         i += 1
 
 
@@ -894,7 +908,7 @@ def _remove_first(x, l):
 
 def member_p(a, l):
     """utilities.ss: member? (memq forced to #t or #f)"""
-    return chez.memq(a, l) is not False
+    return chez.memq_p(a, l)
 
 
 def member_pred_p(pred_p, x, l):

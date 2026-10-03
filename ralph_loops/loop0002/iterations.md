@@ -87,7 +87,7 @@
     This test stays in run-tests.sh (in the tier the gate runs) for the rest of the
     loop. Record the run time per problem in `docs/python-run-times.md`.
 
-- [ ] **12 Extra seeds and speed.** Run every problem with 20 non-golden seeds in the oracle
+- [x] **12 Extra seeds and speed.** Run every problem with 20 non-golden seeds in the oracle
     and in Python (adapt `tests/extra-seeds.py` into `python/tests/`) and require
     identical traces on all 720 runs. Then profile. Make only speed-ups that keep every
     trace identical (for example, `__slots__`, cheaper `tell` dispatch, avoiding repeated

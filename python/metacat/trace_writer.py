@@ -188,12 +188,15 @@ class _Wrapped(SchemeObject):
     """trace.ss's (lambda msg ... (apply original original (cdr msg))): self inside
     stays the original object."""
 
-    def __init__(this, original, before=None, after=None):
+    def __init__(this, original, before=None, after=None, watch=None):
         this.original = original
         this.before = before
         this.after = after
+        this.watch = watch      # the one message before/after act on (speed, item 12)
 
     def otherwise(this, self, msg, args):
+        if msg != this.watch:
+            return this.original(this.original, msg, *args)
         if this.before:
             this.before(msg, args)
         result = this.original(this.original, msg, *args)
@@ -237,7 +240,8 @@ def install_trace():
         return
     _installed = True
     m = _metacat
-    m.coderack.g_coderack = _Wrapped(m.coderack.g_coderack, after=_codelet_chosen)
+    m.coderack.g_coderack = _Wrapped(m.coderack.g_coderack, after=_codelet_chosen,
+                                     watch="choose-codelet")
 
     o_build_bond, o_break_bond = m.bonds.build_bond, m.bonds.break_bond
     o_build_group, o_break_group = m.groups.build_group, m.groups.break_group
@@ -276,7 +280,8 @@ def install_trace():
     m.groups.build_group, m.groups.break_group = build_group, break_group
     m.bridges.build_bridge, m.bridges.break_bridge = build_bridge, break_bridge
     m.descriptions.build_description = build_description
-    m.workspace.g_workspace = _Wrapped(m.workspace.g_workspace, before=_rule_added)
+    m.workspace.g_workspace = _Wrapped(m.workspace.g_workspace, before=_rule_added,
+                                     watch="add-rule")
 
     o_update_temperature = m.formulas.update_temperature
 

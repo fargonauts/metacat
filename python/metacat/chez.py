@@ -224,13 +224,21 @@ def norm(x):
     return x
 
 
+_NUMBER_TYPES = frozenset((int, float, Fraction, complex, ExactComplex))
+_MUL_IDENTITY_TYPES = frozenset((int, float, Fraction))   # (* 1 a) is a for these
+
+
 def _check(x, who):
-    if not _is_number(x):
+    if type(x) not in _NUMBER_TYPES:        # _is_number, as a set lookup (speed, item 12)
         raise SchemeError(who, "~s is not a number", x)
 
 
 def _add2(a, b):
-    if type(a) is int and a == 0:           # exact 0 is the identity: (+ 0 -0.0) is -0.0
+    ta, tb = type(a), type(b)
+    # speed (item 12): two fixnums or two flonums need no exactness rule
+    if (ta is float and tb is float) or (ta is int and tb is int):
+        return a + b
+    if ta is int and a == 0:           # exact 0 is the identity: (+ 0 -0.0) is -0.0
         _check(b, "+")
         return b
     if type(b) is int and b == 0:
@@ -244,6 +252,11 @@ def _add2(a, b):
 
 def add(*xs):
     """Chez: +"""
+    if len(xs) == 2:                        # speed (item 12): (+ 0 a) is a, checked
+        a, b = xs
+        if type(a) not in _NUMBER_TYPES:
+            _check(a, "+")
+        return _add2(a, b)
     r = 0
     for x in xs:
         r = _add2(r, x)
@@ -251,6 +264,10 @@ def add(*xs):
 
 
 def _sub2(a, b):
+    ta, tb = type(a), type(b)
+    # speed (item 12): two fixnums or two flonums need no exactness rule
+    if (ta is float and tb is float) or (ta is int and tb is int):
+        return a - b
     _check(a, "-")
     _check(b, "-")
     if type(b) is int and b == 0:
@@ -272,6 +289,10 @@ def sub(a, *more):
 
 
 def _mul2(a, b):
+    ta, tb = type(a), type(b)
+    # speed (item 12): two fixnums or two flonums need no exactness rule
+    if (ta is float and tb is float) or (ta is int and tb is int):
+        return a * b
     _check(a, "*")
     _check(b, "*")
     if (type(a) is int and a == 0) or (type(b) is int and b == 0):
@@ -282,6 +303,11 @@ def _mul2(a, b):
 
 def mul(*xs):
     """Chez: *"""
+    if len(xs) == 2:                        # speed (item 12): (* 1 a) is a, checked
+        a, b = xs
+        if type(a) not in _MUL_IDENTITY_TYPES:
+            return _mul2(_mul2(1, a), b)
+        return _mul2(a, b)
     r = 1
     for x in xs:
         r = _mul2(r, x)
@@ -289,6 +315,9 @@ def mul(*xs):
 
 
 def _div2(a, b):
+    ta, tb = type(a), type(b)
+    if ta is float and tb is float and b != 0.0:    # speed (item 12)
+        return a / b
     _check(a, "/")
     _check(b, "/")
     if type(b) is int and b == 0:
@@ -761,6 +790,12 @@ def for_each(f, *lists):
 def andmap(f, *lists):
     """Chez: andmap, first to last, stopping at the first #f; the last value."""
     r = True
+    if len(lists) == 1:                     # speed (item 12)
+        for x in lists[0]:
+            r = f(x)
+            if r is False:
+                return False
+        return r
     n = len(lists[0])
     for i in range(n):
         r = f(*[ls[i] for ls in lists])
@@ -771,6 +806,12 @@ def andmap(f, *lists):
 
 def ormap(f, *lists):
     """Chez: ormap, first to last; the first value that is not #f."""
+    if len(lists) == 1:                     # speed (item 12)
+        for x in lists[0]:
+            r = f(x)
+            if r is not False:
+                return r
+        return False
     n = len(lists[0])
     for i in range(n):
         r = f(*[ls[i] for ls in lists])
@@ -956,8 +997,16 @@ def make_vector(n, fill=0):
     return Vector([fill] * n)
 
 
+# Types whose eq? is identity alone (eq_p): for these, memq and remq compare
+# with `is` (speed, item 12).
+_EQ_BY_VALUE_TYPES = frozenset((str, int, list))
+
+
 def remq(x, ls):
     """Chez: remq (removes every occurrence)"""
+    tx = type(x)
+    if tx not in _EQ_BY_VALUE_TYPES and tx is not Char:
+        return [y for y in ls if y is not x]
     return [y for y in ls if not eq_p(y, x)]
 
 
@@ -980,7 +1029,24 @@ def _mem(same, x, ls):
 
 def memq(x, ls):
     """Chez: memq (the tail, or #f)"""
+    tx = type(x)
+    if tx not in _EQ_BY_VALUE_TYPES and tx is not Char:
+        for i, y in enumerate(ls):
+            if y is x:
+                return ls[i:]
+        return False
     return _mem(eq_p, x, ls)
+
+
+def memq_p(x, ls):
+    """(memq x ls) as a boolean, without the tail (speed, item 12)."""
+    tx = type(x)
+    if tx not in _EQ_BY_VALUE_TYPES and tx is not Char:
+        for y in ls:
+            if y is x:
+                return True
+        return False
+    return _mem(eq_p, x, ls) is not False
 
 
 def memv(x, ls):

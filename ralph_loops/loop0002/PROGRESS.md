@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 12/18 SOLVED
+- **Current**: 13/18 SOLVED
 
 ---
 
@@ -1398,3 +1398,104 @@ Item 12, extra seeds and speed. `golden_harness.run_in_fresh_process` and
 `headless.run_problem` can run the 720 extra-seed runs. `python/oracle/bench_runs.py` gives
 the oracle's side and its timing. Profile with `python3 -m cProfile -m metacat abc abd xyz
 --seed 3 --max-codelets 3000`.
+
+---
+
+## Iteration 13 — 2026-10-04 00:32
+
+### Completed
+Item 12, extra seeds and speed: **SOLVED**. All 720 extra-seed runs match the oracle byte
+for byte, both before and after the speed-ups.
+- **The oracle's side.** `python/oracle/capture_extra_seeds.py` (new) builds
+  tests/extra-seeds.py's jobs: every problem line of tests/problems.txt, with 20
+  non-golden seeds from `random.Random(20261003)`, drawn the same way, so these are the
+  720 runs the Racket port was audited on. It runs each once in the unedited oracle
+  (`run.ss ... --trace FILE`, fresh process, 32 at a time, about 1 min 20 s). It freezes each
+  run's exit code, whole stdout, first stderr line, trace sha256 and trace line count
+  into `python/fixtures/extra-seeds/runs.jsonl` (760 KB). The traces themselves (2.6 M
+  lines, about 300 MB) are not kept. `SOURCES` holds the sha256 of run.ss, trace.ss,
+  prelude.ss, problems.txt, tests/extra-seeds.py and the script, plus the Chez version.
+  In the oracle, the 720 end as 618 suspends, 101 caps and 1 halt, with no crash.
+  A second capture into a temp directory was byte-identical.
+- **Tests** (`python/tests/test_extra_seeds.py`, new):
+  - fast tier: the fixture's sources are unchanged; the jobs are extra-seeds.py's 720,
+    none of them golden; and what the runs reach (suspend, cap, halt);
+  - slow tier: all 720 runs through the package's driver, each in a fresh fork of a fresh
+    process (`golden_harness.run_in_fresh_process(..., digest=True)`, new: it reduces a
+    run to what `python3 -m metacat ... --trace` gives). Exit code, stdout, error line and
+    trace hash and length must all equal the oracle's. A failure lists each differing
+    run as a CLI command;
+  - slow tier: the oracle's 720 again, byte-identical to the fixture (freshness, as for
+    the batteries).
+
+  `test_fixtures.py` now skips the `extra-seeds/` directory when it lists batteries.
+- **Tests first?** The code under test is items 04–11's port, which already existed. The
+  first run of the 720 passed at once: 3 min 7 s wall, 54 CPU-min. Mutation checks
+  (`/tmp/mut12.py`, not kept; each file restored and checked with `git diff`) show that
+  the extra seeds see more than the goldens:
+
+  | Mutant | 109 goldens | 720 extra seeds |
+  |---|---|---|
+  | `%concept-mapping-importance-threshold%` 65 → 60 | pass | **3 differ** |
+  | `%group-importance-threshold%` 100 → 99 | pass | **5 differ** |
+  | spanning-bridge theme boost ×2 → ×1 | 57 fail | 378 differ |
+  | theme spread to the Slipnet, square for cube | pass | pass (only trace-extra-battery.scm kills it) |
+
+- **Profile** (cProfile, `abc abd xyz --seed 3` and the halt problem seed 7, 13,929
+  codelets). `tell` dominates: 36 M calls in the long run, plus 5.7 M delegations. Next
+  came Chez arithmetic's type checks (40 M `_check` calls), `get-removal-weight` (1.6 M:
+  every post to a full coderack weighs all codelets), `memq`/`eq?` (14 M), and the trace
+  wrappers (1.8 M messages through `*coderack*`'s and `*workspace*`'s wrappers).
+- **Speed-ups** (each marked `speed (item 12)` in the code; gains in
+  docs/python-run-times.md):
+  1. chez.py arithmetic fast paths (fixnum/fixnum and flonum/flonum; two-argument `+`/`*`;
+     `_check` as a set lookup). `(+ 3 4)` 361 → 158 ns.
+  2. `memq`/`remq` by identity when `eq?` is identity; `member?` without the tail copy.
+     2061 → 322 ns over 20 objects.
+  3. One-list `andmap`/`ormap`: 2136 → 653 ns.
+  4. `weighted-index` without copying the rest of the list: 39.8 → 16.3 µs over 100.
+  5. The trace wrappers forward unwatched messages directly: 1.8 M fewer calls.
+  6. `tell-all` inlines `tell`: 5.2 → 3.6 µs over 20.
+  7. `sort-by-method` caches each key on first request (the four keys are getters):
+     20.6 → 17.1 µs over 20.
+
+  Overall, Python function calls fell 36% (short run) and 29% (halt run). The 720 runs
+  take 40.8 CPU-min instead of 54.2 (−25%) and 2 min 4 s instead of 3 min 7 s. Another
+  user's 20-process job shared the machine throughout, so CPU times varied by up to
+  ±15%. The per-step gains are therefore given as micro-benchmarks and call counts,
+  measured on cumulative copies of the package (`/tmp/var/S0..S7`, built from the diff's
+  hunks). `python/oracle/bench_speed.py` (new) interleaves repetitions across such
+  copies; best of 6, total CPU went from 25.6 s to 16.1 s.
+  After the speed-ups: 109/109 goldens, 720/720 extra seeds and every battery still pass.
+  Not done: `__slots__` (little to gain in 3.12) and caching the highest bin's urgency in
+  `delete-codelets`, which would change coderack.ss's shape.
+- **Tiers**, settled in `python/run-tests.sh`:
+  - `--fast`: 729 tests, about 7 s;
+  - full (the gate): 1032 tests, which adds the Chez re-captures, the 109 goldens, the
+    CLI against the live oracle, the 720 extra seeds and their oracle re-capture. It took
+    5 min 45 s under the shared load, well under 15 min.
+- **Docs**:
+  - docs/python-run-times.md: a new "Speed-ups" section;
+  - docs/python-translation-plan.md: "As built (item 12)", including the two model facts
+    the speed-ups rely on;
+  - docs/anomalies_and_quirks.md: an update to "The goldens never exercise ... the
+    trace's importance thresholds" (the extra seeds reach both);
+  - python/README.md.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1032 tests, 5 min 45 s).
+
+### Blockers
+None. Notes:
+- The run-times table in docs/python-run-times.md (`bench_runs.py`) predates the speed-ups.
+  I did not regenerate it during this item because the machine was loaded. Item 17's
+  final audit can rerun `python3 python/oracle/bench_runs.py docs/python-run-times.md` on
+  an idle machine. Note that it rewrites the file, so the Speed-ups section would have to
+  be appended again.
+- `sort-by-method`'s key cache assumes pure sort keys. A new caller with an effectful key
+  would need the uncached form (docs/python-translation-plan.md, item 12).
+
+### Next
+Item 13, the SGL interpreter on tkinter: `sgl-interpreter.ss` and `fonts.ss` against the sgl
+battery's 48 fixtures (`python/fixtures/sgl/`). Recall from item 03 that the graphics tell
+strings from symbols (`string?` in sgl-interpreter.ss:386/398/432, fonts.ss:93), so text
+arguments must stay `chez.String` where the original has strings. Engine modules must not
+import tkinter; the interpreter's canvas operations can be recorded headless for the tests.

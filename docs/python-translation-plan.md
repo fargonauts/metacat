@@ -708,6 +708,24 @@ from symbols").
 - **Speed**: 1.23 ms per codelet over the goldens' 272,857 codelets, 9× Chez
   (docs/python-run-times.md); startup 0.05 s.
 
+### As built (item 12)
+
+- **Extra seeds**: the oracle's side of the 720 runs is frozen as hashes and stdout
+  (`python/fixtures/extra-seeds/`, by `python/oracle/capture_extra_seeds.py`), not as
+  traces, and the gate re-captures it to check freshness. The Python side runs through
+  `golden_harness.run_in_fresh_process(..., digest=True)`, which reduces each run to what
+  the CLI would give: exit code, stdout, the error line and the trace's sha256.
+- **Speed-ups** keep the structure of the Scheme: they are faster versions of the Chez
+  primitives (chez.py's arithmetic, `memq`, `remq`, `andmap`, `ormap`) and of a few
+  utilities (`weighted-index`, `tell-all`, `sort-by-method`), plus the trace writer's
+  wrappers. None reorders a draw or skips a `tell` that has an effect. Two depend on
+  facts of the model, stated where they are made: `memq`'s identity path relies on
+  `eq?` being identity for everything but symbols, fixnums, characters and `'()`
+  (`eq_p`), and `sort-by-method`'s key cache on the model's sort keys being getters
+  (`get-left-string-pos`, `get-age`, `get-quality`, `get-absolute-activation`). A new
+  `sort-by-method` with a key that has effects would have to drop the cache.
+  docs/python-run-times.md has each one's gain.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

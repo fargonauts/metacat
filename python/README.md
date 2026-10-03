@@ -190,3 +190,15 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   inside a codelet (suspend at an answer) resumed to the oracle's `--keep-going` state.
   `oracle/bench_runs.py` times every golden run in Python and in the oracle
   (docs/python-run-times.md).
+
+Extra seeds and speed (item 12):
+- `oracle/capture_extra_seeds.py` runs tests/extra-seeds.py's 720 runs (20 non-golden
+  seeds per problem line of tests/problems.txt, the seeds the Racket port was audited on)
+  in the unedited oracle and freezes each run's exit code, stdout, first stderr line and
+  trace hash into `fixtures/extra-seeds/` (the traces themselves would be about 300 MB).
+  `tests/test_extra_seeds.py` runs the 720 through the package's driver, each in a fresh
+  fork, and requires the same five things (slow tier: about 2 min on 32 cores, plus 1.5
+  min to re-capture the oracle's side and compare it byte for byte).
+- `oracle/bench_speed.py [DIR ...]` measures the CPU time of five fixed runs, interleaving
+  the repetitions across copies of `python/`; docs/python-run-times.md records each
+  speed-up (marked `speed (item 12)` in the code) and its gain.

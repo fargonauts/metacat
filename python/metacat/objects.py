@@ -132,7 +132,17 @@ def tell_all(objects, msg, *args):
     """utilities.ss: tell-all.  chez: map's order of application (fixture
     tell-all-order)."""
     # chez: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
-    return chez.map_(lambda x: tell(x, msg, *args), objects)
+    def tell_one(obj):
+        # tell, inlined (speed, item 12)
+        method = obj.MESSAGES.get(msg)
+        if method is not None:
+            result = method(obj, obj, *args)
+        else:
+            result = obj.otherwise(obj, msg, args)
+        if result is INVALID:
+            return report_error_and_halt((obj, msg) + args, obj)
+        return result
+    return chez.map_(tell_one, objects)
 
 
 def delegate(self, msg, args, *objects):

@@ -62,3 +62,46 @@ Startup (load, set up a problem, run 1 codelet), median of 5: Chez 0.71 s, Pytho
 | `abc ccbbaa ijk` | 3 | 5959 | 2.83 | 5.47 | 1.93 | 0.12 | 0.90 |
 | `abc aabbdd ijkl` | 3 | 11974 | 3.24 | 11.22 | 3.47 | 0.09 | 0.93 |
 | **all** | 109 | 272857 | 112.34 | 339.56 | 3.02 | 0.13 | 1.23 |
+
+## Speed-ups (loop0002 item 12)
+
+The table above was measured before these speed-ups. Each one keeps every run identical:
+after them, the 109 goldens (test_golden.py) and the 720 extra-seed runs
+(test_extra_seeds.py, against the oracle) still match byte for byte, and so do every
+battery. Each change is marked `speed (item 12)` in the code.
+
+| # | Speed-up | Where | Micro-benchmark, before → after |
+| ---: | --- | --- | --- |
+| 1 | Arithmetic fast paths: two fixnums or two flonums skip the exactness rules; `+`/`*` with two arguments skip the identity step; `_check` is a set lookup | chez.py `_add2`, `_sub2`, `_mul2`, `_div2`, `add`, `mul`, `_check` | `(+ 3 4)` 361 → 158 ns; flonum `-` 284 → 149 ns; `(* 1/3 6)` 2499 → 1497 ns; flonum `/` 403 → 163 ns |
+| 2 | `memq`/`remq` compare by identity when the item's `eq?` is identity (objects, not symbols, fixnums, characters or `'()`); `member?` no longer copies the tail | chez.py `memq`, `remq`, new `memq_p`; utilities.py `member_p` | `member?` of the 20th of 20 objects 2061 → 322 ns; `remq` from 20 1910 → 416 ns |
+| 3 | `andmap`/`ormap` over one list without building an argument list per element | chez.py | 20 elements: 2136 → 653 ns, 2171 → 667 ns |
+| 4 | `weighted-index` walks an index instead of copying the rest of the list at each step | utilities.py | 100th of 100 weights: 39.8 → 16.3 µs |
+| 5 | The trace wrappers of `*coderack*` and `*workspace*` pass every message but the one they watch (`choose-codelet`, `add-rule`) straight on | trace_writer.py `_Wrapped` | 1.8 M fewer calls in the halt run below |
+| 6 | `tell-all` inlines `tell` | objects.py | 20 objects: 5.2 → 3.6 µs |
+| 7 | `sort-by-method` asks each element's key once, when the original first asks it, and remembers it (the four sort keys of the model are plain getters) | utilities.py | 20 objects: 20.6 → 17.1 µs |
+
+Not done: `__slots__` (attribute access on a class's instances is already a dict lookup in
+Python 3.12, and `tell` dispatch dominates); caching the highest bin's urgency across
+`delete-codelets`'s removal weights, which would change the shape of coderack.ss's code.
+
+Whole runs: `python3 python/oracle/bench_speed.py` (five runs: abc abd xyz seed 3, abc abd
+mrrjjj mrrjjjj seed 1, the halt problem eqe qeq abbba aaabaaa seed 7 with 13,929
+codelets, a keep-going run and rst rsu xyz seed 2). The machine was shared with another
+user's 20-process job during this item, so CPU times varied by up to ±15% between
+repetitions; the per-step CPU times did not separate the steps reliably, and the
+micro-benchmarks above and the call counts below are the per-step measures.
+
+| Measure | Before (HEAD of item 11) | After (all 7) | Change |
+| --- | ---: | ---: | ---: |
+| bench_speed.py total CPU, best of 3, one process at a time | 31.6 s | 23.4 s (steps 1–4 only) | −26% |
+| bench_speed.py total CPU, best of 6, interleaved, 8 at a time | 25.6 s | 16.1 s | −37% |
+| Python function calls, abc abd xyz seed 3 (2,427 codelets) | 33.8 M | 21.6 M | −36% |
+| Python function calls, halt run seed 7 (13,929 codelets) | 350.5 M | 248.8 M | −29% |
+| test_extra_seeds.py's 720 runs, total CPU | 54.2 min | 40.8 min | −25% |
+| test_extra_seeds.py's 720 runs, wall clock on 32 cores | 3 min 7 s | 2 min 4 s | −34% |
+
+Function calls per step (cProfile, abc abd xyz seed 3 / halt run): 33.8 M / 350.5 M at
+the start; after step 1, 23.7 M / 276.3 M; step 2, 22.5 M / 260.6 M; steps 3 and 4 do not
+change the count (comprehensions are inlined in Python 3.12, and step 4 saves copies,
+not calls); step 5, 22.2 M / 258.9 M; step 6, 21.6 M / 250.3 M; step 7, 21.6 M / 248.8 M.
+On the five benchmark runs, Python now takes 0.43–1.3 ms per codelet (best of 6, under the load above).

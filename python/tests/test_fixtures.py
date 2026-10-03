@@ -28,7 +28,9 @@ def test_every_battery_is_captured():
     assert local == ["bridge-extra", "chez", "codelet-extra", "coderack-extra", "rule-extra",
                      "slipnet-extra", "trace-extra", "utilities-extra",
                      "workspace-extra"]   # python/oracle/batteries/ (items 02-10)
-    assert sorted(p.name for p in FIXTURES.iterdir() if p.is_dir()) == BATTERIES
+    # extra-seeds/ holds whole runs, not a battery (capture_extra_seeds.py, item 12)
+    assert sorted(p.name for p in FIXTURES.iterdir()
+                  if p.is_dir() and p.name != "extra-seeds") == BATTERIES
 
 
 @pytest.mark.parametrize("battery", BATTERIES)

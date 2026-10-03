@@ -278,6 +278,10 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   importance of 63 for succgrp=>predgrp on a non-spanning bridge, a group of strength 99,
   themes at activations 30, 50, 80 and −60), and its fixtures kill the three mutants.
 - **Status:** explained.
+- **Update (loop0002, item 12):** the 720 extra-seed runs (python/tests/test_extra_seeds.py)
+  reach both thresholds: the 65 → 60 mutant changes 3 of them and the 100 → 99 mutant 5,
+  while each still passes all 109 goldens. The square-for-cube mutant passes the 720 too,
+  so a partly active theme's spread still shows only in trace-extra-battery.scm.
 
 ## ⚙️ Chez / Racket quirks
 

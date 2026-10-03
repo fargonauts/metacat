@@ -86,16 +86,35 @@ def _run_one(args):
                 getattr(e, "partial_trace", None), getattr(e, "stdout", None))
 
 
-def run_in_forks(jobs, processes=None):
+def _run_one_digest(args):
+    """_run_one for the extra seeds (test_extra_seeds.py): the run as `python3 -m
+    metacat ... --trace FILE` gives it, reduced to what the oracle's fixture keeps:
+    (exit code, stdout, the first stderr line or "", trace sha256, trace lines)."""
+    import hashlib
+    from metacat.__main__ import condition_text
+    strings, seed, cap, keep = args
+    port, out = io.StringIO(), io.StringIO()
+    code, error = 0, ""
+    try:
+        with redirect_stdout(out):
+            headless.run_problem(strings, seed, cap, keep, port)
+    except Exception as e:   # noqa: BLE001 - the original's own errors, as __main__
+        code, error = 1, "Error: %s" % condition_text(e)
+    data = port.getvalue().encode("utf-8")
+    return code, out.getvalue(), error, hashlib.sha256(data).hexdigest(), data.count(b"\n")
+
+
+def run_in_forks(jobs, processes=None, digest=False):
     """Run each (strings, seed, cap, keep-going?) in a fresh fork of this process
-    (after prepare()), in parallel; results in order."""
+    (after prepare()), in parallel; results in order.  With digest, each result is
+    _run_one_digest's instead of _run_one's."""
     prepare()
     ctx = multiprocessing.get_context("fork")
     with ctx.Pool(processes or min(32, os.cpu_count() or 1), maxtasksperchild=1) as pool:
-        return pool.map(_run_one, jobs, chunksize=1)
+        return pool.map(_run_one_digest if digest else _run_one, jobs, chunksize=1)
 
 
-def run_in_fresh_process(jobs, processes=None):
+def run_in_fresh_process(jobs, processes=None, digest=False):
     """run_in_forks in a new Python process, so that neither the test session's
     engine (which other test files change and restore) nor the runs affect each
     other: each run starts from a freshly loaded engine, as each golden starts in a
@@ -104,14 +123,14 @@ def run_in_fresh_process(jobs, processes=None):
     import subprocess
     here = os.path.dirname(os.path.abspath(__file__))
     code = ("import sys, pickle; sys.path[:0] = %r; import golden_harness as g; "
-            "jobs, n = pickle.load(sys.stdin.buffer); "
-            "open(sys.argv[1], 'wb').write(pickle.dumps(g.run_in_forks(jobs, n)))"
+            "jobs, n, d = pickle.load(sys.stdin.buffer); "
+            "open(sys.argv[1], 'wb').write(pickle.dumps(g.run_in_forks(jobs, n, d)))"
             % ([here, os.path.dirname(here)],))
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         result = os.path.join(tmp, "results.pickle")
         proc = subprocess.run([sys.executable, "-c", code, result],
-                              input=pickle.dumps((jobs, processes)),
+                              input=pickle.dumps((jobs, processes, digest)),
                               capture_output=True, check=False)
         if proc.returncode != 0:
             raise RuntimeError("golden runner failed:\n" + proc.stderr.decode())
