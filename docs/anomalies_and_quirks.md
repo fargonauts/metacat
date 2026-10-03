@@ -669,6 +669,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** not a bug. A later battery whose traces did depend on order would show up
   as a failure in this kind of pool and not under Chez.
 
+### Python: a break inside a codelet can only be resumed from a parked thread
+- **Seen:** loop0002 iteration 12 (item 11), `abc abd xyz` seed 3: answer-finder reports
+  `yyz` during codelet 2428 (the count still reads 2427) and calls `suspend`, so run.ss's
+  `break` stops the run in the middle of that codelet.
+- **What:** `break` captures a continuation with `call/cc` and calls `(reset)`; `go` calls
+  the continuation, and the rest of the codelet runs. Python has no re-entrant
+  continuations, and an exception would unwind the codelet. metacat/run.py runs a command
+  that may break in an engine thread (`run.toplevel`); the break parks that thread and
+  `go` releases it. A Chez continuation can also be called again after the run went on,
+  which a thread can't do: the port raises "this break can no longer be resumed". No
+  caller in the original does it (`*breakpoint-continuation*` is replaced at each break).
+- **Evidence:** python/tests/test_run.py, `test_a_break_inside_a_codelet_resumes_that_codelet`:
+  the run stops at 2427, 2429 and 2659 (the three answers) and 3000 (the breakpoint), and
+  its generator state, codelet count and temperature at 3000 equal the oracle's
+  `--keep-going` run's.
+- **Status:** worked around (docs/python-translation-plan.md, "As built (item 11)").
+
+### Python: `str.isalpha` is close to, but not, Chez's `char-alphabetic?`
+- **Seen:** loop0002 iteration 12 (item 11), the CLI's argument parser (run.ss's
+  `parse-args`: a word that starts with a letter is a string of the problem).
+- **What:** Chez's `char-alphabetic?` is Unicode's Alphabetic property; Python's
+  `str.isalpha` is the general categories L*. They differ on a few characters (letter
+  numbers such as Roman numerals, some combining marks). Both accept every ASCII letter
+  and reject digits and `-`.
+- **Evidence:** python/tests/test_cli.py compares the CLI and the oracle on twelve bad
+  argument lists, `1xyz` among them; all are ASCII.
+- **Status:** won't fix. Only a problem typed with such characters would see it, and the
+  original's letters are a–z.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

@@ -75,7 +75,7 @@
     Racket port's harness did, and compare each golden up to the first codelet that
     needs unported code.
 
-- [ ] **11 Full runs, the trace writer and the CLI.** Translate the headless parts of
+- [x] **11 Full runs, the trace writer and the CLI.** Translate the headless parts of
     `run.ss`. Add `metacat/trace.py`, which writes trace-format.md byte for byte, and
     `metacat/__main__.py`, which has the same arguments, output and exit codes as
     `chez_scheme/oracle/run.ss`. Tests:

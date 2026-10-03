@@ -679,6 +679,35 @@ from symbols").
   about 1.4 ms per codelet, all updates included. The longest golden (17,000 codelets) sets
   the wall time.
 
+### As built (item 11)
+
+- **Modules**: run.py (run.ss, all 33 definitions), headless.py (the oracle's prelude.ss
+  headless windows and run.ss driver, promoted from the tests), trace_writer.py (the
+  oracle's trace.ss JSON writer and wrappers; trace.py is trace.ss, so the writer has
+  another name than iterations.md's `metacat/trace.py`) and `__main__.py` (the CLI).
+  The test-side golden_run.py is gone; golden_harness.py only reads problems.txt and runs
+  forks.
+- **break/go**: `run.toplevel(thunk)` is the REPL evaluating one command. It runs the
+  thunk in a daemon "engine" thread and waits on a queue. `break_`'s `(reset)` raises
+  `objects.Reset`, which break's own continuation point catches: in an engine thread it
+  posts "reset" to the waiting command and parks on an Event; `go` calls the
+  `Breakpoint` (break's continuation), which re-targets the parked thread's queue to
+  itself, releases the Event and waits, so break returns `'ignore` and the run goes on
+  from inside the codelet. Only one thread runs model code at a time, so the run is the
+  same run (test_run.py). Outside `toplevel` (headless drivers, scripts) Reset propagates.
+  `init-mcat`/`clear-breakpoint` unwind a parked thread they drop (`_Abandoned`, a
+  BaseException no model code catches). A Breakpoint resumes once: Chez could re-enter
+  a continuation, which no run does. Item 15 can call `go` from a GUI worker rather
+  than Tk's thread.
+- **Trace wrappers when there is no trace**: they compute nothing when `trace_writer.PORT`
+  is None; they only read, so the run is the same either way (the CLI's output with and
+  without `--trace` is compared).
+- **Error output**: an error of the original (the `caddr` crash) prints the oracle's first
+  line, `Error: Exception in caddr: incorrect list structure #f`, then a Python traceback,
+  and exits 1.
+- **Speed**: 1.23 ms per codelet over the goldens' 272,857 codelets, 9× Chez
+  (docs/python-run-times.md); startup 0.05 s.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

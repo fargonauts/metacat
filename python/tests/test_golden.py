@@ -3,10 +3,9 @@ jootsing, memory).
 
 Part of the Python translation of Metacat (GPL v2 or later, like Metacat itself).
 
-Every golden of tests/problems.txt is run by golden_harness.py (the oracle's
-prelude.ss headless windows, trace.ss's writer and wrappers, run.ss's driver,
-around golden_run.py, a test-side translation of run.ss's run loop until item
-11) in a fresh fork of a fresh process, and its trace must equal the golden byte
+Every golden of tests/problems.txt is run by the package's headless driver
+(metacat/headless.py, metacat/run.py, metacat/trace_writer.py; golden_harness.py
+runs them in parallel) in a fresh fork of a fresh process, and its trace must equal the golden byte
 for byte; a failure names the first differing line.  The fast tier runs one short
 golden (a b z, seed 1: 1000 codelets with keep-going); the slow tier runs all
 109, and the original's crash on abc ccbbaa ijk seed 3 against the live oracle.
@@ -203,13 +202,10 @@ def _extra_battery():
     from scheme_canon import canon
     from test_workspace import init_problem
 
-    import golden_run
     import metacat as _metacat
     from metacat import concept_mappings, groups, setup, slipnet, workspace
     from metacat.objects import Lambda, tell
 
-    sys.modules["metacat.run"] = golden_run
-    _metacat.run = golden_run
     engine.load()
     eeg = types.ModuleType("metacat.eeg_graphics")
     eeg.g_EEG = Lambda(lambda self, msg, *args: "done")

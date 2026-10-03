@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 11/18 SOLVED
+- **Current**: 12/18 SOLVED
 
 ---
 
@@ -1296,3 +1296,105 @@ Item 11: full runs, the trace writer and the CLI.
 - `golden_harness.run_problem` already returns run.ss's stdout lines for the CLI
   comparison.
 
+
+---
+
+## Iteration 12 — 2026-10-03 23:34
+
+### Completed
+Item 11, full runs, the trace writer and the CLI: **SOLVED**.
+- **Code** (new, in the package):
+  - `metacat/run.py`: run.ss in full, all 33 definitions. It has the run loop from
+    item 10's test-side `golden_run.py`, which is now deleted, plus the REPL commands:
+    `ss`, `runtil`, `clear-breakpoint`, `break`, `quiet-break`, `go`, `suspend`,
+    `rerun`, and `prompt`/`no-prompt`, which are never used because `swl:version` is
+    "0.9x".
+  - **break/go**: `run.toplevel(thunk)` stands for the REPL evaluating one command. It
+    runs the command in an engine thread. break's `(reset)` parks that thread at the
+    break point, and `toplevel` returns. `go` calls the `Breakpoint` (break's
+    continuation): the parked thread resumes and break returns `'ignore`, even from the
+    middle of a codelet. `go` then waits until the next break. Only one thread runs model
+    code at a time. Outside `toplevel` (the headless drivers) `Reset` propagates.
+    `init-mcat` unwinds a parked run that it drops.
+  - `metacat/headless.py`: the oracle's prelude.ss headless windows and its run.ss driver
+    (`run_problem`, `headless_break`, the Answer and Ooops lines, the summary), moved from
+    `tests/golden_harness.py`.
+  - `metacat/trace_writer.py`: trace.ss's JSON writer and wrappers. iterations.md says
+    `metacat/trace.py`, but that name is trace.ss, the Temporal Trace (item 10), so the
+    writer got another name. The wrappers compute nothing when there is no trace port.
+  - `metacat/__main__.py`: `python3 -m metacat` takes run.ss's arguments, prints the
+    same output and uses the same exit codes: 0, 2 for usage errors, and 1 for the
+    original's crash. On a crash the first stderr line is the oracle's, then a Python
+    traceback follows.
+  - `tests/golden_harness.py` now only reads problems.txt and runs forks around
+    `headless.run_problem`. `test_golden.py`'s extra battery uses the real `metacat.run`.
+- **Tests**:
+  - `tests/test_cli.py` (30 tests) runs the CLI and the live oracle in parallel, about
+    6 s. Each case must give the same stdout and exit code:
+    - racket/tests/cli-test.rkt's cases: an answer, no cap, a cap, justify, keep-going,
+      verbose, the halt run (eqe qeq abbba aaabaaa seed 3), and the crash run (abc ccbbaa
+      ijk seed 3: exit 1 and the same first error line);
+    - twelve bad argument lists;
+    - `--trace`, which must write golden abc-abd-xyz_3852097033 byte for byte, as
+      `--verbose --trace` must for 3009318743;
+    - a run seeded from the clock, which the oracle must replay.
+
+    Fast tier: the usage errors, without the oracle.
+  - `tests/test_run.py` (14 tests) and `tests/run_scenarios.py`, each scenario in a
+    fresh process. They are the counterpart of racket/tests/run-test.rkt:
+    - a run stopped at 150, 300 and 450 with `go` in between is the same run (generator
+      state, count and temperature) as one run straight to 450;
+    - the control panel's mode switches;
+    - `*running?*` is true during the resumed run;
+    - step mode (`ss 40`);
+    - `go` with no break;
+    - **a break inside a codelet**: abc abd xyz seed 3 suspends during codelet 2428,
+      while the count is still 2427. Resumed with `go` through the breaks at 2429 and
+      2659 to the breakpoint at 3000, it reaches the same state as the oracle-equivalent
+      `--keep-going` run;
+    - a new run drops a parked break;
+    - the definition, docstring and no-tkinter checks.
+  - **All 109 goldens match event for event** through the package's driver, in parallel
+    (test_golden.py, 32 forks, about 35 s).
+  - **Tests first, partly.** I wrote run.py, headless.py and trace_writer.py first, moving
+    code that item 10's tests had already pinned against the 109 goldens. The CLI cases
+    were checked by hand against the oracle before test_cli.py existed. Then I wrote
+    test_cli.py and test_run.py and showed that they fail without the new modules (moved
+    aside): test_cli.py gave **6 failed, 24 errors**, and test_run.py and test_golden.py
+    failed at collection (`ImportError: cannot import name 'headless'`). With the
+    modules in place, everything passed.
+- **Mutation checks** (`/tmp/mut11.py`, not kept; each file restored, then the gate
+  re-run). 11 mutants:
+  - 10 caught: no "stopped", init-mcat not unwinding the parked break, no
+    switch-to-run-mode, the ss message, keep-going ignoring the cap (it hangs, caught by
+    the timeout), the Answer line's spacing, the parser taking any word as a string, exit
+    code 3, the themes event emitted every time, no seed check.
+  - 1 survived at first: `go` not setting `*running?*`. The `running_during_go` check
+    now kills it.
+- **Run times**: `python/oracle/bench_runs.py` writes `docs/python-run-times.md`. It runs
+  every golden run once as a process in Python and in the oracle and checks that both
+  give the same output. Over all runs Python takes 1.23 ms per codelet and Chez
+  0.13 ms, about 9×. Startup takes 0.05 s in Python and 0.71 s in Chez. The longest
+  problem, eqe qeq abbba aaabaaa, takes 56 s over its 3 seeds against Chez's 7.4 s.
+- **Docs**:
+  - `docs/python-translation-plan.md`: "As built (item 11)";
+  - `docs/anomalies_and_quirks.md`: two Python entries: a break inside a codelet needs a
+    parked thread, and `str.isalpha` vs `char-alphabetic?`;
+  - `python/README.md`: the new modules and tests;
+  - `python/run-tests.sh`: the tier comment.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1027 tests, 2 min 54 s).
+
+### Blockers
+None. Notes:
+- `*EEG*` is still a null stand-in installed by `headless.prepare()`, because
+  eeg-graphics.ss belongs to the panels item (14).
+- A `Breakpoint` resumes once. Chez could re-enter a continuation that was already
+  used, but nothing in the original does.
+- `go` waits on the calling thread until the next break. The GUI (item 15) should call it
+  from a worker thread, or poll, not from Tk's thread.
+
+### Next
+Item 12, extra seeds and speed. `golden_harness.run_in_fresh_process` and
+`headless.run_problem` can run the 720 extra-seed runs. `python/oracle/bench_runs.py` gives
+the oracle's side and its timing. Profile with `python3 -m cProfile -m metacat abc abd xyz
+--seed 3 --max-codelets 3000`.

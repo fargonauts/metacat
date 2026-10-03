@@ -3,7 +3,8 @@
 # (ralph_loops/loop0002/gate.py) runs it with no arguments.
 #
 #   bash python/run-tests.sh          # full tier: every test, including the ones
-#                                     # marked slow (Chez re-captures, golden runs)
+#                                     # marked slow (Chez re-captures, the 109
+#                                     # golden runs, the CLI against the live oracle)
 #   bash python/run-tests.sh --fast   # fast tier: skips tests marked slow
 #
 # Any other arguments are passed to pytest.  Stops at the first failure (-x).

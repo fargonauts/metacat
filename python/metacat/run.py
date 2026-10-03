@@ -1,26 +1,41 @@
-"""run.ss's headless run loop, translated in the tests until item 11 (test helper).
+"""run.ss: the run loop (init-mcat, run-mcat, step-mcat, update-everything ...)
+and the REPL commands that drive it (ss, runtil, break, go, rerun ...).
 
 Metacat is copyright (c) 1999, 2003 by James B. Marshall; this translation is free
 software under the GNU General Public License, version 2 or later, like Metacat
-itself.  Translated to Python (2026) from run.ss, loop0002 item 10.
+itself.  Metacat is based on Copycat, which was originally written in Common Lisp
+by Melanie Mitchell.  Translated to Python (2026) from run.ss, with
+racket/engine/run.rktl as a worked translation.
 
-The counterpart of the copy of run.ss inside racket/tests/golden-harness.rkt in the
-Racket port's item 10: init-mcat, run-mcat, step-mcat, update-everything and their
-helpers, one function per definition, under the mapped names.  golden_harness.py
-registers this module as metacat.run, so the engine's reads through the package
-(_metacat.run.suspend, .g_temperature_clamped_p, .p_update_cycle_length ...) find
-it.  Item 11 moves it into the engine as metacat/run.py.  `break_` and
-`quiet_break` wait for the REPL in the original; the driver replaces them (the
-oracle's run.ss does the same with set!).  The REPL commands (ss, runtil, go,
-rerun, prompt) are item 11's.
+One function per definition, under the mapped names.  The globals are module
+attributes (`*break-time*` is `g_break_time` ...); the rest of the engine reads
+them through the package (_metacat.run.suspend, .g_temperature_clamped_p ...), so
+a driver may replace `break_`, `quiet_break` or `suspend`, as the oracle's run.ss
+does with set!.
+
+break and go (docs/python-translation-plan.md, "Continuations").  break captures
+a continuation, which may be deep inside a codelet (suspend, answers.ss), then
+calls (reset), which returns to the REPL; go calls that continuation, so the run
+goes on from the break as if break had returned 'ignore.  Python has no
+re-entrant continuations, so a command that may break runs in an engine thread
+(`toplevel(thunk)`, the REPL's evaluation of one command): at the break, (reset)
+parks that thread and `toplevel` returns to its caller; `go` hands control back to
+the parked thread and waits, as the REPL waits, until the run breaks again or the
+command ends.  Only one thread runs model code at a time.  Outside `toplevel`
+(the headless drivers, which replace break anyway) a break's (reset) raises
+objects.Reset, as Chez's reset ends a `scheme --script` run.
 
 Evaluation order: init-workspace's let makes the strings last first (Chez's let);
 nothing in them draws.  update-everything's stochastic-if* draws its coin first.
 """
 from __future__ import annotations
 
+import queue
+import sys
+import threading
+
 import metacat as _metacat
-from metacat import chez, coderack, formulas, setup, slipnet, sugar, utilities
+from metacat import chez, coderack, formulas, objects, setup, slipnet, sugar, utilities
 from metacat import workspace, workspace_strings
 from metacat.objects import tell
 
@@ -41,6 +56,130 @@ g_temperature_clamped_p = False
 g_initial_slipnode_unclamp_time = False
 
 
+# ---------------------------------------------------------------------------
+# The REPL's side of break and go (no counterpart in run.ss: Chez's call/cc and
+# reset)
+
+class _Abandoned(BaseException):
+    """Unwinds a parked engine thread whose breakpoint can no longer be resumed
+    (a new run replaced it); no model code catches it."""
+
+
+_engine = threading.local()   # .holder: [the queue of the command waiting for it]
+
+
+def toplevel(thunk):
+    """The REPL evaluating one command: run thunk in an engine thread until it
+    returns (its value), raises (re-raised here) or resets (None: a break, or
+    report-error-and-halt).  A break parks the thread; go resumes it."""
+    if getattr(_engine, "holder", None) is not None:
+        return thunk()   # already in an engine thread: a nested command
+    back = queue.SimpleQueue()
+    holder = [back]
+
+    def body():
+        _engine.holder = holder
+        try:
+            result = ("value", thunk())
+        except objects.Reset:
+            result = ("reset", None)
+        except _Abandoned:
+            return
+        except BaseException as e:   # noqa: BLE001 - re-raised by the waiting command
+            result = ("error", e)
+        holder[0].put(result)
+
+    threading.Thread(target=body, daemon=True, name="metacat-engine").start()
+    return _wait(back)
+
+
+def _wait(back):
+    kind, value = back.get()
+    if kind == "error":
+        raise value
+    return value
+
+
+class Breakpoint:
+    """break's continuation: calling it with a value resumes the parked run, which
+    sees break return that value; the caller waits as toplevel does."""
+
+    def __init__(self, holder):
+        self.holder = holder           # the parked thread's holder, or None
+        self.resume = threading.Event()
+        self.value = None
+        self.abandoned = False
+        self.parked = False
+
+    def __call__(self, value=None):
+        if not self.parked or self.resume.is_set():
+            # chez: a continuation can be re-entered; a thread cannot
+            raise chez.SchemeError("go", "this break can no longer be resumed")
+        back = queue.SimpleQueue()
+        self.holder[0] = back
+        self.value = value
+        self.resume.set()
+        return _wait(back)
+
+    def abandon(self):
+        if self.parked and not self.resume.is_set():
+            self.abandoned = True
+            self.resume.set()
+
+
+def _breakpoint_point(body):
+    """break's (continuation-point* breakpoint ... (reset)): body receives the
+    Breakpoint and ends with (reset), which raises objects.Reset.  In an engine
+    thread the thread parks there and, once resumed, break returns the value given
+    to the continuation; elsewhere Reset propagates."""
+    holder = getattr(_engine, "holder", None)
+    point = Breakpoint(holder)
+    try:
+        return body(point)
+    except objects.Reset:
+        if holder is None:
+            raise
+        point.parked = True
+        holder[0].put(("reset", None))
+        point.resume.wait()
+        if point.abandoned:
+            raise _Abandoned() from None
+        return point.value
+
+
+def _drop_breakpoint():
+    """Setting *breakpoint-continuation* to #f leaves the parked run, if any, to the
+    garbage collector in Chez; here its thread is unwound."""
+    global g_breakpoint_continuation
+    if isinstance(g_breakpoint_continuation, Breakpoint):
+        g_breakpoint_continuation.abandon()
+    g_breakpoint_continuation = False
+
+
+def reset():
+    """Chez: (reset), back to the REPL (parks an engine thread at a break)."""
+    raise objects.Reset()
+
+
+# ---------------------------------------------------------------------------
+# run.ss
+
+def ss(*args):
+    """run.ss: ss (step mode: (ss n) breaks every n codelets, (ss 0) turns it off)"""
+    global p_step_cycles
+    if args:
+        n = args[0]
+        if n > 0:
+            p_step_cycles = n
+            step_mode_on()
+        else:
+            step_mode_off()
+    chez.printf("step mode ~a~a~%",
+                "on" if g_step_mode_p is not False else "off",
+                chez.format_(", step size ~a", p_step_cycles) if g_step_mode_p is not False
+                else "")
+
+
 def step_mode_on():
     """run.ss: step-mode-on"""
     global g_step_mode_p
@@ -55,14 +194,81 @@ def step_mode_off():
     return tell(setup.g_control_panel, "set-verbose-step-mode", False)
 
 
+def runtil(*args):
+    """run.ss: runtil (sets or clears the breakpoint *break-time*)"""
+    global g_break_time
+    if not args:
+        if g_break_time is not False:
+            return ["breaktime", "set", "at", g_break_time]
+        return ["no", "breaktime", "set"]
+    breaktime = args[0]
+    if breaktime == 0:
+        g_break_time = False
+        tell(setup.g_control_panel, "clear-breakpoint-message")
+        return ["breaktime", "cleared"]
+    g_break_time = breaktime
+    tell(setup.g_control_panel, "display-breakpoint-message")
+    return ["breaktime", "set", "at", g_break_time]
+
+
+def clear_breakpoint():
+    """run.ss: clear-breakpoint"""
+    _drop_breakpoint()
+    return "done"
+
+
+# prompt and no-prompt: Marshall's workaround for SWL 0.9u's REPL prompts.
+# swl:version is "0.9x" (the oracle's prelude.ss), so break never uses them.
+prompt = False   # run.ss: (waiter-prompt-and-read), the REPL's prompt procedure
+
+
+def no_prompt(n):
+    """run.ss: no-prompt (SWL 0.9u's REPL read without a prompt; never used, since
+    swl:version is not "0.9u")"""
+    if not (isinstance(n, int) and not isinstance(n, bool) and n >= 0):
+        raise chez.SchemeError("no-prompt", "~s is not a nonnegative exact integer", n)
+    line = sys.stdin.readline()
+    return line if line else None
+
+
 def break_():
-    """run.ss: break (waits for the REPL; the driver replaces it)"""
-    raise NotImplementedError("break: replaced by the driver")
+    """run.ss: break.  Stops the run until go (see the module docstring)."""
+    def body(breakpoint):
+        global g_breakpoint_continuation, g_running_p
+        g_breakpoint_continuation = breakpoint
+        # (swl:sync-display): nothing to synchronize without the views
+        chez.printf("stopped~%")
+        # swl:version is "0.9x": waiter-prompt-and-read no-prompt is not called
+        g_running_p = False
+        tell(setup.g_control_panel, "switch-to-input-mode")
+        return reset()
+    return _breakpoint_point(body)
 
 
 def quiet_break():
-    """run.ss: quiet-break (waits for the REPL; the driver replaces it)"""
-    raise NotImplementedError("quiet-break: replaced by the driver")
+    """run.ss: quiet-break.  break without "stopped"."""
+    def body(breakpoint):
+        global g_breakpoint_continuation, g_running_p
+        g_breakpoint_continuation = breakpoint
+        g_running_p = False
+        tell(setup.g_control_panel, "switch-to-input-mode")
+        return reset()
+    return _breakpoint_point(body)
+
+
+def go():
+    """run.ss: go.  Resumes the run stopped by the last break, and waits until it
+    breaks again (see the module docstring)."""
+    global g_interrupt_p, g_running_p
+    if not utilities.exists_p(g_breakpoint_continuation):
+        chez.printf("No previous break.~%")
+        return None
+    tell(setup.g_control_panel, "switch-to-run-mode")
+    g_interrupt_p = False
+    g_running_p = True
+    if g_display_mode_p is not False:
+        _metacat.view_globals.restore_current_state()
+    return g_breakpoint_continuation("ignore")
 
 
 def suspend():
@@ -71,8 +277,18 @@ def suspend():
     return _metacat.run.break_()
 
 
+def rerun():
+    """run.ss: rerun"""
+    if not utilities.exists_p(g_this_run):
+        chez.printf("No current problem.~%")
+        return None
+    return tell(setup.g_control_panel, "run-new-problem", g_this_run)
+
+
 def run_mcat():
-    """run.ss: run-mcat (the terminate escape is never taken)"""
+    """run.ss: run-mcat (the terminate escape is never taken).  break_ and
+    update_everything are read through the package, so that a driver can replace
+    them."""
     while True:
         step_mcat()
         if setup.g_codelet_count == g_initial_slipnode_unclamp_time:
@@ -108,7 +324,7 @@ def init_mcat(initial_sym, modified_sym, target_sym, answer_sym, seed):
     """run.ss: init-mcat"""
     global g_breakpoint_continuation, g_interrupt_p, g_running_p, g_display_mode_p
     global g_this_run, g_initial_slipnode_unclamp_time, g_temperature_clamped_p
-    g_breakpoint_continuation = False
+    _drop_breakpoint()   # (set! *breakpoint-continuation* #f)
     g_interrupt_p = False
     g_running_p = True
     g_display_mode_p = False

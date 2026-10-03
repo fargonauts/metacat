@@ -160,13 +160,33 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   only the pure helpers the model needs (`find-next-space-position`, `relation-name`,
   `group-event-pexp-text-string`); the panels item adds the rest of each file.
 
-  Tests: `tests/test_golden.py`, the 109 golden traces of `tests/golden/`, byte for byte.
-  `tests/golden_harness.py` is the oracle's prelude.ss headless windows, trace.ss writer
-  and wrappers, and run.ss driver; `tests/golden_run.py` is run.ss's run loop, translated
-  in the tests until item 11 and registered as `metacat.run`. Each golden runs in a fresh
-  fork of a fresh process (about 35 s on 32 cores, 6 min of CPU; slow tier). The fast
-  tier runs `a b z` seed 1 (1000 codelets). The slow tier also runs the oracle live on
-  `abc ccbbaa ijk` seed 3, the original's crash, and compares the 1062 trace lines before
-  it. `oracle/batteries/trace-extra-battery.scm` reaches what the goldens don't: concept
+  Tests: `tests/test_golden.py`, the 109 golden traces of `tests/golden/`, byte for byte,
+  through the package's headless driver (below); `tests/golden_harness.py` reads
+  `tests/problems.txt` and runs each golden in a fresh fork of a fresh process (about
+  35 s on 32 cores, 6 min of CPU; slow tier). The fast tier runs `a b z` seed 1 (1000
+  codelets). The slow tier also runs the oracle live on `abc ccbbaa ijk` seed 3, the
+  original's crash, and compares the 1062 trace lines before it.
+  `oracle/batteries/trace-extra-battery.scm` reaches what the goldens don't: concept
   mapping importances near the 65 threshold, a group of strength 99 and partly active
   themes spreading to the Slipnet.
+- `metacat/run.py`: run.ss (init-mcat, run-mcat, update-everything, and the REPL commands
+  `ss`, `runtil`, `break`, `go`, `rerun`). `run.toplevel(thunk)` runs one command the way
+  the REPL does: a break parks the run's thread and returns, `go` resumes it.
+- `metacat/headless.py`: the oracle's headless windows (prelude.ss) and its run.ss driver
+  (`run_problem`), which prints the Problem line, commentary, answers and summary.
+- `metacat/trace_writer.py`: the JSON-lines trace (docs/trace-format.md), written by
+  wrappers installed as the oracle's trace.ss installs them (trace.py is trace.ss, the
+  Temporal Trace).
+- `metacat/__main__.py`: `python3 -m metacat INITIAL MODIFIED TARGET [ANSWER] [--seed N]
+  [--max-codelets K] [--keep-going] [--trace FILE] [--verbose]`, with the oracle run.ss's
+  arguments, output and exit codes (0, 2 for bad arguments, 1 when the original crashes).
+
+  Tests: `tests/test_cli.py` runs the CLI and the live oracle side by side on
+  racket/tests/cli-test.rkt's cases (an answer, no cap, a cap, justify, keep-going,
+  verbose, the halt run, the crash run, twelve bad argument lists, `--trace`, a clock
+  seed) and requires the same stdout and exit code (slow tier, about 6 s in parallel).
+  `tests/test_run.py` runs `tests/run_scenarios.py` in fresh processes: a run stopped at
+  150, 300 and 450 and resumed with `go` is the run never stopped, step mode, a break
+  inside a codelet (suspend at an answer) resumed to the oracle's `--keep-going` state.
+  `oracle/bench_runs.py` times every golden run in Python and in the oracle
+  (docs/python-run-times.md).
