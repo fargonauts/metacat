@@ -57,7 +57,7 @@
     and `formulas.ss`. Tests: `workspace-battery.scm`, and `workspace-dump.scm` for the
     initial workspace of every problem in `tests/problems.txt`.
 
-- [ ] **07 Bonds, groups, concept mappings.** Translate `bonds.ss`, `groups.ss` and
+- [x] **07 Bonds, groups, concept mappings.** Translate `bonds.ss`, `groups.ss` and
     `concept-mappings.ss`. Tests: `codelet-battery.scm` through the Python equivalent of
     `codelet-harness.scm`.
 

@@ -102,3 +102,20 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   rules) plus `oracle/batteries/workspace-extra-battery.scm` (a group's vertical bridge,
   relevant descriptions, neighbours among groups, relevance with bonds, the bond-density
   and activity boundaries).
+- `metacat/bonds.py`: bonds.ss (bonds, the bond scouts, evaluator and builder,
+  `build-bond`/`break-bond`, the bond predicates).
+- `metacat/groups.py`: groups.ss (groups, which delegate to a workspace object and a
+  workspace structure; the group scouts, evaluator and builder, `propose-group`,
+  `build-group`/`break-group`, `contains?`).
+- `metacat/concept_mappings.py`: concept-mappings.ss (concept mappings, `CMs-equal?`,
+  `remove-duplicate-CMs`).
+- `metacat/group_graphics.py`: only `group-graphics` from group-graphics.ss, which
+  group-builder calls even with graphics off; the rest comes with the panels.
+
+  Tests: `tests/test_codelets.py`, every test of `tests/diff/codelet-battery.scm` through
+  `tests/codelet_harness.py` (the Python `tests/diff/codelet-harness.scm`): 400-codelet
+  traces of every problem and seed of `tests/problems.txt`, seven 2000-codelet runs, and
+  the concept mappings of every slipnet category and of real descriptions. The full
+  battery runs in a fork pool and is in the slow tier; the fast tier runs the first seed
+  of problem 0. `oracle/batteries/codelet-extra-battery.scm` adds local densities and
+  supports (rounded, not floored) and group-builder flipping several bonds in map's order.

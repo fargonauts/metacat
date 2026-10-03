@@ -39,3 +39,9 @@
 [2026-10-03 20:40:29] claude session it07 (cap 3.00 h) -> session_it07.log
 [2026-10-03 21:05:03] session it07: ok (exit 0, 126 tool calls)
 [2026-10-03 21:05:38] tests passed: GATE PASSED
+[2026-10-03 21:05:38] committed 102cc4a: 06 Workspace. Translate `workspace.ss`, `workspace-objects.ss`,
+[2026-10-03 21:05:41] pushed 102cc4a to origin
+[2026-10-03 21:05:41] === iteration 8: 07 Bonds, groups, concept mappings. Translate `bonds.ss`, `groups.ss` and
+[2026-10-03 21:05:41] claude session it08 (cap 3.00 h) -> session_it08.log
+[2026-10-03 21:23:49] session it08: ok (exit 0, 159 tool calls)
+[2026-10-03 21:24:35] tests passed: GATE PASSED

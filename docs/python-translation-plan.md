@@ -549,6 +549,32 @@ from symbols").
 - Measured (this machine): building the initial workspace of `abc abd xyz` 1.6 ms,
   `update-workspace-values` 1.1 ms, the Workspace's `choose-object` 24 µs.
 
+### As built (item 07)
+
+- **Modules**: bonds.py (`Bond`, the four bond codelets, `build-bond`/`break-bond` and the
+  bond predicates), groups.py (`Group` delegating to a `WorkspaceObject` and a
+  `WorkspaceStructure`, as letters do; the five group codelets; `contains?`), and
+  concept_mappings.py (`ConceptMapping`, `CMs-equal?`, `remove-duplicate-CMs`). Each `load()`
+  installs its codelet procedures in the file's order.
+- **group_graphics.py** holds only `group-graphics`, which the model calls ungated when
+  group-builder consolidates sameness groups (it sends `caching-on`, `flush` and maybe
+  `erase-group`/`draw-group` to `*workspace-window*`). The rest of group-graphics.ss
+  (`make-group-pexp`, `draw-group-grope`, the arrowhead constants) is the panels item's;
+  groups.py and images.py reach those names through `_metacat.group_graphics` only with
+  `%workspace-graphics%` on.
+- **Names from files not translated yet**, read at call time: `_metacat.bridges.break_bridge`,
+  `incompatible_horizontal_CMs_p`/`incompatible_vertical_CMs_p` (only when bridges exist),
+  `_metacat.trace.monitor_new_groups`, `_metacat.general_graphics` (graphics on).
+- **Evaluation order**: groups.ss's `get-local-density` draws the right neighbours before the
+  left ones (Chez evaluates `append`'s second argument first); bonds.ss's is a `let*`, left
+  first. group-builder's bond maps (`adjacency-map` and the flipped-bond `map`) use Chez's map
+  order, and its fights stop at the first loss (`andmap`). Every `stochastic-if*` draws its
+  coin first; in top-down-group-scout:category the probability itself draws afterwards.
+- **The harness**: python/tests/codelet_harness.py translates tests/diff/codelet-harness.scm
+  (bonds-and-groups setting only; `b:bridges?`/`b:rules?` paths wait for items 08–09). The
+  59 cases run in a fork pool (about 6 s on 32 cores); about 1.5 ms per codelet,
+  harness dumps included.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

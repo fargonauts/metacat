@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 7/18 SOLVED
+- **Current**: 8/18 SOLVED
 
 ---
 
@@ -800,3 +800,121 @@ Item 07: bonds, groups and concept mappings. Groups delegate to
 `same_group_direction_p` and `contains_p` through the package. test_workspace.py's
 `init_problem` and stand-ins are a model for building a real initial workspace in the
 bond and group tests.
+
+---
+
+## Iteration 8 — 2026-10-03 21:23
+
+### Completed
+Item 07, bonds, groups and concept mappings: **SOLVED**.
+- **Tests first.** `python/tests/codelet_harness.py` translates `tests/diff/codelet-harness.scm`
+  (the bonds-and-groups setting: the restricted run-mcat loop, `b:step`, `b:structures`,
+  `b:difference`, `b:compact`, the fakes and recording monitors). It also translates
+  codelet-battery.scm's `b:problem-trace`, `b:long-trace`, `b:cm-data`, `b:category-cm-test`
+  and `b:workspace-cm-test`. The workspace-dump.scm procedures come from test_workspace.py.
+  `python/tests/test_codelets.py` covers all 59 tests of `tests/diff/codelet-battery.scm`:
+  - 36 problems × every seed × 400 codelets;
+  - seven 2000-codelet runs that reach group-builder's sameness consolidation and its
+    ungated `group-graphics 'erase`;
+  - the concept mappings of every category and of real descriptions after 600 codelets.
+
+  A failure names the first differing trace line (problem, seed, codelet). The full battery
+  runs in a fork pool (`multiprocessing`, fork after `engine.load()` and the harness
+  set-up) and is in the slow tier; it takes about 6 s on 32 cores. The fast tier runs the
+  first seed of problem 0 against the start of its fixture, plus two concept-mapping
+  cases. Structural tests check:
+  - every `define` of the three files has its Python name;
+  - docstrings name their origin;
+  - there is no tkinter import (group_graphics.py included);
+  - the codelet procedures are installed;
+  - the modules load in metacat.ss's order;
+  - the traces reach every enabled codelet type, structures built and broken, and
+    `(window caching-on)`, as codelet-diff-test.rkt checks.
+
+  I wrote both files before any of the modules existed and ran them:
+  - fast and structural tier: 15 failed (`AttributeError: module 'metacat' has no
+    attribute 'groups'`, `ModuleNotFoundError: metacat.bonds`);
+  - battery: 57 failed, 2 passed. The two passing cases were `codelets-problem-count`
+    and `cm-category-count`, which need no new module.
+- **Code** (new): `metacat/bonds.py`, `metacat/groups.py`, `metacat/concept_mappings.py`,
+  and `metacat/group_graphics.py`, which holds only `group-graphics` (the model calls it
+  ungated); the rest of that file is the panels item's. Two subagents translated them
+  into a staging directory while I wrote the harness, and I copied them in after the
+  failing run. With them in place, **all 59 battery cases matched Chez byte for byte on
+  the first run**, and so did the full suite. A spot check: the 2000-codelet
+  `aaabaaa` seed 1 trace is 863,524 characters, equal to the fixture, and takes 3.0 s.
+  One review fix: group_graphics.py read `*workspace-window*` once per call; it now reads
+  it at each use, as the original does.
+- **Mutation checks** (`/tmp/mut7/mutate.py`, not kept; each mutant applied, then
+  test_codelets.py run with `-x`, then the file restored; `git status` confirmed). 21
+  mutants:
+  - **caught by the frozen battery (15):**
+    - groups: left groups' objects not reversed; the local-support factor 0.6 → 0.5;
+      propose-group's neighbours left first (the Chez `append` site); group-evaluator's
+      test inverted; the group fights not stopping at the first loss; the
+      length-description test inverted; scan-bonds not reversed; the evaluation sigmoid
+      /5 → /6;
+    - bonds: the local-support factor; bond local density right neighbours first;
+      bond-evaluator drawing a second coin; `bond-degree-of-assoc` 11 → 10;
+    - concept mappings: strength and slippability without the square; the concept
+      pattern always including the label.
+  - **killed by a new local battery (3):** group and bond local density floored instead of
+    rounded, and group-builder's flipped-bond `map` left to right.
+    `python/oracle/batteries/codelet-extra-battery.scm` has 13 tests:
+    - `local-densities-*` (7): after a harness run, every built bond's and group's local
+      density and support, drawn three times under a seed. I found the problems with 2/3
+      bond densities first by a Python search.
+    - `group-builder-flips-1..6`: group-builder on a predgrp whose three bonds are the
+      flipped versions of built successor bonds.
+
+    It loads the unedited codelet-harness.scm, is captured into
+    `python/fixtures/codelet-extra/` through the unedited diff-eval.ss, and the slow
+    re-capture test covers it. I wrote it *after* the code; its Python cases passed at
+    once, and the mutants now fail. The density cases are in the slow tier.
+  - **equivalent here (3):**
+    - `get-highest-level-coincident-group` `>` → `>=`: only reached for drawn groups, so
+      it is graphics-only;
+    - bond importance 50/100 swapped: only bridges read it (item 08);
+    - the bond's left/right `<` → `<=`: two bonded objects never share a position.
+- **Evaluation order.**
+  - groups.ss's `get-local-density`: `(append left right)` draws the right neighbours
+    first (racket/engine/groups.rktl:371).
+  - bonds.ss's `get-local-density` is a `let*`, left first.
+  - group-builder's `adjacency-map`s and flipped-bond `map` use `chez.map_`; its fights
+    use `andmap` (they stop drawing at the first loss).
+  - Every `stochastic-if*` draws its coin before the probability. In
+    top-down-group-scout:category, the probability draws too (`get-local-support`), after
+    the coin.
+  - Everything else with two effectful parts is a `let*` or a sequence. The remaining
+    argument lists (scout weights, `append`s of incompatible bridges) are pure.
+  - 21 `# chez:`/`# 1.2:` comments.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: an update to the `same-direction?` entry
+    (`bonds.same_direction_p` raises `UnboundVariable`), and a new entry: the battery's
+    cases give Chez's traces in fresh forks, evidence for the fork-after-load golden
+    runner.
+  - `docs/python-translation-plan.md`: "As built (item 07)".
+  - `python/README.md`: the new modules and tests.
+  - `test_fixtures.py` now expects the local battery `codelet-extra`.
+- Speed, for item 12: about 1.5 ms per codelet in the harness, dumps included; the fast
+  tier takes 3.5 s.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (697 tests, 58 s).
+
+### Blockers
+None. Left for later items, by design:
+- Translated but not run yet: the bridge paths of bonds and groups (incompatible bridges,
+  `break-bridge`, `incompatible-*-CMs?`) and bond importance. Item 08's bridge battery
+  (the harness with `b:bridges?`) exercises them.
+- The rest of group-graphics.ss: `make-group-pexp`, `draw-group-grope` and the arrowhead
+  constants. Groups' graphics methods reach them only with `%workspace-graphics%` on; the
+  panels item (14) translates them.
+
+### Next
+Item 08, bridges and breakers. Extend `tests/codelet_harness.py` with the `b:bridges?`
+setting (`b:enable-bridges!`: the bridge and description scouts, breaker, the extra
+top-down nodes, the bridge part of `b:structures` and `b:proposed-counts`). Its
+`structures()` already lists bridges. bridges.py must provide `break_bridge`,
+`incompatible_horizontal_CMs_p`, `incompatible_vertical_CMs_p` and `bridge_between_p`
+(read through the package by groups/bonds/workspace), and the harness's stand-in trace
+module already has `monitor_new_concept_mappings`. The fork-pool pattern of
+test_codelets.py carries over to the bridge battery.

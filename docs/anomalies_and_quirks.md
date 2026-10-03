@@ -50,6 +50,10 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `grep -n "same-direction?" chez_scheme/original/*.ss` (one hit);
   racket/tests/engine-test.rkt checks the port's stand-in raises.
 - **Status:** won't fix (latent). engine/pending.rktl defines a stand-in that raises.
+- **Update (loop0002 iteration 8, item 07):** the Python port does the same:
+  `bonds.same_direction_p` raises `chez.UnboundVariable("same-direction?")`, and
+  `bonds_equal_p` reaches it only when its first three tests hold. Nothing calls
+  `bonds-equal?` in the codelet battery either.
 
 ### `complement-codelet-pattern` is never defined
 - **Seen:** iteration 11 (item 10), compiling trace.ss.
@@ -588,6 +592,21 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `density-boundaries` in python/oracle/batteries/workspace-extra-battery.scm.
 - **Status:** not a bug. Model code compares the exact value directly and never converts
   it first.
+
+### The codelet battery's cases give the same traces in fresh forks as in one Chez process
+- **Seen:** loop0002 iteration 8 (item 07), python/tests/test_codelets.py.
+- **What:** diff-eval.ss runs codelet-battery.scm's 59 cases one after another in one Chez
+  process, so state left by one case could reach the next (codelet types' counts, the
+  Coderack, slipnode fields that `reset` doesn't clear, the generator). The Python test runs
+  each case in its own process, forked from the state right after `engine.load()` and the
+  harness's set-up, and all 59 traces equal Chez's byte for byte. `b:init-problem`,
+  `reset` and `initialize` clear everything the traces observe, which is evidence for the
+  plan's fork-after-load golden runner (docs/python-translation-plan.md, "A fresh engine
+  per run").
+- **Evidence:** `bash python/run-tests.sh -k test_codelet_battery`, 59 cases in a
+  32-process pool, about 6 s, against python/fixtures/codelet/.
+- **Status:** not a bug. A later battery whose traces did depend on order would show up
+  as a failure in this kind of pool and not under Chez.
 
 ## 🔗 Hidden couplings
 
