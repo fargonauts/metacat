@@ -28,6 +28,8 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** won't fix (it's the original's behaviour). The port halts at the same
   codelet: since iteration 11 (item 10) racket/tests/golden-test.rkt compares this run's
   whole trace, `halt` event included.
+- **Update (loop0002 iteration 11, item 10):** the Python port halts at the same codelet:
+  python/tests/test_golden.py compares this run's whole trace, `halt` event included.
 
 ### `caddr` of `#f` in `transcribe-to-english`
 - **Seen:** iteration 3 (item 02), `abc ccbbaa ijk` seed 3.
@@ -51,6 +53,10 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   rule-battery harness doesn't reach the crash on abc ccbbaa ijk seed 3 (no themes or
   self-watching; no answer and no error in 2500 codelets), so the full run is left to the
   golden runs.
+- **Update (loop0002 iteration 11, item 10):** the Python port's full run crashes at the
+  same point too: python/tests/test_golden.py runs the oracle live on abc ccbbaa ijk seed 3
+  and checks that the Python run raises `chez.SchemeError` from `caddr` with the same 1062
+  trace lines written before it.
 
 ### `bonds-equal?` calls `same-direction?`, which nothing defines
 - **Seen:** iteration 8 (item 07), compiling bonds.ss.
@@ -66,6 +72,21 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `bonds_equal_p` reaches it only when its first three tests hold. Nothing calls
   `bonds-equal?` in the codelet battery either.
 
+### A snag event's `print` never names its kind: the failure tags are upper case
+- **Seen:** loop0002 iteration 11 (item 10), translating trace.ss to Python.
+- **What:** rules.ss tags failure results with upper-case symbols (`'SWAP`, `'CONFLICT`,
+  `'CHANGE`, rules.ss lines 1272, 1289, 1302), and trace.ss's `record-case`s use the same
+  upper-case keys, so they work. But the snag event's `print` clause dispatches with
+  `(case snag-type (swap "Swap") (conflict "Conflict") (change "Change"))` and
+  `(eq? snag-type 'change)`, in lower case. Chez 10 is case-sensitive, so nothing matches:
+  the line printed is `#<void>-snag involving objects:`, always with the plural. Under the
+  1999-era Chez, which folded symbols to lower case, it worked.
+- **Evidence:** trace.ss lines 1083–1087; `(case 'SWAP (swap "Swap") (else 'nomatch))`
+  gives `nomatch` under `scheme --script`. Only the Temporal Trace's debugging `print`
+  shows it; no trace or commentary text depends on it.
+- **Status:** won't fix (faithful). racket/engine/trace.rktl and python/metacat/trace.py
+  (a `# 1.2:` comment) reproduce Chez 10's behaviour.
+
 ### `complement-codelet-pattern` is never defined
 - **Seen:** iteration 11 (item 10), compiling trace.ss.
 - **What:** the Temporal Trace answers `get-complement-codelet-pattern` with the variable
@@ -75,6 +96,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `grep -n "complement-codelet-pattern" chez_scheme/original/*.ss`.
 - **Status:** won't fix (latent). engine/pending.rktl makes it an identifier macro that
   raises "variable complement-codelet-pattern is not bound", as Chez would.
+- **Update (loop0002 iteration 11, item 10):** the Python port's
+  `trace.complement_codelet_pattern()` raises `chez.UnboundVariable`, and the clamp event's
+  `get-complement-codelet-pattern` clause calls it (test_golden.py checks that it raises).
 
 ### A string image's `new-alpha-position-category` sends `new-start-letter`
 - **Seen:** iteration 6 (item 05), reading images.ss and checking it under Chez.
@@ -239,6 +263,21 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   same dump after the real `init-mcat`.
 - **Status:** explained (the original's behaviour, ported as is). Whether Marshall meant
   it is not known; the comment in run.ss only says `set-activation` avoids trace events.
+
+### The goldens never exercise a partly active theme's spread or the trace's importance thresholds
+- **Seen:** loop0002 iteration 11 (item 10), mutation checks of the Python translation.
+- **What:** three mutants of the Python port pass all 109 goldens:
+  - a theme's `spread-activation-to-slipnet` with the square of its activation instead of
+    the cube: in every golden, the themes that `get-all-active-themes` returns are fully
+    active (|activation| = 100), so the draw is against 0 or 1 either way (the Racket
+    port's item 10 found the same for thematic-bridge-scout's cluster probability);
+  - `%concept-mapping-importance-threshold%` 65 → 60: no concept mapping's importance
+    falls between 60 and 64 in the goldens;
+  - `%group-importance-threshold%` 100 → 99: no group event candidate has strength 99.
+- **Evidence:** python/oracle/batteries/trace-extra-battery.scm reaches all three (an
+  importance of 63 for succgrp=>predgrp on a non-spanning bridge, a group of strength 99,
+  themes at activations 30, 50, 80 and −60), and its fixtures kill the three mutants.
+- **Status:** explained.
 
 ## ⚙️ Chez / Racket quirks
 
@@ -672,6 +711,11 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   namespace); without that, only the first run matches.
 - **Status:** explained; not a bug. Any batch runner (item 11's CLI, tests) must start
   each golden run with a fresh engine, or clear the Memory, to reproduce the oracle.
+- **Update (loop0002 iteration 11, item 10):** the Python golden runner
+  (python/tests/golden_harness.py) starts a fresh Python process, loads the engine there
+  once, and runs each golden in a fresh fork of it (`maxtasksperchild=1`), so every run
+  starts from a freshly loaded engine, as in the oracle. The test session's own engine,
+  which other test files change and restore, is never used for a golden.
 
 ### Trace events and the EEG reach into graphics files
 - **Seen:** iteration 11 (item 10).
@@ -693,6 +737,12 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   null `*EEG*` are gone: headless runs use the real EEG, as the oracle does. The EEG
   records values only when `%workspace-graphics%` is on, and the goldens with views
   attached show that recording changes nothing.
+- **Update (loop0002 iteration 11, item 10):** the Python port has the same couplings.
+  `metacat/trace_graphics.py` holds only `group-event-pexp-text-string`,
+  `metacat/theme_graphics.py` only `relation-name`, and `metacat/general_graphics.py` only
+  `find-next-space-position`, each translated verbatim (the panels item adds the rest of
+  each file, as group_graphics.py already does). The golden harness gives `*EEG*` a null
+  object accepting `initialize`.
 
 ### Urgencies are exact rationals
 - **Seen:** iteration 3 (item 02).
@@ -767,6 +817,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `descriptions-affect-themespace?` (with `ignore-descriptions?`) and
   `bridge-theme-compatibility-sigmoid`, and `metacat.trace` a recording
   `monitor-new-concept-mappings`. The headless driver (items 10–11) needs the real ones.
+- **Update (loop0002 iteration 11, Python item 10):** themes.py and trace.py define them
+  now, and the stand-in copies are gone from codelet_harness.py. The bridge battery's fake
+  Themespace and recording monitors stay: they are the battery's own fakes.
 
 ### Dead code in bridges.ss
 - **Seen:** iteration 9 (item 08).
@@ -836,6 +889,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   are in engine/themes.rktl and engine/trace.rktl (item 10), `find-next-space-position`
   in engine/general-graphics.rktl (item 13), and the colours are view globals
   (engine/view-globals.rktl), installed by racket/gui/views.rkt.
+- **Update (loop0002 iteration 11, Python item 10):** done in Python: `diff` is
+  themes.py's, `equivalent-workspace-objects?` trace.py's, and `find-next-space-position`
+  general_graphics.py's (an early partial module). test_rules.py no longer has copies.
 
 ### Rules are never removed
 - **Seen:** iteration 10 (item 09).

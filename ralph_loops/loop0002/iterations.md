@@ -67,7 +67,7 @@
 - [x] **09 Rules and answers.** Translate `rules.ss` and `answers.ss` (including
     `transcribe-to-english`'s `caddr`-of-`#f` crash path). Tests: `rule-battery.scm`.
 
-- [ ] **10 Themes, justification, trace, jootsing, memory.** Translate `themes.ss`,
+- [x] **10 Themes, justification, trace, jootsing, memory.** Translate `themes.ss`,
     `justify.ss`, `trace.ss`, `jootsing.ss` and `memory.ss`. Include the headless window
     stand-ins the model needs, such as each codelet type's coderack window and memory's
     icon procedure; see porting-notes.md. Tests: whichever battery tests cover them, plus

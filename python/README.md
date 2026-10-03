@@ -130,9 +130,8 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   traces of every problem and seed, and nine bridge matrices. Slow tier, fork pool (about
   14 s on 32 cores); the fast tier runs the first 300 codelets of problem 0.
   `oracle/batteries/bridge-extra-battery.scm` adds a coherent vertical bridge whose internal
-  strength stays under 100. Until themes.py exists, the harness's `STAND_INS` carries
-  copies of the themes.ss helpers that bridges call (`bridge-type->theme-type`,
-  `descriptions-affect-themespace?`, `bridge-theme-compatibility-sigmoid`).
+  strength stays under 100. The harness's fake Themespace and recording monitors are the
+  battery's own fakes; the themes.ss helpers that bridges call are themes.py's since item 10.
 - `metacat/rules.py`: rules.ss (rules, change descriptions, the rule scout, evaluator and
   builder, rule abstraction, application and quality, and the English transcription,
   including the `caddr`-of-`#f` crash).
@@ -143,8 +142,31 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   harness with bridges and rules on (`codelet_harness.RULES`): traces up to the first answer
   of every problem and seed, the first-answers summary and twelve rule matrices. Slow tier,
   fork pool (about 38 s on 32 cores); the fast tier runs the first 300 codelets of
-  problem 0. rule-battery.scm's fakes (Trace, Memory, events, Commentary, suspend) and
-  verbatim copies of `find-next-space-position`, `equivalent-workspace-objects?` and `diff`
-  are stand-ins until items 10 and 11. `oracle/batteries/rule-extra-battery.scm` pins
+  problem 0. rule-battery.scm's fakes (Trace, Memory, events, Commentary, suspend) are
+  the battery's own; `find-next-space-position`, `equivalent-workspace-objects?` and `diff`
+  are the engine's since item 10. `oracle/batteries/rule-extra-battery.scm` pins
   `transcribe-to-english` on hand-made clauses, the crash included, and rules' quality
   values.
+- `metacat/themes.py`: themes.ss (the Themespace, theme clusters and themes, the
+  thematic-bridge-scout codelet, the REPL abbreviations such as `diff`).
+- `metacat/justify.py`: justify.ss (the answer-justifier codelet, rule-clause comparison,
+  theme patterns to clamp).
+- `metacat/trace.py`: trace.ss (the Temporal Trace: events, snag and clamp periods, the
+  monitors and importance thresholds, theme and codelet patterns). This is the translation
+  of trace.ss; the golden-trace writer is a separate module (item 11).
+- `metacat/jootsing.py`: jootsing.ss (the jootser and progress-watcher codelets).
+- `metacat/memory.py`: memory.ss (the Memory, answer and snag descriptions, reminding).
+- `metacat/general_graphics.py`, `metacat/theme_graphics.py`, `metacat/trace_graphics.py`:
+  only the pure helpers the model needs (`find-next-space-position`, `relation-name`,
+  `group-event-pexp-text-string`); the panels item adds the rest of each file.
+
+  Tests: `tests/test_golden.py`, the 109 golden traces of `tests/golden/`, byte for byte.
+  `tests/golden_harness.py` is the oracle's prelude.ss headless windows, trace.ss writer
+  and wrappers, and run.ss driver; `tests/golden_run.py` is run.ss's run loop, translated
+  in the tests until item 11 and registered as `metacat.run`. Each golden runs in a fresh
+  fork of a fresh process (about 35 s on 32 cores, 6 min of CPU; slow tier). The fast
+  tier runs `a b z` seed 1 (1000 codelets). The slow tier also runs the oracle live on
+  `abc ccbbaa ijk` seed 3, the original's crash, and compares the 1062 trace lines before
+  it. `oracle/batteries/trace-extra-battery.scm` reaches what the goldens don't: concept
+  mapping importances near the 65 threshold, a group of strength 99 and partly active
+  themes spreading to the Slipnet.

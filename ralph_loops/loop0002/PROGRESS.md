@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 10/18 SOLVED
+- **Current**: 11/18 SOLVED
 
 ---
 
@@ -1160,3 +1160,139 @@ Item 10: themes, justify, trace, jootsing and memory. themes.py must define `dif
 `abstract_answer/snag_description`. Then the harness stand-ins for them can go (where the
 batteries' own fakes don't replace them). answers.py sets
 `_metacat.run.g_temperature_clamped_p`, so run.py (item 11) must define it.
+
+---
+
+## Iteration 11 — 2026-10-03 23:04
+
+### Completed
+Item 10, themes, justification, trace, jootsing and memory: **SOLVED**. All 109 golden
+traces match byte for byte, whole runs and not just prefixes.
+- **Tests first.**
+  - `python/tests/golden_harness.py` translates three things: the oracle's prelude.ss
+    headless windows, trace.ss's JSON writer and wrappers, and run.ss's driver.
+    - The windows include each codelet type's coderack window and the Memory window's
+      `add-memory-icon`, which installs a no-op icon procedure. The Commentary window is
+      the Racket port's headless one.
+    - The wrappers set module attributes: `*coderack*`, the build and break procedures,
+      `*workspace*`'s add-rule, `update-temperature`, `update-slipnet-activations`, the
+      Trace window, `abstract-answer-description` and `report-error-and-halt`.
+    - The driver is headless-break, plus the start, end and summary lines.
+  - `python/tests/golden_run.py` translates run.ss's run loop (`init-mcat`, `run-mcat`,
+    `update-everything` …) in the tests, as the Racket port's item 10 did. It is
+    registered as `metacat.run`, and item 11 moves it into the package.
+  - Every golden runs in a fresh fork of a fresh Python process. The Memory outlives a
+    run, and the test session's engine is shared with other test files.
+  - `python/tests/test_golden.py` has these tests:
+    - all 109 goldens, byte for byte, with the first differing line on failure, plus a
+      Comment/Answer count check on stdout (slow tier);
+    - `a b z` seed 1, 1000 codelets (fast tier);
+    - the live oracle on `abc ccbbaa ijk` seed 3: Python must raise the same `caddr` error
+      after the same 1062 trace lines (slow tier);
+    - the goldens reach every event type, every Temporal Trace event type, and the
+      thematic, justify and jootsing codelets;
+    - structural tests for the five modules: every `define` has its Python name,
+      docstrings name their origin, no tkinter, the objects exist after load, the codelet
+      procedures are installed, load order, and `complement-codelet-pattern` raises.
+  - I wrote all three files before any of the modules existed and ran them: **23 failed,
+    2 passed, 109 errors**. The two that passed read only the goldens. Every run failed
+    on `module 'metacat' has no attribute 'memory'`.
+- **Code** (new):
+  - `metacat/themes.py`, `justify.py`, `trace.py`, `jootsing.py` and `memory.py`.
+  - Partial graphics modules holding only the pure helpers that the model and the trace
+    need, as group_graphics.py does: `general_graphics.py` (`find-next-space-position`),
+    `trace_graphics.py` (`group-event-pexp-text-string`) and `theme_graphics.py`
+    (`relation-name`).
+  - Four subagents translated the five files into a staging directory while I wrote the
+    harness and tests, and I reviewed them before copying them in. The first scratch run
+    stopped at the missing `general_graphics`. With it added, **a b z seed 1 matched at
+    once, and then all 109 goldens did**: 272,957 codelets, every event type, 115 answers,
+    the halt run, and the crash run against the live oracle. No model line needed a fix.
+    The first full test run had one failure, a docstring test on the never-defined
+    `complement-codelet-pattern` stand-in, which I fixed.
+- **Stand-ins removed** (now the engine's own):
+  - codelet_harness.py: the themes.ss helpers;
+  - test_rules.py: `equivalent-workspace-objects?`, `find-next-space-position` and `diff`.
+
+  The batteries' own fakes stay. They patch the real modules and restore them, and all
+  battery suites still pass.
+- **Mutation checks** (`/tmp/mut10/mutate.py`, not kept). Each mutant ran against all 109
+  goldens, and the files were restored afterwards (checked with md5sum). 12 mutants:
+  - **caught by the goldens (9):**
+
+    | Mutant | Goldens differing |
+    |---|---|
+    | theme decay 25 → 24 | 109 |
+    | group event names without dashes | 75 |
+    | `traverse-rule-clauses` first to last | 22 |
+    | max clamp period 750 → 700 | 14 |
+    | jootser's snag test without `1-` | 8 |
+    | retention probability 50 → 60 | 5 |
+    | Memory distance threshold 5 → 4 | 5 |
+    | grace period 100 → 99 | 4 |
+    | thematic-bridge-scout's `pick-positive-theme` first to last instead of Chez's map order | 1 |
+
+  - **killed by a new local battery (3):**
+    - a theme's spread to the Slipnet with the square instead of the cube;
+    - the concept-mapping importance threshold 65 → 60;
+    - the group importance threshold 100 → 99.
+
+    On the goldens, active themes are always fully active, no importance falls in 60–64,
+    and no group has strength 99. `python/oracle/batteries/trace-extra-battery.scm` has 3
+    tests: `concept-mapping-importance`, `group-importance` and `theme-spread-to-slipnet`.
+    It uses the real Themespace and Trace with recording windows. It is captured into
+    `python/fixtures/trace-extra/` through the unedited diff-eval.ss and covered by the
+    slow re-capture test. I wrote it *after* the code: its Python side, which runs in a
+    fork, passed at once, and each of the three mutants now fails it.
+- **Evaluation order.** No site needed reordering, which agrees with the Racket port: its
+  five files have no `port:` changes.
+  - Every `stochastic-if*` draws its coin first.
+  - Maps with effects use `chez.map_`.
+  - `traverse-rule-clauses` walks the rests before the firsts, so it is a length check
+    and a reverse loop (the golden mutant above).
+  - answer-justifier computes the one drawing argument of its last `clamp-rules` call
+    first; the others only read.
+  - Comment counts: trace.py 23 `# chez:`/`# 1.2:`, themes.py 13, jootsing.py 9,
+    justify.py 8, memory.py 1. memory.ss draws nothing.
+- **A quirk of the original** (new anomalies entry): rules.ss tags failures `'SWAP`,
+  `'CONFLICT` and `'CHANGE`, but the snag event's `print` dispatches on lower-case `swap`
+  etc. Chez 10 is case-sensitive, so it prints `#<void>-snag involving objects:`. Python
+  reproduces it with a `# 1.2:` comment.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`:
+    - new entries on the snag `print` case and on what the goldens never exercise;
+    - Python updates to the halt, the `caddr` crash, `complement-codelet-pattern`, the
+      Memory outliving a run, the graphics couplings, "Bridges call themes.ss" and "Rules
+      and answers lean on later files".
+  - `docs/python-translation-plan.md`: "As built (item 10)". It also notes that trace.py
+    is trace.ss, so item 11's trace writer needs another name.
+  - `python/README.md`: the new modules and tests.
+  - `test_fixtures.py` now expects the local battery `trace-extra`.
+- Speed, for item 12: the 109 goldens take about 6 min of CPU (about 1.4 ms per codelet)
+  and 35 s on 32 cores. The fast tier takes 4.6 s.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (983 tests, 2 min 12 s).
+
+### Blockers
+None. Left for later items, by design:
+- run.ss is translated only in the tests (`python/tests/golden_run.py`), without the REPL
+  commands (`ss`, `runtil`, `go`, `rerun`, `break`'s continuation). Item 11 moves it to
+  `metacat/run.py`. It also adds `break`/`go` and the CLI, and promotes golden_harness.py's
+  writer and driver into the package.
+- The stdout of a Python run, `Problem:`/`Comment:`/`Answer:`/summary, is produced by the
+  harness but compared with the oracle only in its Comment and Answer counts. Item 11
+  compares the CLI's output with the live oracle's.
+- Translated but not run headless: the graphics paths (gated by the switches, panels
+  item), the Memory's `display`, the Temporal Trace's `display-workspace-state`, and
+  `print` methods.
+
+### Next
+Item 11: full runs, the trace writer and the CLI.
+- Move `tests/golden_run.py` into `metacat/run.py`, with the REPL parts.
+- Put the JSON writer and wrappers of `tests/golden_harness.py` into the package under a
+  name other than `trace.py` (that is trace.ss).
+- Write `__main__.py` with the oracle run.ss's arguments, output and exit codes.
+- Make test_golden.py use the package's driver. Its fresh-process fork pool is already the
+  parallel golden runner the item asks for.
+- `golden_harness.run_problem` already returns run.ss's stdout lines for the CLI
+  comparison.
+

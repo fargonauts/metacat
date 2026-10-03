@@ -633,6 +633,52 @@ from symbols").
 - **Speed**: the rule battery (36 problems, every seed, up to 2500 codelets or the first
   answer, plus twelve matrices) takes about 9 min of CPU, 38 s on 32 cores.
 
+### As built (item 10)
+
+- **Modules**: themes.py (`Themespace`, theme clusters and bridge themes as SchemeObject
+  classes; thematic-bridge-scout; the REPL abbreviations `top`, `bot`, `ver`, `diff` = #f
+  as constants and `lcat`, `iden` … set by `load()`), justify.py (answer-justifier,
+  `compare-rule-clause-lists`, `traverse-rule-clauses`, the theme pattern to clamp),
+  trace.py (the Temporal Trace and its events, the monitors with their importance
+  thresholds, the codelet patterns made by `load()`), jootsing.py (jootser and
+  progress-watcher) and memory.py (the Memory, answer and snag descriptions). Each `load()`
+  makes its file's object (`*themespace*`, `*trace*`, `*memory*`) and installs its codelet
+  procedures, so a loaded engine has every model object, as the original's load does.
+- **trace.py is trace.ss.** Item 11's iterations.md text and TASK.md's layout also call the
+  golden-trace writer `trace.py`; the module-per-file rule gives that name to trace.ss, so
+  item 11 must put the writer under another name (for example `metacat/tracing.py` or
+  inside `headless.py`).
+- **Early partial graphics modules**, as group_graphics.py: general_graphics.py
+  (`find-next-space-position`, every rule's English), trace_graphics.py
+  (`group-event-pexp-text-string`, every group event's name, which is in the trace) and
+  theme_graphics.py (`relation-name`, trace.ss's `print-pattern`). Pure, verbatim; the
+  panels item adds the rest of each file.
+- **Stand-ins removed**: the themes.ss helpers in codelet_harness.py's `STAND_INS`, and
+  test_rules.py's copies of `equivalent-workspace-objects?`, `find-next-space-position` and
+  `diff`. The batteries' own fakes (fake Themespace, Trace, Memory, monitors) stay; they
+  patch the real modules through `engine_module` and restore them.
+- **Evaluation order**: no site needed reordering (as in the Racket port, whose five files
+  have no `port:` changes). Every `stochastic-if*` draws its coin first (themes'
+  spread-activation-to-slipnet, the jootser's and progress-watcher's tests). Maps with
+  effects use `chez.map_` (`tell-all clusters 'pick-positive-theme` draws once per cluster
+  in Chez's map order; a mutant mapping first to last changes one golden).
+  justify.ss's `traverse-rule-clauses` walks the rests of two lists before their firsts
+  (the inner walk is an argument of the outer one), so it fails on a length mismatch
+  before visiting anything and visits elements last to first; it is a length check and a
+  reverse loop.
+- **The golden harness** (python/tests/golden_harness.py, golden_run.py): the oracle's
+  headless windows (prelude.ss), with the Racket port's headless Commentary window; the
+  trace.ss writer and wrappers, installed by setting module attributes
+  (`coderack.g_coderack`, `bonds.build_bond`, `formulas.update_temperature`,
+  `memory.abstract_answer_description`, `objects.report_error_and_halt` …: the engine
+  reads them at call time, so intra-module calls see the wrappers too; nothing imports
+  them with `from ... import`); run.ss's driver around golden_run.py, run.ss's loop
+  translated in the tests and registered as `metacat.run`. Each golden runs in a fresh
+  fork (`maxtasksperchild=1`) of a fresh Python process that has loaded the engine once.
+- **Speed**: the 109 goldens (272,957 codelets) take about 6 min of CPU, 35 s on 32 cores:
+  about 1.4 ms per codelet, all updates included. The longest golden (17,000 codelets) sets
+  the wall time.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

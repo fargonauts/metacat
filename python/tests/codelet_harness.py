@@ -90,50 +90,11 @@ def monitor_new_concept_mappings(cms, bridge):
     return event(["new-cms", cm_names(cms), bridge_data(bridge)])
 
 
-# themes.ss's helpers that bridges.ss calls, translated here until themes.py exists
-# (the oracle has the whole original loaded, so they are the real ones there).
-
-def bridge_type_to_theme_type(theme_type):
-    """themes.ss: bridge-type->theme-type"""
-    return {"top": "top-bridge", "bottom": "bottom-bridge",
-            "vertical": "vertical-bridge"}.get(theme_type)
-
-
-def ignore_descriptions_p(d1, d2):
-    """themes.ss: ignore-descriptions?"""
-    from metacat import workspace_objects as wo
-    return (tell(d1, "relevant?") is False
-            or tell(d2, "relevant?") is False
-            or (tell(d1, "description-type?", slipnet.plato_object_category) is not False
-                and wo.both_spanning_groups_p(tell(d1, "get-object"),
-                                              tell(d2, "get-object")) is not False)
-            or (tell(d1, "description-type?", slipnet.plato_string_position_category)
-                is not False
-                and wo.both_spanning_objects_p(tell(d1, "get-object"),
-                                               tell(d2, "get-object")) is not False)
-            or (tell(d1, "get-descriptor") is slipnet.plato_middle
-                and tell(d2, "get-descriptor") is slipnet.plato_middle))
-
-
-def descriptions_affect_themespace_p(d1, d2):
-    """themes.ss: descriptions-affect-themespace?"""
-    return (tell(d1, "description-type?", tell(d2, "get-description-type")) is not False
-            and not ignore_descriptions_p(d1, d2))
-
-
-def bridge_theme_compatibility_sigmoid(x):
-    """themes.ss: bridge-theme-compatibility-sigmoid (beta is 4)"""
-    return chez.sub1(chez.div(2, chez.add1(chez.exp(chez.mul(-2, 4, x)))))
-
-
 # Globals of files not translated yet that the harness sets or the engine reads.
 STAND_INS = {
     "run": {"p_update_cycle_length": 15, "g_temperature_clamped_p": False,
             "g_step_mode_p": False, "p_step_cycles": 1, "g_display_mode_p": False},
-    "themes": {"g_themespace": Lambda(fake_themespace_fn),
-               "bridge_type_to_theme_type": bridge_type_to_theme_type,
-               "descriptions_affect_themespace_p": descriptions_affect_themespace_p,
-               "bridge_theme_compatibility_sigmoid": bridge_theme_compatibility_sigmoid},
+    "themes": {"g_themespace": Lambda(fake_themespace_fn)},
     "eeg_graphics": {"g_EEG": Lambda(fake_eeg_fn)},
     "trace": {"monitor_slipnode_activation_change": monitor_slipnode_activation_change,
               "monitor_new_groups": monitor_new_groups,

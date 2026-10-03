@@ -16,10 +16,10 @@ translated (translate, which draws), with the generator state after each.
 
 rule-battery.scm's fakes for the files not translated yet (the Trace, the Memory,
 answer and snag events, the abstract descriptions, monitor-new-rules, the
-Commentary window, suspend, answer-justifier's procedure) are translated below,
-as are the real definitions the oracle has loaded and the engine reaches through
-the package: trace.ss's equivalent-workspace-objects?, general-graphics.ss's
-find-next-space-position and themes.ss's `diff` (#f).  run.ss's
+Commentary window, suspend, answer-justifier's procedure) are translated below.
+The real definitions the oracle has loaded (trace.ss's
+equivalent-workspace-objects?, general-graphics.ss's find-next-space-position
+and themes.ss's `diff`) are the engine's own since item 10.  run.ss's
 update-everything and post-initial-codelets are the harness's (the battery sets
 them so).
 
@@ -231,46 +231,14 @@ def answer_justifier_proc():
     return "done"
 
 
-# The real definitions of later files that the oracle has loaded ---------------------------
-
-def equivalent_workspace_objects_p(object1, object2):
-    """trace.ss: equivalent-workspace-objects?"""
-    from metacat import groups
-    return (tell(object1, "object-type") == tell(object2, "object-type")
-            and tell(object1, "which-string") is tell(object2, "which-string")
-            and tell(object1, "get-left-string-pos") == tell(object2, "get-left-string-pos")
-            and tell(object1, "get-right-string-pos") == tell(object2, "get-right-string-pos")
-            and (groups.same_letter_category_p(object1, object2)
-                 if utilities.letter_p(object1)
-                 else (groups.same_group_category_p(object1, object2) is not False
-                       and groups.same_group_direction_p(object1, object2) is not False
-                       and tell(object1, "get-group-length") == tell(object2, "get-group-length")
-                       and chez.andmap(equivalent_workspace_objects_p,
-                                       tell(object1, "get-constituent-objects"),
-                                       tell(object2, "get-constituent-objects")))))
-
-
-def find_next_space_position(s, i):
-    """general-graphics.ss: find-next-space-position"""
-    while True:
-        if i >= len(s):
-            return len(s)
-        if s[i] == " ":
-            return i
-        i += 1
-
-
 STAND_INS = {
     "run": {"suspend": suspend, "update_everything": h.update_everything,
             "post_initial_codelets": h.post_initial_codelets},
     "trace": {"g_trace": Lambda(fake_trace_fn), "make_answer_event": fake_answer_event,
-              "make_snag_event": fake_snag_event, "monitor_new_rules": monitor_new_rules,
-              "equivalent_workspace_objects_p": equivalent_workspace_objects_p},
+              "make_snag_event": fake_snag_event, "monitor_new_rules": monitor_new_rules},
     "memory": {"g_memory": Lambda(fake_memory_fn),
                "abstract_answer_description": abstract_answer_description,
                "abstract_snag_description": abstract_snag_description},
-    "themes": {"diff": False},
-    "general_graphics": {"find_next_space_position": find_next_space_position},
 }
 
 
