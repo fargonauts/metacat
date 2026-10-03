@@ -75,17 +75,17 @@ where a battery has no vector.
 | exact non-integer rational (`102/5`) | `fractions.Fraction` | **always normalised**: a result with denominator 1 becomes `int` (`chez.norm`), because `Fraction(2, 1)` is not an `int` for `integer?`-style tests, `random`, indexing or trace printing |
 | flonum | `float` | |
 | `(/ a b)` on exact numbers | `chez.div(a, b)`, giving `int` or `Fraction` | **never Python `/`** on values that are exact in Chez: `/` makes a float, and a float urgency changes codelet choices. `%` (utilities.ss: `(/ n 100)`) is the most common case |
-| `(* 0 x)` with flonum `x` | `chez.mul` | Chez gives **exact 0** (checked: `(* 0 1.5)` → `0`, `(/ 0 2.5)` → `0`), Python gives `0.0`. Use `chez.mul`/`chez.div` wherever one operand can be a flonum. `+` and `-` agree with Python |
+| `(* 0 x)` with flonum `x` | `chez.mul` | Chez gives **exact 0** (checked: `(* 0 1.5)` → `0`, `(/ 0 2.5)` → `0`), Python gives `0.0`. Use `chez.mul`/`chez.div` wherever one operand can be a flonum. *Item 02 correction:* `+` and `-` differ too, at signed zeros only: exact 0 is their identity, so `(+ 0 -0.0)` and `(- 0 0.0)` are `-0.0` where Python gives `0.0` (`chez.add`/`chez.sub`; anomalies_and_quirks.md) |
 | `max`, `min` | `chez.max_`, `chez.min_` | inexact contagion: `(max 3 2.0)` → `3.0`, `(min 1 2.0)` → `1.0`; Python keeps the `int` |
-| `sqrt`, `exp`, `log`, `expt` | `chez.sqrt` etc. | exact in, exact out where the result is exact: `(sqrt 16)` → `4`, `(sqrt 1/4)` → `1/2`, `(exp 0)` → `1`, `(log 1)` → `0`, `(expt 1/2 2)` → `1/4`, `(expt 0.0 0)` → `1` (exact!). Otherwise IEEE doubles from libm (`math.sqrt` etc.), with item 02 vectors from Chez to confirm bit equality |
-| `tanh` | `math.tanh` | workspace.ss's mapping strengths; Racket took Chez's own primitive, so item 02 checks `math.tanh` against Chez on the battery's 500+ arguments bit for bit (both are libm) |
-| `exact->inexact` of a ratnum | `float(Fraction)` | correctly rounded in both; item 02 vectors |
+| `sqrt`, `exp`, `log`, `expt` | `chez.sqrt` etc. | exact in, exact out where the result is exact: `(sqrt 16)` → `4`, `(sqrt 1/4)` → `1/2`, `(exp 0)` → `1`, `(log 1)` → `0`, `(expt 1/2 2)` → `1/4`, `(expt 0.0 0)` → `1` (exact!). Otherwise IEEE doubles from libm (`math.sqrt` etc.), bit-equal on item 02's vectors. *Item 02:* `expt` has more rules: only a `1/2` power is an exact root (`(expt 8 1/3)` → `2.0`), an exact 1 base gives `1`, an exact 0 base gives `0` for a positive power, and `(expt 0.0 -1)` is `+inf.0` (anomalies_and_quirks.md) |
+| `tanh` | `math.tanh` | workspace.ss's mapping strengths; Racket took Chez's own primitive, item 02 checked `math.tanh` against Chez bit for bit on about 1,100 arguments (`tanh-*` fixtures): equal |
+| `exact->inexact` of a ratnum | `chez.inexact` (`float(Fraction)`) | correctly rounded in both; equal on item 02's 400 random ratnums |
 | utilities.ss `round`, `floor`, `ceiling`, `truncate` (exact results) | `round_` (Python `round`: half to even, returns `int`), `math.floor`, `math.ceil`, `math.trunc` | Chez's `round` is half to even too (`(round 5/2)` → `2`, `(round 7/2)` → `4`, `(round 2.5)` → `2.0`) |
 | `=`, `<`, … | Python operators | mixed exact/inexact comparisons are exact in both |
 | `eqv?`/`equal?` on numbers | `chez.eqv_p`, `chez.equal_p` | `(equal? 2 2.0)` is `#f` but Python's `2 == 2.0` is `True`, and likewise `Fraction(1, 2) == 0.5`. Only where a list compared with `equal?` can hold numbers of mixed exactness (memory.ss, rules.ss, justify.ss sites) |
 | `1+`, `-1+`, `add1`, `sub1` | `add1`, `sub1` | |
 | `random`, `random-seed` | `chez.random`, `chez.random_seed` | the 32-bit LCG of trace-format.md; `(random 1.0)` is `M/2^52` exactly; one module-level state. Must accept an `int` only (normalise Fractions first) |
-| flonum printing | `chez.number_to_string` | shortest round-trip digits (Python's `repr` gives the same digits), laid out Chez's way: positional when the leading digit's exponent e is in (−4, 10), else `d.ddde<exp>` with no `+` and no exponent padding. So `1e21`, `1e-7`, `1.234567890125e11`, `1000000000.0`. Python's `repr` writes `1e+21`, `1e-07`, `123456789012.5` |
+| flonum printing | `chez.number_to_string` | shortest round-trip digits (Python's `repr` gives the same digits **except at exact ties, where Chez rounds the last digit up and Python to even**, item 02), laid out Chez's way: positional when the leading digit's exponent e is in (−4, 10), else `d.ddde<exp>` with no `+` and no exponent padding. So `1e21`, `1e-7`, `1.234567890125e11`, `1000000000.0`. Python's `repr` writes `1e+21`, `1e-07`, `123456789012.5` |
 | ratnum printing | `str(Fraction)` | `"102/5"`, `"-1/2"`, as Chez; normalised ints print as ints |
 
 Only 84 flonum literals appear in the model files (formulas.ss, bridges.ss and rules.ss
@@ -131,7 +131,7 @@ the item's PROGRESS entry.
 |---|---|
 | proper list | Python `list`, **never mutated after construction** (the model never mutates pairs; only rule-graphics.ss:77 has a `set-car!`, which the Racket port turned into a copy). `cons` onto a list → `[x] + ls`; `cdr` loops → index loops (lists are short: strings ≤ 7 letters, coderack ≤ 100) |
 | vector, table (vector of vectors) | Python `list` (fixed length), list of lists |
-| dotted pair | none found in the model's data (the `(cons ...)` sites, 126, are audited per file; a non-list `cdr` would be a 2-tuple) |
+| dotted pair | none found in the model's data (the `(cons ...)` sites, 126, are audited per file); a non-list `cdr` is a `chez.Pair(car, cdr)` (item 02; not a tuple, since `*args` tuples are lists) |
 | `map` (1 or 2 lists) | `chez.map_`: applies f to pairs from the end towards the front (7 elements: 7 5 6 3 4 1 2); 3+ lists last to first. Used **everywhere** `map` appears with a procedure that has effects (`tell-all`, `delegate-to-all`, images.ss's `replace-all`, themes.ss's `pick-positive-theme`, `filter`-like helpers); plain list comprehensions only where the function is pure. Chez also inlines `map` over literal lists in an order of its own; Racket used the library order at every site and matched all goldens, so Python does the same |
 | `for-each` | a `for` loop; `chez.for_each` where its value (the last application's, `None` for `'()`) is used (the `for*` forms pass it on) |
 | `andmap`, `ormap` | first to last, stopping early (battery `andmap-order`, `ormap-order`) |
@@ -185,6 +185,10 @@ debugging. It never compares a string with `eq?`. So:
   `isinstance(x, str)`, which is all the model's tests need.
 - characters are 1-character `str` (only `symbol->letter-categories` and the string
   utilities use them).
+- *Item 02:* where the printer's `write` (`~s`) must tell them apart, a Scheme string is a
+  `chez.String` and a character a `chez.Char` (both `str` subclasses). A plain `str` is
+  written as a symbol. A vector that must print as `#(...)` is a `chez.Vector` (a `list`
+  subclass). `display` prints all of these alike.
 - `INVALID = sys.intern("invalid-message-indicator")` is compared with `is`, so every
   producer uses the constant.
 - The test canonicaliser (helpers.scm's `b:canon`) prints `'sym` and `"str"`
@@ -210,7 +214,7 @@ on string literals and `~s` again and records the result.
 
 `chez.py` keeps one table, as racket/compat.rkt does:
 `define_top_level_value(name, value)`, `top_level_value(name)`,
-`set_top_level_value(name, value)` (raises if unbound), `top_level_bound_p(name)`.
+`set_top_level_value_bang(name, value)` (binds an unbound name, as Chez does in its interaction environment; Racket raised. Item 02 fixture), `top_level_bound_p(name)`. An unbound `top_level_value` raises `chez.UnboundVariable`.
 Users:
 - slipnet.ss:371, `establish-link`, defines each of the 202 links as `a-b-link`; the link
   macros then message it through `top_level_value`;
@@ -260,12 +264,13 @@ module as Racket's `pending.rktl` does: the first two `False`, the last two rais
 
 ### Printing
 
-`chez.display`, `chez.write`, `chez.format` (`~a ~s ~% ~n ~~`, either case),
+`chez.display`, `chez.write`, `chez.format_` (`~a ~s ~% ~n ~~`, either case; others raise),
 `chez.printf` and `newline` as in compat.rkt §4: `display` abbreviates `(quote x)` as
 `'x` and `write` doesn't; symbols are written with Chez's `\xHH;` escapes; characters
 and strings are written with Chez's names and escapes; `#<void>`; Python lists print as
-Scheme lists, `True`/`False` as `#t`/`#f`, `None` as nothing visible in `display`
-(void). Never `str()`/`repr()` a number where Chez prints it. The trace writer
+Scheme lists, `True`/`False` as `#t`/`#f`, `None` as `#<void>` (item 02 correction;
+fixture `format-void`). Symbols with non-ASCII characters outside R6RS's constituent
+categories are written with `\xHH;` (item 02). Never `str()`/`repr()` a number where Chez prints it. The trace writer
 (trace-format.md) has its own JSON rules: exact rationals as `"n/d"` strings, flonums
 through `number_to_string`.
 

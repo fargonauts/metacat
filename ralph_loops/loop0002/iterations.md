@@ -27,7 +27,7 @@
     - the order of the work, and the risks ranked.
     Tests: the object-system prototype with its micro-benchmark, as a pytest file.
 
-- [ ] **02 Chez semantics: `chez.py`.** The PRNG (test vectors from Chez, including
+- [x] **02 Chez semantics: `chez.py`.** The PRNG (test vectors from Chez, including
     `(random 1.0)` doubles and state after every draw), exact rounding, the printer
     (`display`/`write`/`format` with `~a ~s ~% ~n ~~`, flonums, rationals, symbols,
     strings, characters, lists), `map` order, `sort` (results and predicate-call

@@ -4,10 +4,11 @@
 Part of the Python translation of Metacat (GPL v2 or later, like Metacat itself).
 
     python3 python/oracle/capture.py BATTERY...     # utilities, sgl-battery, tests/diff/rule-battery.scm
-    python3 python/oracle/capture.py --all          # every tests/diff/*-battery.scm, in parallel
+    python3 python/oracle/capture.py --all          # every battery, in parallel
     python3 python/oracle/capture.py --all --out DIR   # somewhere else (the freshness test)
 
-A battery (tests/diff/NAME-battery.scm) is evaluated by Chez Scheme 10 with the
+A battery (tests/diff/NAME-battery.scm, or python/oracle/batteries/NAME-battery.scm
+for the Python port's own vectors, such as chez-battery.scm) is evaluated by Chez Scheme 10 with the
 whole original loaded, through chez_scheme/oracle/diff-eval.ss, unedited, after
 tests/diff/helpers.scm (and, for sgl, tests/diff/sgl-chez-setup.ss), exactly as
 racket/tests/diff-runner.rkt does.  diff-eval.ss prints one "NAME => VALUE"
@@ -40,6 +41,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 DIFF = REPO / "tests" / "diff"
+# the Python port's own batteries (Chez vectors the frozen tests/diff/ lacks)
+LOCAL = Path(__file__).resolve().parent / "batteries"
 DIFF_EVAL = REPO / "chez_scheme" / "oracle" / "diff-eval.ss"
 PRELUDE = REPO / "chez_scheme" / "oracle" / "prelude.ss"
 LIST_TESTS = Path(__file__).resolve().parent / "list-tests.ss"
@@ -59,7 +62,8 @@ class CaptureError(Exception):
 
 def batteries() -> list[str]:
     """Every battery's short name (utilities, coderack, ...), sorted."""
-    return sorted(p.name[: -len("-battery.scm")] for p in DIFF.glob("*-battery.scm"))
+    return sorted(p.name[: -len("-battery.scm")]
+                  for d in (DIFF, LOCAL) for p in d.glob("*-battery.scm"))
 
 
 def battery_name(arg: str) -> str:
@@ -68,13 +72,14 @@ def battery_name(arg: str) -> str:
     for suffix in (".scm", "-battery"):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
-    if not (DIFF / f"{name}-battery.scm").exists():
+    if not (DIFF / f"{name}-battery.scm").exists() and not (LOCAL / f"{name}-battery.scm").exists():
         raise CaptureError(f"no battery tests/diff/{name}-battery.scm")
     return name
 
 
 def battery_path(name: str) -> Path:
-    return DIFF / f"{name}-battery.scm"
+    local = LOCAL / f"{name}-battery.scm"
+    return local if local.exists() else DIFF / f"{name}-battery.scm"
 
 
 def file_name(index: int, test: str) -> str:
@@ -148,7 +153,10 @@ def join(names: list[str], values: list[bytes]) -> bytes:
 
 def source_files(name: str) -> list[Path]:
     """Everything a capture depends on, besides chez_scheme/original/ (the gate pins it)."""
-    return [DIFF_EVAL, PRELUDE, LIST_TESTS, *sorted(DIFF.iterdir())]
+    files = [DIFF_EVAL, PRELUDE, LIST_TESTS, *sorted(DIFF.iterdir())]
+    if battery_path(name).parent == LOCAL:
+        files.append(battery_path(name))
+    return files
 
 
 def sources(name: str, version: str) -> str:
@@ -189,7 +197,7 @@ def capture_all(names: list[str], out: Path = FIXTURES) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("battery", nargs="*", help="battery name or path")
-    parser.add_argument("--all", action="store_true", help="every tests/diff/*-battery.scm")
+    parser.add_argument("--all", action="store_true", help="every battery (tests/diff/ and oracle/batteries/)")
     parser.add_argument("--out", type=Path, default=FIXTURES, help="fixtures directory")
     args = parser.parse_args(argv)
     try:

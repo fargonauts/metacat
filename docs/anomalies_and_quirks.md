@@ -407,6 +407,79 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   4284 (the session) after the test had killed bwrap.
 - **Status:** worked around. The test passes `--die-with-parent --unshare-pid` to bwrap.
 
+### Chez's printer rounds a halfway last digit up; Python's `repr` rounds it to even
+- **Seen:** loop0002 iteration 3 (item 02), `number->string-bits` and `-decades` in
+  python/oracle/batteries/chez-battery.scm.
+- **What:** both print the shortest digits that read back to the double. When the double
+  lies exactly halfway between the two shortest candidates, Chez takes the upper one and
+  Python the even one: 1586243275893042.25 prints as `1.5862432758930423e15` in Chez and
+  `1.5862432758930422e15` in Python (`repr`), and 71684848459136.625 as `...136.63` and
+  `...136.62`. Racket happened to agree with Chez on every value its tests printed.
+- **Evidence:** `python/fixtures/chez/*number-%3Estring-ties.txt` (17 ties among 5,240 doubles);
+  `python3 -c "print(repr(1586243275893042.25))"`.
+- **Status:** worked around. `chez._flonum_digits` starts from `repr` and moves a halfway
+  last digit up, keeping it if it still reads back. `test_number_to_string_ties`.
+
+### Chez writes non-ASCII symbol characters as `\xHH;` unless they are R6RS constituents
+- **Seen:** loop0002 iteration 3 (item 02), `write-symbols`.
+- **What:** in a symbol, `write` prints a character above 127 as is only if its Unicode
+  category is Lu, Ll, Lt, Lm, Lo, Mn, Nl, No, Pd, Pc, Po, Sc, Sm, Sk, So or Co (plus Nd,
+  Mc, Me after the first character). U+0080–U+00A0, U+00AB `«`, U+00AD, U+00BB `»`,
+  U+2028, U+2029 and U+FEFF become `\x80;` and so on. racket/compat.rkt writes every
+  non-ASCII character as is. The model's symbols are ASCII, so it never mattered.
+- **Evidence:** `python/fixtures/chez/042-write-symbols.txt`.
+- **Status:** worked around in chez.py (`unicodedata.category`). Racket's difference
+  is harmless and left alone (racket/ is frozen).
+
+### Exact 0 is the identity of `+` and `-`: `(+ 0 -0.0)` is `-0.0`
+- **Seen:** loop0002 iteration 3 (item 02), `arith-add`, `arith-sub`, `arith-nary`.
+- **What:** Chez returns the other operand when one is exact 0. So `(+ 0 -0.0)` is
+  `-0.0`, `(- 0 0.0)` is `-0.0` (negation), and `(max 0 -0.0)` and `(min 0 -0.0)` are
+  `-0.0`. Python gives `0.0` for `0 + -0.0` and `0 - 0.0`. With `(* 0 x)` and `(/ 0 x)`
+  (exact 0 for any flonum `x`, even `+inf.0` or `0.0`), this is where Python's mixed
+  arithmetic differs from Chez's.
+- **Evidence:** `python/fixtures/chez/004-arith-add.txt` and the other `arith-*` tables;
+  the `-inline` variants agree with the procedure calls.
+- **Status:** worked around: `chez.add`/`sub`/`mul`/`div`/`max_`/`min_`. Only the sign
+  of a zero changes, and that only shows when it's printed or divided by.
+
+### Chez's `expt`: exact roots only for 1/2, exact results for exact 0 and 1 bases
+- **Seen:** loop0002 iteration 3 (item 02), `expt-table`, `expt-extra`, `expt-model`.
+- **What:** an exact 0 power gives exact `1` (`(expt 0.0 0)` → `1`). An exact base to an
+  exact integer power is exact. A power of `1/2` is `sqrt` (`(expt 4 1/2)` → `2`), but
+  other exact roots are inexact (`(expt 8 1/3)` → `2.0`, `(expt 4 3/2)` → `8.0`). An exact
+  1 base gives exact `1` for any power. An exact 0 base gives exact `0` for a positive
+  power (`(expt 0 0.95)` → `0`), `1.0` for `0.0`, and an error for a negative power.
+  `(expt 0.0 -1)` is `+inf.0`, where Python raises `ZeroDivisionError`. A negative base to
+  a non-integer power is `exp(p log b)` (complex). Otherwise it's libm's `pow`, as Python's
+  `**` (`(expt 1.1 27)`, not repeated multiplication).
+- **Evidence:** `python/fixtures/chez/*expt*`.
+- **Status:** explained; chez.py's `expt` follows it. The model's `(expt strength 0.95)`
+  meets the exact-0 case whenever a strength is 0.
+
+### `set-top-level-value!` binds an unbound name in Chez
+- **Seen:** loop0002 iteration 3 (item 02), `top-level-values`.
+- **What:** in Chez's interaction environment, `(set-top-level-value! 'x 4)` of an
+  unbound `x` binds it, while `top-level-value` of an unbound name raises.
+  racket/compat.rkt raises for both. The model only sets names it has defined.
+- **Status:** explained; chez.py does as Chez.
+
+### A bad literal `format` string makes Chez's compiler warn, which fails a whole battery test
+- **Seen:** loop0002 iteration 3 (item 02), writing chez-battery.scm.
+- **What:** `(format "~a")`, `(format "x" 1)` and `(format "~q" 1)` with literal strings
+  draw "Warning in compile: too few arguments for control string", even inside a handler.
+  diff-eval.ss's handler sees the warning condition and prints `ERROR` for the test.
+  Called through a variable (`c:format`), they raise at run time as expected.
+- **Status:** worked around in the battery.
+
+### Python raises where IEEE arithmetic (and Chez) give an infinity
+- **Seen:** loop0002 iteration 3 (item 02).
+- **What:** `1 / 0.0`, `0.0 ** -1`, `math.log(0.0)` and `float(10**400)` raise in
+  Python. Chez gives `+inf.0`, `+inf.0`, `-inf.0` and `+inf.0`. `math.exp(1000)` raises
+  `OverflowError`. Also `round(math.inf)` raises, where Chez's `round` returns `+inf.0`.
+- **Status:** worked around in chez.py (`div`, `expt`, `log`, `inexact`, `exp`, `round_`).
+  Plain Python operators on model floats must not meet these cases.
+
 ## 🔗 Hidden couplings
 
 ### Model state that only a window can provide

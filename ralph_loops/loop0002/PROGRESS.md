@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 2/18 SOLVED
+- **Current**: 3/18 SOLVED
 
 ---
 
@@ -156,3 +156,126 @@ the extra vectors (exact zero products, contagion, exact sqrt/exp/log/expt,
 `object_prototypes.chez_map1` is a first `map_` to promote. Item 03 builds `objects.py`
 from candidate C3 and moves `name_mapping.py` into the package as `metacat/names.py`.
 
+
+---
+
+## Iteration 3 — 2026-10-03 19:05
+
+### Completed
+Item 02, `chez.py`: **SOLVED**.
+- **Vectors from Chez.** `python/oracle/batteries/chez-battery.scm` (new, 63 tests) holds
+  the vectors that the frozen `tests/diff/` batteries lack. `capture.py` now also finds
+  batteries in `python/oracle/batteries/`; a local battery's own file joins its `SOURCES`,
+  so the other ten batteries' `SOURCES` are unchanged. It is captured into
+  `python/fixtures/chez/` (1.9 MB) through the same unedited diff-eval.ss, and the slow
+  re-capture freshness test covers it. Contents:
+  - the generator: the value of every draw and the state after it (15 seeds × 54
+    arguments, including the 4-step path for n > 2^32 − 1), a 1,500-draw Metacat-like
+    run from seed 3852097033, and the bad seeds and arguments;
+  - arithmetic: `+ - * / max min` over 12 × 12 exact, inexact, signed-zero and infinite
+    operands, called both as procedure values and as inlined primitives (they agree);
+    n-ary and unary forms, `quotient`/`remainder`/`modulo`, the predicates, `1+`/`-1+`;
+  - rounding: Chez's own (`#%round` …) and utilities.ss's exact versions;
+  - `exact->inexact` on 400 random ratnums;
+  - `sqrt`/`exp`/`log`/`tanh` on 237 exact and 161 flonum arguments, `tanh` on the 601
+    mapping strengths, and `expt` as a 23 × 23 table, 40 extra cases and the model's
+    own shapes;
+  - the printer: `number->string` on 3,000 doubles from random bits, 300 per decade,
+    5,240 near ties and the edge cases; `write`/`display` of every character, string and
+    symbol code point below 256 and a few beyond; symbol specials; `display`, `write`,
+    `~a` and `~s` on nested data and quote abbreviations; `format` errors; `printf`;
+  - lists: `map` with 1–4 lists up to 31 elements and length mismatches, `for-each` and
+    `andmap`/`ormap` values, `sort` results and predicate-call logs up to 150 elements
+    (`<`, `<=`, `>`), on pairs and presorted lists; `remq`/`remv`/`remove`,
+    `memq`…`assoc`, `eqv?`/`equal?`;
+  - top-level values.
+- **Tests first.** `python/tests/test_chez.py` (62 tests covering all 63 fixtures, plus `scheme_canon.py`:
+  helpers.scm's `b:canon`/`b:num` for Python values). It rebuilds each battery
+  expression in Python, in the same order of draws (Chez's `map` where the battery uses
+  `map`), and compares canonical text with the fixture. Besides the new fixtures, it
+  covers the Chez-level tests of the utilities battery: `rng-*`, `map*-order`,
+  `for-each*`, `andmap`/`ormap-order`, `sort-*`, `number->string-*`, `format-*`,
+  `printf-output`, `remq`/`remv`/`remove`, `1+` and `rounding`. I wrote the tests before
+  `chez.py` existed and ran them: collection failed with `ImportError: cannot import name
+  'chez'`, so every test failed. The capture script came first. Its first run showed
+  two battery mistakes, which I fixed in the battery, not in the fixtures: a `b:seeded`
+  result used as a list, and literal bad `format` strings, which become compile-time
+  warnings that diff-eval reports as ERROR.
+- **`python/metacat/chez.py`.** The first version passed 55 of 60. What the Chez vectors
+  then taught (all now in `docs/anomalies_and_quirks.md`):
+  - Chez prints a double that lies exactly halfway between the two shortest digit
+    strings with the **upper** one; Python's `repr` rounds half to even
+    (1586243275893042.25 → `…423e15` vs `…422e15`). `_flonum_digits` corrects `repr`.
+    I added the `number->string-ties` test so the rule is pinned (17 ties among 5,240).
+  - In symbols, Chez writes non-ASCII characters that aren't R6RS constituents as
+    `\xHH;` (U+0080–U+00A0, «, », soft hyphen, U+2028/9, U+FEFF). racket/compat.rkt
+    writes them as is, which is harmless for the model.
+  - `expt`: only a `1/2` power is an exact root (`(expt 8 1/3)` → `2.0`); exact base 1 → `1`;
+    exact base 0 → `0` for positive powers, `1.0` for `0.0`, an error for negative ones;
+    `0.0` to a negative power → `+inf.0`; negative base to a non-integer power →
+    `exp(p log b)`, bit-equal to Chez. I added `expt-extra` after these findings.
+  - Exact 0 is the identity of `+` and `-`: `(+ 0 -0.0)` → `-0.0`, `(- 0 0.0)` → `-0.0`
+    (Python: `0.0`). This corrects the plan's "`+` and `-` agree".
+  - `set-top-level-value!` binds an unbound name in Chez (Racket raised).
+  - Python raises where Chez gives infinities (`1/0.0`, `0.0**-1`, `math.log(0.0)`,
+    `round(inf)`).
+  - Confirmed equal: `math.tanh`, `math.exp`, `math.log`, `math.sqrt`, `**` (libm `pow`)
+    and `float(Fraction)` are bit-equal to Chez on every vector.
+  Representations: symbols and Scheme strings are `str`. `chez.String` and `chez.Char`
+  mark a string or character only where `write` must tell it from a symbol;
+  `chez.Pair` is a pair with a non-list cdr; `chez.Vector` is a vector that must print
+  `#(...)`; `None` is void and prints `#<void>`.
+- **Mutation checks** (each applied to chez.py, run, then restored; `cmp` confirmed):
+  all 22 caught.
+
+  | Mutation | Failing |
+  |---|---|
+  | LCG multiplier 72931 → 72933 | 17 |
+  | float draw takes 3 bits of s1, not 4 | 11 |
+  | int draw takes the low half of s2 | 10 |
+  | exact 0 × flonum gives `0.0` | 3 |
+  | `(+ 0 x)` through Python | 2 |
+  | `max` without inexact contagion | 2 |
+  | one-list `map` left to right | 6 |
+  | list merge sort: first half first | 2 |
+  | `sorted()` for 25+ elements | 3 |
+  | `remq` removes the first occurrence only | 1 |
+  | `for-each` returns void | 2 |
+  | printer without the tie rule (plain `repr`) | 3 |
+  | exponent written `e+21` | 10 |
+  | positional layout up to e = 10 | 7 |
+  | `write` abbreviates `(quote x)` | 2 |
+  | every non-ASCII symbol character as is | 1 |
+  | `round` half away from zero | 2 |
+  | flonum^int by repeated multiplication | 2 |
+  | `tanh` from `exp` | 1 |
+  | `set-top-level-value!` raises when unbound | 1 |
+  | `(eqv? 0.0 -0.0)` true | 2 |
+  | `float(Fraction)` as `float(n)/float(d)` | 1 |
+
+- Speed, for item 12: `random(1.0)` 0.61 µs, `random(7)` 0.30 µs, `map_` over 10
+  elements 0.53 µs, `sort` of 10 elements 2.5 µs, `mul(Fraction, int)` 2.3 µs,
+  `div(37, 100)` 0.66 µs, `number_to_string` 4.8 µs.
+- Docs: `docs/python-translation-plan.md` corrected. `+`/`-` at signed zeros, `expt`,
+  the printer's ties, `None` printing `#<void>` (the plan said "nothing visible"), the
+  `String`/`Char`/`Pair`/`Vector` representations, and `set_top_level_value_bang`.
+  `python/README.md` covers the local batteries and chez.py. `test_fixtures.py` now
+  expects 10 frozen batteries plus `chez`.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (163 tests, 53 s).
+
+### Blockers
+None. Out of scope, by design: Chez's exact complex numbers (`1+2i`) have no Python
+counterpart and never occur in Metacat. The two fixture values that contain one are
+taken as is (`scheme_canon.Raw`), and `sqrt` of a negative perfect square raises
+`NotImplementedError`. `random` of a bignum range (beyond 2^60 − 1) is also
+unsupported, since Metacat never draws one. Procedures print as `#<procedure>`, without
+Chez's names.
+
+### Next
+Item 03: `objects.py` (candidate C3), `sugar.py` and `utilities.py`, against all 197
+utilities tests. Use `chez.map_` for `tell-all` and every `map` with effects, and
+`chez.sort`/`chez.remq`. Bind `utilities.round_` etc. to `chez.exact_round`…`exact_truncate`
+(they already pass the `rounding` fixture). Use `chez.add1`/`sub1` for `1+`/`-1+`, and
+`chez.format_`/`printf`. Use `chez.mul`/`div`/`max_`/`min_` wherever an operand can be a
+flonum, `chez.expt`/`sqrt`/`exp`/`tanh` everywhere. `scheme_canon.canon` replaces the
+prototype tests' minimal canon. Move `name_mapping.py` into `metacat/names.py`.
