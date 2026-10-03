@@ -31,6 +31,7 @@ from fractions import Fraction as F
 import pytest
 
 from chez_fixtures import chez as fixture, manifest
+from engine_stubs import engine_module
 from scheme_canon import canon
 from test_chez import LOG, SEEDS, iota, log, repeat, seeded, with_log  # helpers.scm
 from metacat import chez
@@ -66,35 +67,6 @@ def strs(xs):
 def seq(*values):
     """(begin e1 e2 ...): the arguments are already evaluated, in order; the last value."""
     return values[-1]
-
-
-@contextmanager
-def engine_module(name, **attrs):
-    """The battery's (define name value) for names that belong to a later engine
-    module (metacat.setup, metacat.slipnet, metacat.coderack): set them on the real
-    module if it exists, else on a temporary stand-in; restore afterwards."""
-    full = "metacat." + name
-    existed = full in sys.modules or importlib.util.find_spec(full) is not None
-    if existed:
-        mod = importlib.import_module(full)
-    else:
-        mod = types.ModuleType(full)
-        sys.modules[full] = mod
-        setattr(metacat, name, mod)
-    saved = {k: getattr(mod, k) for k in attrs if hasattr(mod, k)}
-    for k, v in attrs.items():
-        setattr(mod, k, v)
-    try:
-        yield mod
-    finally:
-        for k in attrs:
-            if k in saved:
-                setattr(mod, k, saved[k])
-            else:
-                delattr(mod, k)
-        if not existed:
-            del sys.modules[full]
-            delattr(metacat, name)
 
 
 # The battery's fake object ----------------------------------------------------------

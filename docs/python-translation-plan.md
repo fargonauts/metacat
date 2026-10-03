@@ -469,6 +469,37 @@ sgl-interpreter.ss, general-graphics.ss, fonts.ss, gui.ss) and rules.ss:269
 files must keep the distinction there (anomalies: "The graphics and rules.ss tell strings
 from symbols").
 
+### As built (item 04)
+
+- **`engine.py`** has metacat.ss's load order (`LOAD_ORDER`, Python module names).
+  `load()` imports the modules translated so far and calls their `load()`, once per
+  process. `set_global(name, value)` / `get_global(name)` map the Scheme name through
+  `names.scheme_to_python` to the first module of the load order (plus `view_globals`)
+  that defines it, and raise `chez.SchemeError` otherwise.
+- **References to files not translated yet** go through the package at call time:
+  `import metacat as _metacat`, then `_metacat.workspace.g_workspace`,
+  `_metacat.run.g_display_mode_p`, `_metacat.groups.contains_p`. Once such a module exists
+  this still works (engine.py imports it); later items may switch a module to
+  `from metacat import workspace` when the target exists. Tests provide the globals of
+  missing modules with `tests/engine_stubs.engine_module`.
+- **`view_globals.py`** mirrors racket/engine/view-globals.rktl: the colours and fonts the
+  model reads (`urgency-color`, the codelet types' graphics methods, trace events), the
+  speed settings and `restore-current-state`, all `#f` (or raising) until the views set
+  them. constants.py keeps only the model's part of constants.ss.
+- **setup.py**: `setup` and `enable-resizing` are the GUI's (item 15). Other modules read
+  and assign the globals qualified (`setup.g_temperature`).
+- **coderack.py**: the codelet closure that make-codelet makes is the `Codelet` class. It
+  shares variables with its codelet type's closure (count, selection probability,
+  procedure, window), so it keeps that object as `owner` and the message's receiver as
+  `codelet_type`. Codelet lists are rebuilt on every cons and `remq`, never mutated, so a
+  list handed out stays as it was. `case` without `else` returns `None` (void), as the
+  battery's `post-codelet-probability` rows show. `load()` makes `*codelet-types*` with
+  `codelet_type_list_star(..., module=coderack)`, whose labels are `chez.String`s (the
+  graphics tell strings from symbols), then the three type lists and `*coderack*`.
+- **descriptions.py**: `load()` runs the four `define-codelet-procedure*` forms.
+- **Arithmetic on values that may be `#f`** goes through `chez.add`/`sub`/`mul`, since
+  Python's `bool` is an `int` (anomalies entry).
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

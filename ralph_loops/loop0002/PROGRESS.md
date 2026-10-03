@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 4/18 SOLVED
+- **Current**: 5/18 SOLVED
 
 ---
 
@@ -426,3 +426,140 @@ there). `slipnet_node_list_star(specs, module=slipnet)` and
 `codelet_type_list_star(specs, module=coderack)` also set the module attributes.
 Objects return `objects.INVALID` (never a spelled-out string) from `otherwise`. Run
 drivers replace `objects.report_error_and_halt`.
+
+---
+
+## Iteration 5 — 2026-10-03 20:19
+
+### Completed
+Item 04, constants, setup, coderack and descriptions: **SOLVED**.
+- **Tests first.** `python/tests/test_coderack.py` has one case for each of the 43 tests of
+  `tests/diff/coderack-battery.scm`. Each case rebuilds the battery expression in Python
+  with the same order of draws and effects. Every battery `map` is `chez.map_`, since
+  several of them reset and post inside the map. Each case compares its `b:canon` text with
+  the frozen fixture. The battery's fakes are translated in the test: the logging window,
+  workspace, themespace, trace, top-down nodes, proposed structures, descriptions and the
+  settings alists. So are its top-level forms between tests (installing the fakes before
+  `urgency-value-table`, resetting the modes before `threshold-distributions`), and they
+  run before the test they precede. The cases run in the battery's order in one engine,
+  as the battery does. Globals of modules not translated yet (`*workspace*`, `*themespace*`,
+  `*trace*`, `*top-down-slipnodes*`, run.ss's `*display-mode?*`/`*step-mode?*`/
+  `%step-cycles%`) are stand-ins from `tests/engine_stubs.py`. That file is
+  `engine_module`, moved out of test_utilities.py, which now imports it. Other tests check
+  that:
+  - every model `define` of the four files has its Python name;
+  - the codelet types are module attributes and top-level values;
+  - the four description types have procedures;
+  - `set_global` rejects unknown names;
+  - docstrings name their origin;
+  - no module imports tkinter.
+
+  I wrote the file before any of the modules existed and ran it: collection failed with
+  `ImportError: cannot import name 'engine' from 'metacat'`, so every case failed.
+- **Code** (all new):
+  - `metacat/constants.py`: the threshold distributions;
+  - `metacat/view_globals.py`: the colours, fonts and speed settings the model reads, `#f`
+    until the views set them, as in racket/engine/view-globals.rktl;
+  - `metacat/setup.py`: the globals and user commands (`setup` and `enable-resizing` are
+    the GUI's, item 15);
+  - `metacat/coderack.py`: codelet types, codelets (a `Codelet` class that keeps its type's
+    closure as `owner`), bins, the coderack, posting probabilities and counts, bottom-up
+    and top-down posting. `load()` makes `*codelet-types*` through
+    `sugar.codelet_type_list_star(..., module=coderack)`, then the three type lists and
+    `*coderack*`;
+  - `metacat/descriptions.py`: `make-description`, the four codelet procedures (installed
+    by `load()`), `propose-`/`build-description`, `descriptions-equal?`,
+    `description-member?`;
+  - `metacat/engine.py`: `LOAD_ORDER` (metacat.ss's order), `load()` (each module's
+    `load()`, once) and `set_global`/`get_global` by Scheme name.
+
+  After the first write, the 43 cases (50 tests) passed on the first run. The only failure
+  was in the test itself (`manifest()` returns a tuple).
+- **Mutation checks** (`/tmp/mut/mutate*.py`, not kept; each mutation applied, the test
+  file run with `-x`, then the file restored; `git status` confirmed it was clean). 37
+  mutations; all caught except the equivalent ones:
+
+  | Mutation | Result |
+  |---|---|
+  | bin add-codelet appends instead of consing | caught |
+  | choose-random-codelet picks a wrong index | caught |
+  | remove-codelet without the swap | caught |
+  | choose-codelet over the bins reversed | caught |
+  | delete-codelets over the codelet list reversed | 4 failing |
+  | `get-coderack-bin` `>= 100` → `> 100` | 17 failing |
+  | post's overflow test `=` → `>` | 2 |
+  | deferred `>= 100` → `> 100` | 1 |
+  | excess deferred codelets not random-picked | 1 |
+  | add-deferred-codelet appends | 4 |
+  | rule-scout probability exact 1/2 instead of 0.5 | 2 |
+  | jootser probability 0.25 | 2 |
+  | jootser bottom-up urgency | 3 |
+  | thematic count `floor` instead of `round` | 1 |
+  | `post-codelet-probability`'s missing else gives 0 instead of void | 2 |
+  | unclamp without reset-urgencies | 2 |
+  | time stamp `*codelet-count*` + 1 | caught |
+  | plural label on the first line | 1 |
+  | codelet print without `round` | 2 |
+  | "(scope is ...)" for one argument | 1 |
+  | description counted as a proposed structure | 2 |
+  | top-down slipnodes not told | caught |
+  | delete-codelets does not decrease the count | 4 |
+  | a distribution weight changed | 1 |
+  | verbose-on's test inverted | 1 |
+  | `blank-window` given a symbol instead of a string | 1 |
+  | `%eliza-mode%` default `#f` | 1 |
+  | descriptions-equal? ignores the descriptor | 2 |
+  | description-member? returns the element | 1 |
+  | **adjust-urgency with Python `min`/`max`** | **0 at first**: see below |
+  | urgency table with an exact exponent `/15` | 0: equivalent (same rounded table) |
+  | `get-coderack-bin` `<= 0` → `< 0` | 0: equivalent (urgency 0 maps to bin 0 either way) |
+  | bottom-up posting `coin <= p`, p evaluated first | 0: equivalent (no draw in p; ties need coin = p exactly) |
+  | clamp always re-applies | 0: equivalent headless (same urgencies) |
+  | `initialize` returns `'done` literally | 0: equivalent |
+
+  To kill the `min`/`max` survivor I added a local battery,
+  `python/oracle/batteries/coderack-extra-battery.scm` (2 tests:
+  `adjust-urgency-clipping`, with flonum and exact urgencies pushed past 0 and 100 by nine
+  deltas, and `clamp-exactness`, clamping at 90 then 90.0). It is captured into
+  `python/fixtures/coderack-extra/` through the unedited diff-eval.ss and covered by the
+  slow re-capture test. Unlike the 43, it was written *after* the code; its Python cases
+  passed at once, and the mutant now fails. `test_fixtures.py` now expects the local
+  batteries `chez`, `coderack-extra` and `utilities-extra`.
+- **Evaluation order.** No call or `let` in coderack.ss, setup.ss or constants.ss has two
+  effectful parts (as porting-notes.md says for the Racket port). The draws are
+  `stochastic-pick-by-method` (bins by urgency sum, deletion by removal weight), `random`
+  (the codelet in a bin), `random-pick` (excess deferred codelets) and `stochastic-if*`
+  in the posting loops. Those loops draw the coin before the probability, with a
+  `# chez:` comment. descriptions.ss's `make-description` `let` is pure, and its comment
+  says so. Racket's notes call that let right to left; item 02 measured left to right in
+  a test lambda. The order doesn't matter here.
+- **Docs.**
+  - `docs/anomalies_and_quirks.md`: two Python traps. Python's `bool` is an `int`
+    (`100 - False` is 100 where Chez raises), so arithmetic on values that may be `#f` goes
+    through `chez.sub`… And pytest's diff of multi-MB strings takes minutes, so the battery
+    asserts report the first differing character instead.
+  - `docs/python-translation-plan.md`: a new "As built (item 04)" subsection.
+  - `python/README.md`: the new modules.
+- Speed (for item 12): choose-codelet + post on a coderack of 99 codelets: 31 µs; post into
+  a full coderack, which deletes one codelet by removal weight: 275 µs.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (435 tests, 33 s).
+
+### Blockers
+None. Left for later items, by design:
+- descriptions.py's `make-description`, its codelets, `propose-description` and
+  `build-description` are translated but not yet run: they need the Workspace, Slipnet,
+  formulas and themes. The workspace and codelet batteries (items 06–07) pin them.
+- The codelet types' graphics methods (`highlight`, `draw-graphics`,
+  `update-bar-graphics`, `draw-codelet-count`) are translated but call
+  `general_graphics.solid_box` and the coderack window. The panels item (14) tests them.
+- Every codelet type's coderack window is `#f` until `set-graphics-parameters`, as in the
+  original. The headless driver (items 10–11) must install a null window in each,
+  as the oracle prelude's `install-headless-windows!` does.
+
+### Next
+Item 05, slipnet and images: `slipnet.py` and `images.py`, each with a `load()` that
+builds the nodes (`sugar.slipnet_node_list_star(specs, module=slipnet)`), the links and
+`*top-down-slipnodes*`. engine.py calls them in metacat.ss's order. Its test should take
+the battery's stand-ins from `tests/engine_stubs.py` and call `engine.load()` once.
+`engine.set_global` finds any module in `LOAD_ORDER` that exists, stand-ins included.
+Reach modules that don't exist yet through `_metacat.<module>` at call time.

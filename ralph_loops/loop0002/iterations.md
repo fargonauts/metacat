@@ -42,7 +42,7 @@
     `tests/diff/utilities-battery.scm`**, translated to pytest against its frozen
     fixture.
 
-- [ ] **04 Constants, setup, coderack, descriptions.** Translate the model parts of
+- [x] **04 Constants, setup, coderack, descriptions.** Translate the model parts of
     `constants.ss` and `setup.ss`, plus `coderack.ss` and `descriptions.ss`. Tests: every
     test of `coderack-battery.scm` against its fixture (bin selection at every
     temperature, `choose-codelet` over seeds with the RNG state after each choice,

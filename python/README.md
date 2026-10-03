@@ -58,3 +58,19 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   Tests: `tests/test_utilities.py`, every test of `tests/diff/utilities-battery.scm` plus
   `oracle/batteries/utilities-extra-battery.scm` (ties, `select-extreme` ties, a few
   mixed-exactness cases).
+- `metacat/engine.py`: metacat.ss's load order. `engine.load()` calls each translated
+  module's `load()` once (the top-level defines that need other engine modules);
+  `engine.set_global("*temperature*", 50)` sets a global by its Scheme name.
+- `metacat/constants.py`: constants.ss's model part (the threshold distributions).
+- `metacat/view_globals.py`: the colours, fonts and speed settings the model reads,
+  `#f` until the views set them (racket/engine/view-globals.rktl).
+- `metacat/setup.py`: setup.ss's globals and user commands.
+- `metacat/coderack.py`: coderack.ss (codelet types, codelets, bins, the coderack,
+  bottom-up and top-down posting); `load()` makes the codelet types and `*coderack*`.
+- `metacat/descriptions.py`: descriptions.ss; `load()` gives the four description
+  codelet types their procedures.
+
+  Tests: `tests/test_coderack.py`, every test of `tests/diff/coderack-battery.scm` plus
+  `oracle/batteries/coderack-extra-battery.scm` (urgency clipping with flonums, clamp
+  exactness). Globals of modules not translated yet are stand-ins
+  (`tests/engine_stubs.py`).

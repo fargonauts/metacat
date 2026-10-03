@@ -21,3 +21,9 @@
 [2026-10-03 19:06:56] claude session it04 (cap 3.00 h) -> session_it04.log
 [2026-10-03 19:31:24] session it04: ok (exit 0, 71 tool calls)
 [2026-10-03 19:32:22] tests passed: GATE PASSED
+[2026-10-03 19:32:22] committed e4dc783: 03 Objects, sugar and utilities. `objects.py` (as decided in item 01),
+[2026-10-03 19:32:25] pushed e4dc783 to origin
+[2026-10-03 19:32:25] === iteration 5: 04 Constants, setup, coderack, descriptions. Translate the model parts of
+[2026-10-03 19:32:25] claude session it05 (cap 3.00 h) -> session_it05.log
+[2026-10-03 20:21:03] session it05: ok (exit 0, 72 tool calls)
+[2026-10-03 20:21:58] tests passed: GATE PASSED

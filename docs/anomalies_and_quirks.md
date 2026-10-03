@@ -505,6 +505,30 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `real_part`, `imag_part`, printed by `number_to_string`. Arithmetic on coordinates
   (the graphics: `magnitude`, `+` on coords) isn't there yet; the graphics items add it.
 
+### Python's `bool` is an `int`, so a Scheme `#f` that reaches arithmetic computes silently
+- **Seen:** loop0002 iteration 5 (item 04), translating coderack.ss's `get-removal-weight`
+  (`(* (- *codelet-count* time-stamp) ...)`), where `time-stamp` is `#f` until the codelet
+  is posted.
+- **What:** `100 - False` is `100` and `3 * True` is `3` in Python; Chez raises
+  `-: #f is not a number`. A model slip that lets `#f` into arithmetic would give a number
+  instead of the original's error, and the run would go on differently.
+- **Evidence:** `python3 -c 'print(100 - False)'` prints `100`; `chez.sub(5, False)` raises
+  `SchemeError`.
+- **Status:** worked around: arithmetic on a model quantity that may be `#f` goes through
+  `chez.add`/`sub`/`mul`/`div`, which check their operands (`chez._is_number` excludes
+  `bool`); `chez_num_eq` in coderack.py does the same for `=`.
+
+### pytest's diff of two multi-megabyte strings takes minutes
+- **Seen:** loop0002 iteration 5 (item 04), mutation checks of the coderack battery.
+- **What:** `assert canon(value) == fixture` on a failing case of 100 KB-1 MB made pytest
+  spend 1-2 minutes (or more) building its assertion explanation, even with `--tb=no`,
+  so a mutant looked like a hang.
+- **Evidence:** a mutant of `CoderackBin.choose_random_codelet` with the plain assertion
+  timed out at 120 s; with the assertion below it fails in 0.2 s.
+- **Status:** worked around: test_coderack.py compares first (`same = got == expected`),
+  then asserts `same` with a message showing the first differing character and its
+  context.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
