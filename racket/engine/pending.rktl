@@ -36,39 +36,6 @@
               "variable complement-codelet-pattern is not bound")]))
 
 ;; Graphics (the GUI items)
-;; constants.ss, graphics part
-(pending-variables %coderack-background-color% %current-codelet-color%
-                   %extremely-low-urgency-color% %very-low-urgency-color%
-                   %low-urgency-color% %medium-urgency-color% %high-urgency-color%
-                   %very-high-urgency-color% %extremely-high-urgency-color%
-                   %vertical-slippage-color% %dim-vertical-slippage-color%
-                   %coattail-inducing-slippage-color%
-                   %dim-coattail-inducing-slippage-color%)
-;; general-graphics.ss
-(pending-procedures solid-box outline-box arrowhead)
-;; the Temporal Trace's display-workspace-state (trace.ss) sets *fg-color*
-(pending-variables %default-fg-color% *fg-color*)
-;; Called by make-rule on every rule (transcribe-to-english, rules.ss): an
-;; early verbatim copy of general-graphics.ss's definition (pure string
-;; code), moved back by the GUI items.
-(define find-next-space-position
-  (lambda (s i)
-    (cond
-      ((>= i (string-length s)) (string-length s))
-      ((char=? (string-ref s i) #\space) i)
-      (else (find-next-space-position s (+ i 1))))))
-;; constants.ss colours that trace.ss's events keep or draw with
-(pending-variables %faded-workspace-structure-color% %bridge-label-background-color%
-                   %faded-bridge-label-background-color% %vertical-bridge-color%
-                   %top-bridge-color% %bottom-bridge-color% %top-rule-color%
-                   %bottom-rule-color% %theme-supporting-concept-mapping-color%
-                   %clamp-event-concept-pattern-color%
-                   %concept-activation-event-concept-pattern-color%
-                   %concept-mapping-event-concept-pattern-color%
-                   %workspace-event-structure-color% %group-event-concept-pattern-color%
-                   %top-rule-event-concept-pattern-color%
-                   %bottom-rule-event-concept-pattern-color%
-                   %snag-event-concept-pattern-color% %snag-color%)
 ;; trace-graphics.ss: every group event's print name (make-group-event,
 ;; trace.ss) is made by group-event-pexp-text-string.  An early verbatim
 ;; copy (pure string code), moved back by the GUI items.
@@ -103,19 +70,6 @@
       ((eq? relation plato-successor) "succ")
       ((eq? relation plato-predecessor) "pred")
       (else #f))))
-;; rule-graphics.ss
-(pending-procedures initialize-rule-graphics)
-;; workspace-graphics.ss: run.ss's go calls it when *display-mode?* is on
-(pending-procedures restore-current-state)
-;; group-graphics.ss (group-graphics itself is in engine/group-graphics.rktl)
-(pending-procedures make-group-pexp draw-group-grope)
-(pending-variables %small-group-arrowhead-length% %group-arrowhead-angle%)
-;; workspace-graphics.ss: created by set! in the Workspace window's
-;; initialisation, never defined (groups.ss reads them in graphics-gated code)
-(pending-variables %group-letter-category-font% %relevant-group-length-font%)
-;; bridge-graphics.ss
-(pending-procedures bridge-graphics draw-bridge-grope new-bridge-label-number
-                    make-bridge-pexp)
 ;; eeg-graphics.ss (the EEG records workspace values for its window)
 (pending-variables *EEG*)
 ;; coderack-graphics.ss

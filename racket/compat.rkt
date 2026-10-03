@@ -550,7 +550,10 @@
 
 ;; (record-case exp (key formals body ...) ... (else body ...)): dispatch on
 ;; (car exp), binding formals (a list, an improper list or a symbol) to
-;; (cdr exp).  key may be a symbol or a list of symbols.
+;; (cdr exp).  key may be a symbol or a list of symbols.  As in Chez, the
+;; formals are bound with car and cdr, not by applying a lambda: arguments
+;; beyond the formals are ignored, and too few raise (car of ()).
+;; trace.ss relies on this (porting-notes.md, item 13).
 (define-syntax (record-case stx)
   (syntax-case stx ()
     [(_ e clause ...)
@@ -559,10 +562,17 @@
                       (syntax-case c (else)
                         [(else body ...) c]
                         [((key ...) formals body ...)
-                         #'((key ...) (apply (lambda formals body ...) (cdr r)))]
+                         #'((key ...) (record-case-bind formals (cdr r) body ...))]
                         [(key formals body ...)
-                         #'((key) (apply (lambda formals body ...) (cdr r)))]))])
+                         #'((key) (record-case-bind formals (cdr r) body ...))]))])
        #'(let ([r e]) (case (car r) cl ...)))]))
+
+(define-syntax (record-case-bind stx)
+  (syntax-case stx ()
+    [(_ () args body ...) #'(let () body ...)]
+    [(_ (x . more) args body ...)
+     #'(let* ([a args] [x (car a)]) (record-case-bind more (cdr a) body ...))]
+    [(_ x args body ...) (identifier? #'x) #'(let ([x args]) body ...)]))
 
 ;; Chez's (reset) calls the reset handler, which under the REPL abandons the
 ;; computation (and under --script exits).  Here the default handler raises

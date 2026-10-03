@@ -94,7 +94,7 @@
     SGL form to PNG offscreen and inspect it with Read; a pixel-level snapshot test
     guards against regressions.
 
-- [ ] **13 Workspace, bridge, group and rule graphics.** Port `general-graphics.ss`,
+- [x] **13 Workspace, bridge, group and rule graphics.** Port `general-graphics.ss`,
     `workspace-graphics.ss`, `bridge-graphics.ss`, `group-graphics.ss` and
     `rule-graphics.ss` as views that subscribe to the engine's hooks. Tests: render the
     workspace at several points of a golden run to PNG, inspect, and compare with the

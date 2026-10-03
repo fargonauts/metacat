@@ -1,0 +1,172 @@
+#lang racket/base
+;;=============================================================================
+;; Copyright (c) 1999, 2003 by James B. Marshall
+;;
+;; This file is part of Metacat.
+;;
+;; Metacat is based on Copycat, which was originally written in Common
+;; Lisp by Melanie Mitchell.
+;;
+;; Metacat is free software; you can redistribute it and/or modify it under the
+;; terms of the GNU General Public License as published by the Free Software
+;; Foundation; either version 2 of the License, or (at your option) any later
+;; version.
+;;
+;; Metacat is distributed in the hope that it will be useful, but WITHOUT ANY
+;; WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+;; FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+;; details.
+;;=============================================================================
+;; Ported to Racket, 2026: the views, i.e. the windows of the graphics files,
+;; as one module that includes their ported .rktl files in metacat.ss's load
+;; order, on top of the engine (racket/engine.rkt), the SGL interpreter
+;; (sgl.rkt), fonts.ss (fonts.rkt) and the colours (colors.rkt).  It needs
+;; racket/draw but not racket/gui: windows are drawn into viewport% display
+;; lists, shown by a window host (offscreen here; on screen once the control
+;; panel exists).
+;;
+;; Loading this module is the counterpart of metacat.ss loading the graphics
+;; files into the program's one top level: their definitions of names the
+;; model reads (colours, fonts, *fg-color*, restore-current-state, ...) are
+;; installed in the engine by engine-route.rkt's define and set!.  It changes
+;; nothing in a run by itself; attach-workspace-view! turns the Workspace
+;; window on, as setup.ss's (setup) and the control panel do.
+;;
+;; The graphics code the model calls (pexp builders: general-graphics.ss's
+;; shapes, group-, bridge- and rule-graphics.ss) is in the engine.  See
+;; docs/porting-notes.md, item 13.
+;;=============================================================================
+
+(require racket/class
+         racket/include
+         (only-in racket/draw make-bitmap bitmap-dc%)
+         "engine-route.rkt"
+         "../compat.rkt"
+         "../utilities.rkt"
+         "../engine.rkt"
+         (except-in "sgl.rkt" *platform* *tcl/tk-version-8_3?* %nice-graphics%)
+         "fonts.rkt"
+         (except-in "colors.rkt" =white= =black= =grey= =red= =green= =blue= =yellow=
+                    =pink= =orange=))
+
+(provide (except-out (all-defined-out) window-host%)
+         attach-workspace-view! window->bitmap save-window-png
+         make-window-host set-window-host-maker!)
+
+;;-----------------------------------------------------------------------------
+;; port: the parts of SWL the window code uses
+
+;; SWL's sync-display flushed Tk's drawing; the GUI hooks the same procedure
+;; as the SGL interpreter (set-flush-event-queue!)
+(define swl:sync-display (lambda () (*flush-event-queue*)))
+
+;; the screen, for constants.ss's set-window-size-defaults (which reads it
+;; but sizes windows by its scale argument only)
+(define swl:screen-width (lambda () 1280))
+(define swl:screen-height (lambda () 1024))
+
+;; SWL thread message queues (general-graphics.ss's resize listener)
+(define thread-make-msg-queue
+  (lambda (name) (vector name '() (make-semaphore 0))))
+(define thread-send-msg
+  (lambda (q msg)
+    (vector-set! q 1 (append (vector-ref q 1) (list msg)))
+    (semaphore-post (vector-ref q 2))))
+(define thread-msg-waiting?
+  (lambda (q) (pair? (vector-ref q 1))))
+(define thread-receive-msg
+  (lambda (q)
+    (semaphore-wait (vector-ref q 2))
+    (let ((msg (car (vector-ref q 1))))
+      (vector-set! q 1 (cdr (vector-ref q 1)))
+      msg)))
+(define thread-fork (lambda (thunk) (thread thunk)))
+(define thread-sleep (lambda (ms) (sleep (/ ms 1000.0))))
+(define critical-section-lock (make-semaphore 1))
+(define-syntax-rule (critical-section e ...)
+  (call-with-semaphore critical-section-lock (lambda () e ...)))
+;; the Workspace window's mouse handler interrupts the REPL thread to (go);
+;; the engine thread is the control panel's (item 15)
+(define thread-break
+  (lambda (thread ignore k)
+    (error 'thread-break "no engine thread to interrupt yet")))
+
+;; theme-graphics.ss (not ported yet): the Workspace window's mouse handler
+;; reads it
+(define *theme-edit-mode?* #f)
+
+;; The window host: SWL's <toplevel> and its <frame> or <scrollframe>, with
+;; the methods make-graphics-window sends them.  Offscreen by default (it
+;; keeps the title and geometry, and has no scrollbars); the control panel
+;; installs a maker of on-screen hosts with set-window-host-maker!.
+(define window-host%
+  (class object%
+    (init-field scrolling destroy-action)
+    (super-new)
+    (define title "")
+    (define geometry "+0+0")
+    (define viewport #f)
+    (define/public (show-viewport vp) (set! viewport vp))
+    (define/public (get-viewport) viewport)
+    (define/public (set-title! t) (set! title t))
+    (define/public (get-title) title)
+    (define/public (set-geometry! g) (set! geometry g))
+    (define/public (get-geometry)
+      (format "~ax~a~a" (get-width) (get-height)
+              (let ((i (let loop ((i 0))
+                         (cond ((= i (string-length geometry)) #f)
+                               ((char=? (string-ref geometry i) #\+) i)
+                               (else (loop (+ i 1)))))))
+                (if i (substring geometry i) "+0+0"))))
+    (define/public (get-width) (+ 2 (if viewport (send viewport get-width) 0)))
+    (define/public (get-height) (+ 2 (if viewport (send viewport get-height) 0)))
+    (define/public (set-resizable! w h) (void))
+    (define/public (set-min-size! w h) (void))
+    (define/public (set-aspect-ratio-bounds! a b) (void))
+    (define/public (get-scrollbar orientation) #f)
+    (define/public (set-vertical-view! fraction) (void))
+    (define/public (raise) (void))
+    (define/public (lower) (void))
+    (define/public (destroy) (void))))
+
+(define window-host-maker
+  (lambda (scrolling destroy-action)
+    (new window-host% (scrolling scrolling) (destroy-action destroy-action))))
+(define (set-window-host-maker! maker) (set! window-host-maker maker))
+(define (make-window-host scrolling destroy-action)
+  (window-host-maker scrolling destroy-action))
+
+;;-----------------------------------------------------------------------------
+;; The graphics files, in metacat.ss's load order
+
+(include "constants.rktl")             ; constants.ss (graphics part)
+(include "general-graphics.rktl")      ; general-graphics.ss (windows)
+(include "workspace-graphics.rktl")    ; workspace-graphics.ss
+
+;;-----------------------------------------------------------------------------
+;; port: attaching views to a run, and pictures of them
+
+;; The Workspace window, as (setup) makes it, with workspace graphics on.
+;; gui.ss's speed settings are set as at full speed with no flashing (the
+;; speed slider sets them once the control panel exists).  Call before
+;; init-mcat.  Returns the window.
+(define (attach-workspace-view! [width 800])
+  (set! %num-of-flashes% 1)
+  (set! %flash-pause% 0)
+  (set! %snag-pause% 0)
+  (set! %codelet-highlight-pause% 0)
+  (set! %text-scroll-pause% 0)
+  (set! *workspace-window* (make-workspace-window width))
+  (set! %workspace-graphics% #t)
+  *workspace-window*)
+
+;; the visible part of a graphics window, as a bitmap
+(define (window->bitmap window)
+  (let* ((vp (tell window 'get-vp))
+         (bm (make-bitmap (send vp get-width) (send vp get-height) #f))
+         (dc (new bitmap-dc% (bitmap bm))))
+    (send vp render dc)
+    bm))
+
+(define (save-window-png window file)
+  (send (window->bitmap window) save-file file 'png))

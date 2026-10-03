@@ -87,9 +87,11 @@
                  #:weight (if (memq 'bold style) 'bold 'normal)
                  #:style (if (memq 'italic style) 'italic 'normal)
                  #:underlined? (and (memq 'underline style) #t)
-                 ;; grey-level antialiasing, as Xft draws Tk's text; no
-                 ;; subpixel colour fringes, whatever the desktop's setting
-                 #:smoothing 'partly-smoothed))
+                 ;; aliased, as X11's core fonts drew Tk's text in the
+                 ;; dissertation's screenshots; the graphics erase text by
+                 ;; drawing it again in the background colour, which leaves
+                 ;; grey fringes around antialiased text (item 13)
+                 #:smoothing 'unsmoothed))
     (define/public (get-font) font)
     (define/public (get-family) face)
     (define/public (get-size) size)

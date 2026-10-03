@@ -130,15 +130,17 @@
     (define resize-handler nop-event-handler)
     (define left-press-handler nop-event-handler)
     (define right-press-handler nop-event-handler)
-    ;; port: the display list, oldest item first, and the scroll position
-    ;; (the canvas coordinates of the visible window's top left corner)
+    ;; port: the display list, newest item first (get-items gives it oldest
+    ;; first), the scroll position (the canvas coordinates of the visible
+    ;; window's top left corner) and the scroll region (the canvas size)
     (define items '())
+    (define scroll-region (list 0 0 width height))
     (define scroll-x 0)
     (define scroll-y 0)
     (define changed-callback void)
 
     (define/private (add-item! tag kind coords . options)
-      (set! items (append items (list (item (tag->tags tag) kind coords options 'normal))))
+      (set! items (cons (item (tag->tags tag) kind coords options 'normal) items))
       (changed-callback))
 
     (define/private (matches? it tag)
@@ -157,9 +159,13 @@
     (define/public (get-height) height)
     (define/public (set-size! w h) (set! width w) (set! height h) (changed-callback))
     (define/public (set-scroll-position! x y) (set! scroll-x x) (set! scroll-y y))
-    (define/public (get-items) items)
+    (define/public (get-scroll-position) (list scroll-x scroll-y))
+    (define/public (set-scroll-region! x1 y1 x2 y2)
+      (set! scroll-region (list x1 y1 x2 y2)))
+    (define/public (get-scroll-region) scroll-region)
+    (define/public (get-items) (reverse items))
     (define/public (set-changed-callback! f) (set! changed-callback f))
-    (define/public (render dc) (render-items dc items background-color width height
+    (define/public (render dc) (render-items dc (reverse items) background-color width height
                                              scroll-x scroll-y))
 
     (define/public (set-resize-handler! resize)
@@ -192,7 +198,7 @@
       (add-item! tag 'rectangle
 	(list (x->pixel x1 0) (y->pixel y1 0) (x->pixel x2 0) (y->pixel y2 0))
 	(cons 'outline fg) (cons 'fill fg))
-      (set-item-state! (car (reverse items)) 'hidden))
+      (set-item-state! (car items) 'hidden))
     (define/public (draw-line-segments fg lw ls ox oy points tag)
       (let loop ((points points))
 	(unless (null? points)
@@ -301,13 +307,14 @@
               (if (null? cs) '()
                   (cons (+ (car cs) dx) (cons (+ (cadr cs) dy) (loop (cddr cs))))))))))
     ;; Tk: raise the items with the tag above all others, keeping their order
+    ;; (items is newest first, so the raised ones go in front)
     (define/public (raise tag)
       (let-values (((raised others)
                     (let loop ((l items) (r '()) (o '()))
                       (cond ((null? l) (values (reverse r) (reverse o)))
                             ((matches? (car l) tag) (loop (cdr l) (cons (car l) r) o))
                             (else (loop (cdr l) r (cons (car l) o)))))))
-        (set! items (append others raised))
+        (set! items (append raised others))
         (changed-callback)))
     (define/public (unhide tag)
       (for-tag tag (lambda (it) (set-item-state! it 'normal))))

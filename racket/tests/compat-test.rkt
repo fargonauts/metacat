@@ -35,6 +35,16 @@
 (let ([r 'mine])
   (check-equal? (record-case '(msg 1) (msg (x) (list r x)) (else 'no)) '(mine 1)))
 
+;; Chez's record-case binds formals with car/cdr, so extra arguments are
+;; ignored (trace.ss sends draw-string-letters a string and a tag; the
+;; Workspace window's method takes the string only), and too few raise
+(check-equal? (record-case '(msg 1 2 3) (msg (x) x) (else 'no)) 1)
+(check-equal? (record-case '(msg 1 2 3) (msg () 'none) (else 'no)) 'none)
+(check-equal? (record-case '(msg 1 2 3) ((msg other) (x . more) (list x more)) (else 'no))
+              '(1 (2 3)))
+(check-equal? (record-case '(msg 1 2) (msg all all) (else 'no)) '(1 2))
+(check-exn exn:fail? (lambda () (record-case '(msg 1) (msg (x y) y) (else 'no))))
+
 ;; extend-syntax keywords are matched by name, even when bound locally
 (let ([from 'f] [to 't] [each 'e] [in 'i])
   (let ([acc '()])

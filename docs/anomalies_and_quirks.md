@@ -202,6 +202,15 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   after it, 2 tests fail.
 - **Status:** worked around in `racket/tests/diff-runner.rkt` (compilation manager,
   created inside the namespace). Mutation scripts wait one second around each edit.
+- **Update (iteration 14, item 13):** the same trap across modules. headless.rkt's
+  `run-problem` gained a keyword argument, but `raco test racket/` and plain `racket`
+  (cli-test.rkt runs `racket racket/cli.rkt`) loaded the old `cli_rkt.zo`, compiled
+  against the old headless.rkt: "instantiate-linklet: mismatch; reference to a variable
+  that is not exported". The gate failed with 39 failures in cli-test.rkt.
+  tests/run-tests.sh now runs `raco make` on every module of racket/ before
+  `raco test`. A mutation restored in the same second as the mutated compile also left
+  one stale `.zo` (bridge-graphics.rktl); the mutation script now waits before
+  restoring too.
 
 ### Chez evaluates `append`'s second argument first
 - **Seen:** iteration 8 (item 07): the codelet harness, `abc abd iijjkk` seed 3, the
@@ -253,7 +262,42 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** racket/tests/sgl-test.rkt checks the dash pixels along a line (fails
   with `(1 1 1 1 1 1 1 0 …)` without the fix).
 - **Status:** worked around in racket/gui/sgl.rkt: a thin run (a whole path, or one
-  dash) stops one pixel step short of its last point; fonts use `'partly-smoothed`.
+  dash) stops one pixel step short of its last point; fonts used `'partly-smoothed`
+  until item 13, and are `'unsmoothed` since (see "Erasing antialiased text leaves
+  fringes").
+
+### Chez's `record-case` ignores extra arguments; the port's raised
+- **Seen:** iteration 14 (item 13), the first run with the Workspace window attached.
+- **What:** the Temporal Trace (trace.ss lines 442 and 473–478) sends the Workspace
+  window `(draw-string-letters string 'answer)`, with a tag the window's method
+  `(draw-string-letters (string) ...)` doesn't take. Chez's `record-case` binds the
+  formals with `car`/`cdr` (`(expand '(record-case r [(a) (x) x]))` shows it), so the
+  extra argument is ignored and too few arguments raise "car: () is not a pair". compat's
+  `record-case` applied a `lambda`, which raised an arity error at the first answer of
+  every run once workspace graphics were on.
+- **Evidence:** racket/tests/compat-test.rkt (extra, missing and rest arguments);
+  without the fix, racket/tests/workspace-view-test.rkt fails on every run that reaches
+  an answer.
+- **Status:** worked around. compat's `record-case` binds as Chez does (item 13).
+
+### The graphics erase text by overpainting, which leaves fringes around antialiased text
+- **Seen:** iteration 14 (item 13), the first renders of the Workspace window.
+- **What:** to erase, the original draws the same pexp again in the background colour.
+  Over antialiased text this leaves grey fringes: a ghost "?" where the answer's letters
+  went, and smears after concept mappings whose font changed from irrelevant (italic) to
+  relevant (bold italic).
+- **Evidence:** set `#:smoothing 'partly-smoothed` in racket/gui/fonts.rkt and run
+  `racket racket/tests/views-harness.rkt mrrjjj-answer /tmp/a.png`.
+- **Status:** worked around. Text is drawn aliased, as X11's core fonts drew it in the
+  dissertation's screenshots (divergences.md).
+
+### Image-mode text boxes are narrower than italic glyphs
+- **Seen:** iteration 14 (item 13), the bridge labels (yellow boxes) in 4× crops.
+- **What:** `draw-text` sizes an image-mode text's background box from the text's
+  width. Italic digits overhang it by a pixel or two on the right.
+- **Evidence:** the snapshots in racket/tests/snapshots/workspace-*.png.
+- **Status:** not a bug, as far as anyone can tell: Tk sized the box the same way. Item 12
+  ported sgl-interpreter.ss's arithmetic verbatim. Kept.
 
 ## 🔗 Hidden couplings
 
@@ -404,6 +448,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `'eraser`); racket/gui/sgl.rkt's viewport keeps them in its display list.
 - **Status:** not a bug; ported verbatim. If long runs in the GUI get slow, this is the
   first place to look.
+
+### Workspace graphics write graphics state into model objects, but draw no random numbers
+- **Seen:** iteration 14 (item 13).
+- **What:** with `%workspace-graphics%` on, the model calls the graphics files directly.
+  Groups compute their graphics coordinates (`set-graphics-parameters`), and bridges
+  number their labels (`new-bridge-label-number`) and set concept-mapping pexps.
+  Images store group pexps (images.ss line 207). Answers lay out the translated string
+  (`init-translated-string-graphics`). The Memory makes answer-description pexps
+  through the Trace (`make-answer-description-pexp`, which draws on the Workspace window
+  in cache mode and takes the cached pexp back). The EEG records values each update.
+  Groups and bridges also keep a `drawn?` flag that only the graphics set. A run could
+  diverge if any of this drew from the generator or changed what the model reads.
+- **Evidence:** racket/tests/workspace-view-test.rkt: all 109 golden runs give identical
+  traces with the Workspace window attached, and a mutation that makes `bridge-graphics`
+  draw one random number makes them differ.
+- **Status:** explained: none of it draws or feeds back into the model's choices. The
+  ported graphics are verbatim, so this also holds for the original.
+
+### `update-rule-pexps!` mutates pexps shared with the rules
+- **Seen:** iteration 14 (item 13), porting rule-graphics.ss.
+- **What:** on a resize, the Workspace window recomputes the rule pexps inside each
+  answer and snag description in the Memory, in place with `set-car!`. Those
+  `(rule ...)` cells are shared with the rules' own pexps, which the window recomputes
+  just before with `initialize-rule-graphics`, so in the original both end up new.
+- **Evidence:** rule-graphics.ss line 77; workspace-graphics.ss `update-rule-pexps`.
+- **Status:** worked around. Racket's pairs are immutable, so the port's
+  `update-rule-pexps!` returns an updated copy and the window stores it in the
+  description. tests/diff/graphics-battery.scm checks the result against the
+  original's mutated pexp.
 
 ## 🛸 UFO sightings
 

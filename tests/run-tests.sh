@@ -13,6 +13,13 @@ if [ -z "$SCHEME" ]; then
   exit 1
 fi
 
+# Compile every module first, through the compilation manager: raco test and
+# plain `racket` (cli-test.rkt runs racket/cli.rkt) load a module's .zo
+# without checking its dependencies, so a changed module could leave others'
+# .zo files stale (docs/anomalies_and_quirks.md).
+echo "== raco make racket/"
+find racket -name '*.rkt' -not -path '*/compiled/*' -print0 | xargs -0 raco make
+
 echo "== raco test racket/"
 raco test racket/
 

@@ -254,11 +254,12 @@
                              (cons 'temperature (tell event 'get-temperature)))))
                    (apply window self msg))))
   (set-global! '*temperature-window* (make-null-window 'temperature '(initialize update-graphics)))
-  (set-global! '*EEG-window* (make-null-window 'EEG '(initialize)))
+  (set-global! '*EEG-window* (make-null-window 'EEG '(initialize plot-current-values)))
   ;; eeg-graphics.ss's EEG object (not ported yet): a headless run only
   ;; initializes it (the Workspace's initialize); recording is gated by
-  ;; %workspace-graphics%, and the model never reads it
-  (set-global! '*EEG* (make-null-window 'EEG-object '(initialize)))
+  ;; %workspace-graphics% (on when a Workspace view is attached), and the
+  ;; model never reads it
+  (set-global! '*EEG* (make-null-window 'EEG-object '(initialize record-current-values)))
   (let ([coderack-graphics (make-null-window 'coderack-graphics '(set-last-codelet-type))])
     (for-each
       (lambda (type)
@@ -401,14 +402,17 @@
 (define (partial-trace) the-partial-trace)
 
 ;; strings: 3 or 4 symbols; seed: 1 to 2^32-1; cap: a codelet count or #f.
-;; Returns why the run stopped: suspend, cap or halt.
-(define (run-problem strings seed cap keep? [trace-port #f])
+;; views: #f, or a thunk that attaches views (racket/gui/views.rkt) to the
+;; run once the headless windows are installed; watching must not change
+;; the run.  Returns why the run stopped: suspend, cap or halt.
+(define (run-problem strings seed cap keep? [trace-port #f] #:views [views #f])
   (unless installed?
     (install-headless-windows!)
     (install-trace!)
     (set-global! 'break headless-break)
     (set-global! 'quiet-break headless-break)
     (set! installed? #t))
+  (when views (views))
   (set! out trace-port)
   (set! last-themes #f)
   (set! answers '())

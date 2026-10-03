@@ -80,8 +80,23 @@
            (lambda () ((engine 'same-direction?) 'a 'b)))
 (check-true (procedure? (engine 'group-graphics)))
 
-;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'restore-current-state))))
+;; names from files not ported yet are #f (no pending procedures are left
+;; since item 13)
+(check-false (engine '%coderack-codelet-count-font%))
+
+;; the graphics files' pexp builders (item 13) are the engine's; the colours
+;; and fonts the views install are #f until views are loaded, and
+;; restore-current-state raises
+(for ([name '(circle outline-box solid-box arrowhead dotted-line-points dashed-line-points
+              zigzag-line-points elliptical-arc break-into-lines make-group-pexp
+              draw-group-grope bridge-graphics make-bridge-pexp draw-bridge-grope
+              new-bridge-label-number initialize-rule-graphics update-rule-pexps!
+              make-new-rule-pexp)])
+  (check-true (procedure? (engine name)) (symbol->string name)))
+(for ([name '(=white= %top-bridge-color% %default-fg-color% *fg-color* %rule-font%
+              %bridge-label-font% %group-letter-category-font%)])
+  (check-false (engine name) (symbol->string name)))
+(check-exn #rx"no views are loaded" (lambda () ((engine 'restore-current-state))))
 
 ;; run.ss (item 11)
 (for ([name '(ss step-mode-on step-mode-off runtil clear-breakpoint break quiet-break go

@@ -51,7 +51,10 @@ port (`tests/golden/`).
   each run's first answer, with fakes for the Trace and Memory, item 09) or, after
   `tests/diff/sgl-chez-setup.ss`, `tests/diff/sgl-battery.scm` (item 12: the setup
   redefines `send` to record the viewport messages and reloads the original's
-  `sgl-interpreter.ss` against it; diff-eval.ss takes any number of files). It prints one canonical result per
+  `sgl-interpreter.ss` against it; diff-eval.ss takes any number of files), or
+  `tests/diff/graphics-battery.scm` (item 13: the pexp builders of
+  general-, group-, bridge- and rule-graphics.ss against a recording Workspace
+  window). It prints one canonical result per
   `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
   for batteries that set the original's globals. The Racket side is
   `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`

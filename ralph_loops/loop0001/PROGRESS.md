@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 13/18 SOLVED
+- **Current**: 14/18 SOLVED
 
 ---
 
@@ -1403,3 +1403,149 @@ Item 12 (The SGL interpreter on racket/draw): **SOLVED**.
   - Always bind a font before `text` (see anomalies).
   - For PNG inspection: `render-viewport` in sgl-fixture.rkt shows how to
     paint a viewport into a bitmap.
+
+---
+
+## Iteration 14 — 2026-10-03 02:46
+Item 13 (Workspace, bridge, group and rule graphics): **SOLVED**.
+
+### Completed
+- **Where the code went** (porting-notes.md, item 13). The model calls the graphics
+  files directly when `%workspace-graphics%` is on, so the port splits them by need:
+  - **Engine** (no racket/draw): general-graphics.ss's pexp builders and text helpers
+    (`engine/general-graphics.rktl`), and group-, bridge- and rule-graphics.ss
+    (`engine/*-graphics.rktl`, verbatim, included in load order).
+    - `engine/view-globals.rktl` declares as `#f` what the model reads but the
+      graphics define: constants.ss colours, `=white=` …, `*fg-color*`, the 11
+      Workspace fonts, `restore-current-state`. All are in `set-global!`.
+    - pending.rktl has no pending procedures left. The early copy of
+      `find-next-space-position` is gone.
+  - **Views**: `racket/gui/views.rkt` (racket/draw, no racket/gui) includes
+    `gui/constants.rktl` (constants.ss's graphics part), `gui/general-graphics.rktl`
+    (`make-graphics-window`, the text window) and `gui/workspace-graphics.rktl`.
+    - `racket/gui/engine-route.rkt` gives it a `define`/`set!` that, for names
+      imported from the engine, expand to `set-global!`. So the included files stay
+      verbatim, and loading views.rkt installs colours and fonts in the engine, as
+      metacat.ss loading the files did.
+    - SWL's toplevel and frame become a window host: offscreen `window-host%` now,
+      replaceable with `set-window-host-maker!` by item 15.
+    - `attach-workspace-view!` makes the window as `(setup)` does and turns workspace
+      graphics on, with gui.ss's speed settings at full speed and no flashing.
+      `window->bitmap` and `save-window-png` take pictures.
+  - `racket/headless.rkt`: `run-problem` takes `#:views thunk`. The headless EEG
+    windows accept the two messages that workspace graphics add.
+- **Port changes** (marked `port:`):
+  - `update-rule-pexps!` returns a copy instead of `set-car!`, and the window stores it;
+  - in `make-graphics-window`: the host, `viewport%` with `set-scroll-region!`, the
+    title, and scrolling without waiting for a Tk scrollbar;
+  - SWL thread and queue stand-ins on Racket threads.
+- **Bugs found and fixed on the way:**
+  1. compat's `record-case` applied a lambda, so extra arguments raised. Chez binds
+     with `car`/`cdr` and ignores them, and trace.ss sends the Workspace window
+     `draw-string-letters` with an extra tag. Every run with graphics on crashed at
+     its first answer until this was fixed.
+  2. Erasing by overpainting left grey fringes around antialiased text (a ghost "?",
+     smears after concept mappings that changed font). Text is now aliased, as X11's
+     core fonts were in the dissertation's screenshots (divergences.md). The
+     sgl-fixture snapshot was regenerated after I inspected it (only text pixels
+     changed).
+  3. `viewport%` appended each item to its display list, which is quadratic over a
+     run. It now prepends; `get-items` and `render` still see oldest first.
+  4. Stale `.zo` files made the first gate run fail (39 failures in cli-test.rkt), so
+     tests/run-tests.sh now runs `raco make` on every module before `raco test`.
+- **Tests**:
+  - `tests/diff/graphics-battery.scm` (50 tests) + `racket/tests/graphics-diff-test.rkt`,
+    Chez with the original vs the engine:
+    - every pexp builder, with flonum coordinates bit for bit (`make-polar`, `angle`
+      and `acos` agree);
+    - group and bridge pexps at every proposal level, gropes, and every
+      `group-graphics`/`bridge-graphics` operation against a recording window;
+    - `initialize-rule-graphics`, `make-new-rule-pexp`, `update-rule-pexps!`,
+      `new-bridge-label-number`.
+  - **`racket/tests/workspace-view-test.rkt`**:
+    - **All 109 golden runs with the Workspace window attached give traces identical
+      to tests/golden/ (watching changes nothing).** The windows were drawn into: over
+      10,000 display items in all.
+    - The original's crash run crashes at the same point, with the same trace, with
+      the view attached.
+    - Pixel snapshots of six scenes (`racket/tests/snapshots/workspace-*.png`).
+    - views.rkt never loads racket/gui.
+    - About 50 s. Runs go through the new `racket/tests/golden-pool.rkt`, which
+      golden-test.rkt now uses too.
+  - compat-test.rkt: `record-case` with extra, missing and rest arguments.
+    engine-test.rkt: the builders and view globals.
+- **Tests first, honestly:**
+  - The `record-case` tests were written first and failed (2 of 37, arity mismatch).
+  - The port of the graphics code came before the battery and the view test: I needed
+    a working window to see what to test. The battery agreed on the first run once its
+    fakes stopped calling slipnodes (which are procedures) as methods. Before that, 4
+    tests were `ERROR` on both sides, which I noticed and fixed.
+  - The view test's first runs failed on harness problems: a stale `.zo`, bitmaps from
+    another namespace's class system, and snapshots that didn't exist yet.
+- **Mutation checks**, each restored afterwards:
+
+  | Mutation | Caught by | Failures |
+  | --- | --- | --- |
+  | group arrowhead angle 60 → 45 | battery | 2 |
+  | bridge arc height 15/100 → 20/100 | battery | 2 |
+  | dashed-line minimum dashes 3 → 2 | battery | 1 (only after adding `dashed-line-short`) |
+  | rule y-extra 3/5 → 1/2 | battery | 1 |
+  | centered zigzag `opp` swapped | battery | 4 |
+  | bridge label numbering off by one | battery | 1 |
+  | letter font 28/600 → 27/600 | snapshots | 6 |
+  | answer's top rule drawn in the bottom colour | snapshots | 3 |
+  | window `draw` ignoring `*fg-color*` | snapshots | 5 |
+  | `bridge-graphics` draws one random number | goldens with views | 119 |
+  | `record-case` back to applying a lambda | goldens with views | 103 |
+
+- **What I saw in the renderings** (Read on each PNG, plus 4× crops):
+  - `mrrjjj-513` (`abc abd mrrjjj` seed 1, at the 513 codelets of the dissertation's
+    figure p224-541): the same layout as that figure. Bold italic serif letters, the
+    double arrows, top bonds as elliptical arcs and a dotted proposed one, a group box
+    around `abc` with its arrowhead, groups `R` and `J` with letter-category labels,
+    zigzag vertical bridges with yellow number labels, a dotted proposed bridge, and
+    the concept-mapping lists (`¹lmost=>lmost letter=>letter`) at the bottom left.
+  - `mrrjjj-answer`: the answer `mrrjjk`. Top bridges in red, bottom in blue, the
+    slipped vertical bridge in violet, the rules in their double-bordered red and blue
+    boxes.
+    - First render: a ghost "?" and smeared superscripts, which led to aliased text.
+    - Clean after the fix. Label "3" looked boxless at 1×, but the crop shows its
+      yellow box.
+  - `xyz-snag-event`: the first try had "Event 5: Snag" over "Workspace", because the
+    scene skipped the event's `clear`. Fixed in the harness. Now it looks like the
+    dissertation's event views (p233-621): faded grey structures, the snag object `z`
+    and the translated rule in orange, `???` in orange.
+  - `xyz-answer` and `xyz-answer-description`: run7's `wyz`, as in Figs. 5.10/5.11.
+    Crossed vertical bridges, the spanning-group bridge with its concept-mapping list,
+    `pred=>succ` highlighted in magenta. The description adds green theme-supporting
+    mappings under the title "Answer Description".
+  - `xyd-justify`: the justify run's answer string `xyd` with its bonds.
+  - Italic digits overhang their yellow boxes by a pixel (anomalies; the box
+    arithmetic is the original's).
+- Docs:
+  - porting-notes.md: new item 13 section;
+  - divergences.md: windows, aliased text, speed settings;
+  - anomalies_and_quirks.md: `record-case`, text fringes, image-text boxes, graphics
+    state without random draws, shared rule pexps, the stale-`.zo` update;
+  - chez_scheme/oracle/README.md.
+- `python3 ralph_loops/loop0001/gate.py`: **GATE PASSED** (`raco test racket/`: 1438 tests;
+  about 6 min). `chez_scheme/original/` untouched;
+  tests/golden/ untouched.
+
+### Blockers
+- None.
+
+### Next
+- Item 14 (the other panels). Notes:
+  - Add each graphics file to views.rkt's includes in load order.
+  - Names the engine reads move from pending.rktl to view-globals.rktl (and
+    `set-global!`): `%coderack-codelet-count-font%`, the EEG's `*EEG*`, and the early
+    copies `group-event-pexp-text-string` and `relation-name`.
+  - engine-route.rkt's `define` installs them.
+  - Each window is made with `make-graphics-window`, which gives an offscreen host;
+    `window->bitmap` takes its picture.
+  - Attach views through `run-problem`'s `#:views`, and keep workspace-view-test's
+    "goldens with views" check, extended to all the panels.
+  - The Trace's and Memory's `display` methods drive the Slipnet, Themespace,
+    Coderack and Temperature windows, so their views are testable once those exist.
+  - The gate is about 7–8 min.

@@ -1146,8 +1146,9 @@ fonts.ss's `make-mfont`, `get-actual-font-values`, `get-actual-font-size`,
   (`*hidden-canvas*`), so no logo window is needed; `create-mcat-logo` (a
   racket/gui window) comes with the control panel, as do
   `*scrollbar-width*`/`*scrollbar-height*` (`#f` until then). Text
-  antialiasing is greyscale (`'partly-smoothed`). These are in
-  divergences.md.
+  antialiasing was greyscale (`'partly-smoothed`); item 13 made text aliased
+  (`'unsmoothed`), because the graphics erase text by overpainting. These are
+  in divergences.md.
 - constants.ss's `(make <rgb> r g b)` → an immutable `color%`;
   `swl-color-rgb` gives the components back (for tests).
 
@@ -1195,3 +1196,99 @@ fonts.ss's `make-mfont`, `get-actual-font-values`, `get-actual-font-size`,
   | text 1 pixel higher | 0 / 1 |
   | hidden items painted | 0 / 2 |
   | ring's inner disc outlined in fg | 0 / 1 (after a fix: filled ovals ignored their outline colour) |
+
+## Workspace, bridge, group and rule graphics (item 13)
+
+**Where the graphics code goes.** In the original, the graphics files are loaded into
+the same top level as the model, and the model calls them directly whenever
+`%workspace-graphics%` is on. The port splits them by what they need:
+- **The engine** (racket/engine.rkt, no racket/draw) gets the code that only builds SGL
+  expressions or messages `*workspace-window*`:
+  - `engine/general-graphics.rktl`: general-graphics.ss without its windows, i.e. the
+    pexp builders (circles, boxes, dotted/dashed/zigzag lines, arcs, arrows) and the
+    text helpers. It also has metacat.ss's `*platform*` (`'linux`, as the oracle's
+    prelude) and `*tcl/tk-version-8_3?*`;
+  - `engine/group-graphics.rktl`, `engine/bridge-graphics.rktl`,
+    `engine/rule-graphics.rktl`, verbatim but for the change below.
+
+  The early copy of `find-next-space-position` in pending.rktl is gone: it is the
+  file's own again.
+- **The views** (racket/gui/views.rkt, racket/draw but not racket/gui) include
+  `gui/constants.rktl` (constants.ss's graphics part: window sizes, colours, titles;
+  `swl-color` and `*color-names*` stay in colors.rkt), `gui/general-graphics.rktl`
+  (`make-graphics-window` and the scrollable text window) and
+  `gui/workspace-graphics.rktl`, in metacat.ss's load order.
+- **Globals both sides use.** engine/view-globals.rktl declares, as `#f`, every colour,
+  font and procedure that the model reads but the graphics files define: the
+  constants.ss colours, `=white=` …, `%default-fg-color%`/`*fg-color*`, the 11 fonts
+  that `select-workspace-fonts` creates by `set!`, and `restore-current-state`. All of
+  them are in `set-global!`'s list. racket/gui/engine-route.rkt gives views.rkt a
+  `define` and a `set!` that, for a name imported from engine.rkt, expand to
+  `(set-global! 'name value)` (module-level `define`s only; every `set!`). Everything
+  else is racket/base's. So the included files stay verbatim, and loading views.rkt
+  installs them in the engine as loading the files did in the original.
+- **Hooks.** The model's hooks to the views are the original's: `*workspace-window*`
+  and `%workspace-graphics%`. `attach-workspace-view!` makes the window as `(setup)`
+  does and turns graphics on. racket/headless.rkt's `run-problem` takes
+  `#:views thunk`, called after the headless windows are installed and before
+  `init-mcat`. With workspace graphics on, the model also sends `*EEG*`
+  `record-current-values` and `*EEG-window*` `plot-current-values`, so the headless
+  null windows accept those.
+
+**Changes (marked `port:`)**:
+- rule-graphics.ss's `update-rule-pexps!` returns an updated copy instead of using
+  `set-car!` (Racket's pairs are immutable), and workspace-graphics.ss's
+  `update-rule-pexps` stores the copy with `set-answer-description-pexp` /
+  `set-snag-description-pexp` (anomalies: shared rule pexps).
+- general-graphics.ss's `make-graphics-window`:
+  - SWL's toplevel and its frame or scrollframe become one window host
+    (`make-window-host`): `window-host%` offscreen, with title, geometry and no
+    scrollbars; item 15 installs on-screen hosts with `set-window-host-maker!`;
+  - the viewport is sgl.rkt's `viewport%` with `set-scroll-region!`;
+  - `set-window-title` asks the host instead of the viewport's grandparent;
+  - `reposition-vertical-scrollbar` scrolls the viewport (`set-scroll-position!`)
+    instead of waiting for a Tk scrollbar to appear;
+  - `get-scrollbar-from-frame` asks the host.
+- SWL stand-ins in views.rkt: `swl:sync-display` calls sgl.rkt's
+  `*flush-event-queue*` hook; `swl:screen-width`/`-height` return 1280×1024 (only read,
+  never used, by `set-window-size-defaults`); the resize listener's message queues,
+  `thread-fork`, `thread-sleep` and `critical-section` sit on Racket threads and a
+  semaphore; `thread-break` (the Workspace window's click handler, which `(go)`es the
+  REPL thread) raises until the control panel's engine thread exists;
+  `*theme-edit-mode?*` is `#f` until theme-graphics.ss is ported.
+- compat's `record-case` binds formals with `car`/`cdr`, as Chez does, so extra
+  arguments are ignored (anomalies; trace.ss relies on it).
+- sgl.rkt's `viewport%` keeps its display list newest first, since appending each item
+  was quadratic over a run. `get-items` and `render` still see the items oldest first.
+- fonts.rkt draws text aliased (`'unsmoothed`), because the graphics erase text by
+  overpainting (divergences.md).
+
+**Tests**:
+- `tests/diff/graphics-battery.scm` (50 tests) + `racket/tests/graphics-diff-test.rkt`,
+  Chez with the original vs the engine. It covers every pexp builder of
+  general-graphics.ss (flonum coordinates compared to the last bit, through
+  `make-polar`, `angle` and `acos`, which agree), the text helpers, `make-group-pexp` at
+  every proposal level, direction and span, `make-bridge-pexp` (horizontal, vertical,
+  spanning, letters and groups), bridge and group gropes, every `bridge-graphics` and
+  `group-graphics` operation against a recording Workspace window, `initialize-rule-graphics`,
+  `make-new-rule-pexp`, `update-rule-pexps!` (the port's copy against the original's
+  mutated pexp), and `new-bridge-label-number`. All agreed on the first run, once the
+  battery's fakes stopped calling slipnodes as methods.
+- `racket/tests/workspace-view-test.rkt`:
+  - all 109 golden runs with the Workspace window attached (on places, through the new
+    `racket/tests/golden-pool.rkt`, which golden-test.rkt now uses too): traces
+    identical to tests/golden/, and the window drawn into (over 10,000 items in all);
+  - the original's crash run (`abc ccbbaa ijk` seed 3) with the view attached crashes
+    in `caddr` at the same point, with the same trace as without;
+  - pixel snapshots of six scenes (racket/tests/views-harness.rkt):
+    - `mrrjjj-513`: `abc abd mrrjjj` seed 1 at 513 codelets, the moment of the
+      dissertation's p224-541;
+    - `mrrjjj-answer`: the same run at its answer;
+    - `xyz-snag-event`: run7 (`abc abd xyz` seed 3852097033), the Trace's view of its
+      snag;
+    - `xyz-answer` and `xyz-answer-description`: run7's answer `wyz`, and its
+      description in the Memory;
+    - `xyd-justify`: a justify run;
+  - views.rkt loads racket/draw and not racket/gui.
+- racket/tests/engine-test.rkt: the builders are engine procedures, and the view
+  globals are `#f` until views are loaded.

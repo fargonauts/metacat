@@ -65,7 +65,13 @@
 (include "engine/trace.rktl")          ; trace.ss
 (include "engine/jootsing.rktl")       ; jootsing.ss
 (include "engine/memory.rktl")         ; memory.ss
-(include "engine/group-graphics.rktl") ; group-graphics.ss (group-graphics only)
+;; the graphics files' pexp builders, which the model calls when
+;; %workspace-graphics% is on (their windows are in racket/gui/)
+(include "engine/general-graphics.rktl") ; general-graphics.ss (without the windows)
+(include "engine/group-graphics.rktl") ; group-graphics.ss
+(include "engine/bridge-graphics.rktl") ; bridge-graphics.ss
+(include "engine/rule-graphics.rktl")  ; rule-graphics.ss
+(include "engine/view-globals.rktl")   ; colours and fonts the views install
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
 ;; (set-global! 'name value): set! one of the engine's global variables from
@@ -118,4 +124,30 @@
     *this-run* *display-mode?* *running?* *interrupt?* *break-time*
     *step-mode?* %step-cycles% break quiet-break
     ;; run.ss: the rules battery (item 09) replaces them with fakes
-    suspend update-everything post-initial-codelets))
+    suspend update-everything post-initial-codelets
+    ;; engine/view-globals.rktl: installed by the views (racket/gui/views.rkt)
+    =white= =black= =grey= =red= =green= =blue= =yellow= =pink= =orange=
+    %vertical-slippage-color% %dim-vertical-slippage-color%
+    %coattail-inducing-slippage-color% %dim-coattail-inducing-slippage-color%
+    %top-bridge-color% %vertical-bridge-color% %bottom-bridge-color%
+    %bridge-label-background-color% %faded-bridge-label-background-color%
+    %top-rule-color% %bottom-rule-color% %snag-color%
+    %theme-supporting-concept-mapping-color%
+    %faded-workspace-structure-color% %workspace-event-structure-color%
+    %clamp-event-concept-pattern-color% %concept-activation-event-concept-pattern-color%
+    %concept-mapping-event-concept-pattern-color% %group-event-concept-pattern-color%
+    %top-rule-event-concept-pattern-color% %bottom-rule-event-concept-pattern-color%
+    %snag-event-concept-pattern-color%
+    %coderack-background-color% %current-codelet-color%
+    %extremely-low-urgency-color% %very-low-urgency-color% %low-urgency-color%
+    %medium-urgency-color% %high-urgency-color% %very-high-urgency-color%
+    %extremely-high-urgency-color%
+    %default-fg-color% *fg-color*
+    %group-letter-category-font% %relevant-group-length-font% %bridge-label-font%
+    %rule-font% %workspace-title-font% %codelet-count-font% %letter-font%
+    %irrelevant-group-length-font% %relevant-concept-mapping-font%
+    %irrelevant-concept-mapping-font% %concept-mapping-list-superscript-font%
+    restore-current-state
+    ;; gui.ss's speed settings (engine/pending.rktl), read by the windows
+    %num-of-flashes% %flash-pause% %snag-pause% %codelet-highlight-pause%
+    %text-scroll-pause%))
