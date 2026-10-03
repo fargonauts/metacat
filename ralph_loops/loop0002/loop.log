@@ -3,3 +3,9 @@
 [2026-10-03 18:20:07] claude session it01 (cap 3.00 h) -> session_it01.log
 [2026-10-03 18:26:41] session it01: ok (exit 0, 22 tool calls)
 [2026-10-03 18:27:32] tests passed: GATE PASSED
+[2026-10-03 18:27:34] committed c6832e7: 00 Skeleton and the fixture pipeline. Create `python/` as in TASK.md's
+[2026-10-03 18:27:43] pushed c6832e7 to origin
+[2026-10-03 18:27:43] === iteration 2: 01 The translation plan. Write `docs/python-translation-plan.md`, the equivalent
+[2026-10-03 18:27:43] claude session it02 (cap 3.00 h) -> session_it02.log
+[2026-10-03 18:44:20] session it02: ok (exit 0, 70 tool calls)
+[2026-10-03 18:44:53] tests passed: GATE PASSED

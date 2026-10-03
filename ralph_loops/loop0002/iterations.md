@@ -11,7 +11,7 @@
     say where it runs). Capture all batteries now. Tests: the pipeline round-trips; the
     fixture count per battery equals the battery's test count; `run-tests.sh` passes.
 
-- [ ] **01 The translation plan.** Write `docs/python-translation-plan.md`, the equivalent
+- [x] **01 The translation plan.** Write `docs/python-translation-plan.md`, the equivalent
     of numbo's translation audit. Read the Racket port's `compat.rkt`, `utilities.rkt`,
     every `port:` comment in `racket/engine/*.rktl`, and the docs listed in TASK.md. Then
     record:

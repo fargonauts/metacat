@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 1/18 SOLVED
+- **Current**: 2/18 SOLVED
 
 ---
 
@@ -64,3 +64,95 @@ Item 01: the translation plan (`docs/python-translation-plan.md`) and the
 object-system prototype with its micro-benchmark. Later items load expected values with
 `from chez_fixtures import chez`. If new Chez-side setup is needed for a fixture, add a
 capture script under `python/oracle/` instead of editing `tests/diff/`, which is frozen.
+
+---
+
+## Iteration 2 — 2026-10-03 18:43
+
+### Completed
+Item 01, the translation plan: **SOLVED**.
+- `docs/python-translation-plan.md`, the counterpart of numbo's translation audit. I read
+  compat.rkt, utilities.rkt, every `port:` comment and the six docs first. It records:
+  - every Chez semantic the engine depends on and its Python strategy:
+    - numbers: `Fraction` normalised to `int`, `chez.div`/`mul`/`max_`/`min_`/
+      `sqrt`/`exp`/`log`/`expt`, the PRNG, rounding, the flonum printer;
+    - evaluation-order sites with file and line (groups.ss:368–370, utilities.ss:690
+      `pairwise-map`, run.ss:234, `for*`, `stochastic-if*`, `~`, `wins-fight?`);
+    - `map`, `sort`, `remq`, `for-each`, `eq?`, truthiness, symbols vs strings,
+      one-armed `if`, `case`, `record-case`, top-level values and `eval`;
+    - continuations: escapes become exceptions; `break`/`go` becomes an exception
+      headless and a blocked engine thread in the GUI;
+    - printing.
+  - the object representation, with the benchmark (below);
+  - the module structure: one module per `.ss` file, definitions only at import time,
+    and a `load()` per module called in metacat.ss's order by `engine.py`. In-file
+    references are unqualified; cross-module references are always qualified
+    (`setup.g_temperature`); `chez`/`objects`/`sugar`/`utilities` are imported
+    directly. `engine.set_global` takes Scheme names. Goldens run in workers forked
+    after load.
+  - the name mapping;
+  - the order of the work and nine risks, ranked. Truthiness comes first: it's new
+    in Python, and Racket didn't have it.
+- New Chez facts, checked under `scheme --script`:
+  - `(* 0 1.5)` → `0` and `(/ 0 2.5)` → `0` (exact);
+  - `(max 3 2.0)` → `3.0`;
+  - `(exp 0)` → `1`, `(log 1)` → `0` and `(expt 0.0 0)` → `1`;
+  - a 2-binding `let` inside a lambda evaluates left to right (`12`), unlike the
+    documented top-level `21`. Logged in anomalies_and_quirks.md as an update to the
+    evaluation-order entry.
+- `python/oracle/count-calls.ss` (new) runs the unedited oracle run.ss with `tell` and
+  `delegate` wrapped. About 1,000 `tell`s per codelet, 12–17% of them delegated:
+  2,242,151 over the 2,170 codelets of abc abd xyz seed 3852097033. Output unchanged
+  (wyz at 2170).
+- Prototypes and tests:
+  - `python/tests/object_prototypes.py`: candidates A (closure + if/elif), B (closure +
+    dict of closures), C/C2/C3 (class per object with a message dict and the original
+    `(self, msg, *args)` protocol) and D (Python inheritance), plus `bench()`.
+    `python3 python/tests/object_prototypes.py` prints the table that is in the plan.
+  - **Decision: C3.** About 173 ns per message wherever it sits in the record-case,
+    297 ns delegated once, and 146 ns to create a child + parent. A costs 507 ns for
+    the 40th message; B costs 4.4 µs to create an object; D can't delegate to
+    separate objects.
+  - `test_object_prototype.py` (32 tests). A, B, C and C3 are checked against the Chez
+    fixtures of utilities-battery.scm's `tell`, `tell-args`, `tell-alias`,
+    `tell-invalid`, `base-object`, `delegate`, `delegate-to-all`(`-order`,
+    `-invalid`), `tell-all-order` and `record-case-no-else`, with a minimal `b:canon`.
+    Other tests cover self through delegation and forwarders, the `chez_map1` order,
+    and every candidate answering the benchmark object alike. The micro-benchmark
+    asserts only the orderings the decision rests on, with wide margins, and prints
+    the table.
+  - `python/tests/name_mapping.py` + `test_name_mapping.py` (29 tests). The mapping is
+    valid, non-reserved and injective on all of the original's 1,309 names (defines,
+    extend-syntax forms, codelet types, slipnodes), with 25 pinned examples.
+- Tests-first, honestly: here the prototypes *are* the code under test, so they were
+  written together with their tests. What the tests caught while being written:
+  - D failed the halt path ('ChildD' isn't callable);
+  - the self-through-delegation test hit the original's own infinite recursion (an
+    object without `object-type` that gets a bad message), and now delegates to
+    `base-object`;
+  - a wrong expectation (`plato-LetterCtgy` isn't a name; the nodes are
+    `plato-letter-category`);
+  - the first version of the self test covered only C. A `delegate_c3` mutation passed,
+    so the test now runs for C and C3.
+  Mutation checks, all restored afterwards:
+
+  | Mutation | Tests failing |
+  | --- | --- |
+  | `tell-all` left to right | 4 |
+  | `delegate` (C) passing the parent as self | 1 |
+  | `delegate_c3` passing the parent as self | 1 |
+  | `tell` not halting | 7 |
+  | `otherwise` without `else` returning invalid | 1 |
+
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (98 tests, 45 s).
+
+### Blockers
+None.
+
+### Next
+Item 02, `chez.py`. The plan's "Numbers" and "Lists" tables list what it needs. Capture
+the extra vectors (exact zero products, contagion, exact sqrt/exp/log/expt,
+`float(Fraction)` rounding, `math.tanh` against Chez) with a script in `python/oracle/`.
+`object_prototypes.chez_map1` is a first `map_` to promote. Item 03 builds `objects.py`
+from candidate C3 and moves `name_mapping.py` into the package as `metacat/names.py`.
+

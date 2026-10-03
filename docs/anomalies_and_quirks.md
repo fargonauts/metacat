@@ -213,6 +213,12 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   inlined `+` and `cons` go left to right. Racket always goes left to right.
 - **Status:** worked around. Every call site where argument order changes the order of
   random draws must be ported in Chez's order (`porting-notes.md`, `trace-format.md`).
+- **Update (loop0002, item 01):** a 2-binding `let` *inside a lambda* went left to right
+  under `scheme --script`: `((lambda () (let ((a (show 1)) (b (show 2))) 0)))` prints
+  `12`, while the documented top-level `let` prints `21`. In the same script, a 3-argument
+  call printed `312` both at top level and inside a lambda. The order depends on context,
+  so a site can't be read off a rule; docs/python-translation-plan.md lists the known
+  sites, which Python (left to right, like Racket) must order by hand.
 
 ### Chez's `map` applies its procedure in a strange order
 - **Seen:** iteration 4 (item 03).
