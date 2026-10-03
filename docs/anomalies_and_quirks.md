@@ -100,6 +100,19 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   for every horizontal bridge's LettCtgy description pair.
 - **Status:** won't fix (ported verbatim; the goldens depend on it).
 
+### `init-env`'s default font is a bare SWL font, which `draw-text` cannot `tell`
+- **Seen:** iteration 13 (item 12), rendering the SGL fixture.
+- **What:** sgl-interpreter.ss's `init-env` binds `font` to `(swl-font sans-serif 10)`,
+  an SWL `<font>` instance. The viewport's `draw-text` asks the font for its size with
+  `(tell font 'get-pixel-size text)`, which only works for the closures `make-fixed-font`
+  and `make-mfont` return. So a `(text ...)` drawn without a `(font ...)` binding in an
+  enclosing `let-sgl` fails, unless SWL instances happen to be applicable (not checked:
+  SWL is not available).
+- **Evidence:** `racket/tests/sgl-test.rkt` (`check-exn` on `(draw! vp '(text "x"))`):
+  the port fails with "application: not a procedure" on the `swl-font%` object.
+- **Status:** open, latent. Every panel seen so far binds a font before drawing text;
+  items 13–14 will show whether any panel relies on the default. Ported verbatim.
+
 ## 🌀 Anomalies
 
 ### Most documented demo seeds replay exactly; a few don't
@@ -227,6 +240,20 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   (`call-with-continuation-prompt`), and the reset handler must be set, not
   parameterized: a parameterization is part of the captured continuation, so `go` would
   bring back the first caller's dead escape. The GUI item has to respect both.
+
+### racket/draw's unsmoothed 1-pixel lines include their end point; Tk's don't
+- **Seen:** iteration 13 (item 12), the SGL fixture's dashes and polypoints.
+- **What:** with smoothing `'unsmoothed`, `draw-line` with a 1-pixel pen from x=2 to
+  x=8 paints 7 pixels, and a zero-length line paints one. X11 (and so Tk) draws a
+  butt-capped line of width 1 from p to q over the pixels before q: 6 pixels, so a
+  Tk dash "- " is 6 on, 6 off, and Tk's polypoints (lines one pixel long) are single
+  pixels. Pens of width 3 already paint exactly 6. Also, `make-font #:smoothing
+  'smoothed` gives subpixel (coloured) antialiasing on this desktop; `'partly-smoothed`
+  is the greyscale one.
+- **Evidence:** racket/tests/sgl-test.rkt checks the dash pixels along a line (fails
+  with `(1 1 1 1 1 1 1 0 …)` without the fix).
+- **Status:** worked around in racket/gui/sgl.rkt: a thin run (a whole path, or one
+  dash) stops one pixel step short of its last point; fonts use `'partly-smoothed`.
 
 ## 🔗 Hidden couplings
 
@@ -366,6 +393,17 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `grep -n "'delete-rule" chez_scheme/original/*.ss` finds nothing;
   `tests/diff/rule-battery.scm`'s traces contain no broken rule in 109 runs.
 - **Status:** not a bug, apparently by design; ported verbatim.
+
+### Erasing draws: the canvas only grows until a `clear`
+- **Seen:** iteration 13 (item 12), porting sgl-interpreter.ss.
+- **What:** `(erase color pexp)` and `erase!` don't delete anything: they draw pexp
+  again in the erase colour, as new Tk items tagged `eraser`. A window that erases and
+  redraws (the Workspace's structures, the Coderack's bars) keeps adding items until the
+  next `(clear)` or `delete`. The tag `eraser` also replaces the caller's tag.
+- **Evidence:** tests/diff/sgl-battery.scm's `erase-*` tests (all items carry
+  `'eraser`); racket/gui/sgl.rkt's viewport keeps them in its display list.
+- **Status:** not a bug; ported verbatim. If long runs in the GUI get slow, this is the
+  first place to look.
 
 ## 🛸 UFO sightings
 

@@ -86,7 +86,7 @@
     This test stays in `run-tests.sh` for the rest of the loop. Record run time per
     problem against the oracle.
 
-- [ ] **12 The SGL interpreter on racket/draw.** Fetch the dissertation PDF into
+- [x] **12 The SGL interpreter on racket/draw.** Fetch the dissertation PDF into
     `docs/reference/` and extract the screenshots of each panel. Port
     `sgl-interpreter.ss` to draw on a `racket/draw` `dc<%>` (rectangles, arcs, rings,
     polylines, dashed lines, text with justification, `let-sgl` origin/colour/font/line

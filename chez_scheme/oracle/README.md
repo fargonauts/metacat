@@ -48,7 +48,10 @@ port (`tests/golden/`).
   `tests/diff/codelet-harness.scm`) or `tests/diff/bridge-battery.scm` (the same
   harness with bridges, descriptions and the breaker enabled, item 08) or
   `tests/diff/rule-battery.scm` (the same harness with rules and answers too, up to
-  each run's first answer, with fakes for the Trace and Memory, item 09). It prints one canonical result per
+  each run's first answer, with fakes for the Trace and Memory, item 09) or, after
+  `tests/diff/sgl-chez-setup.ss`, `tests/diff/sgl-battery.scm` (item 12: the setup
+  redefines `send` to record the viewport messages and reloads the original's
+  `sgl-interpreter.ss` against it; diff-eval.ss takes any number of files). It prints one canonical result per
   `(test NAME EXPR)` form and defines `b:set-global!` (`set-top-level-value!`)
   for batteries that set the original's globals. The Racket side is
   `racket/tests/diff-runner.rkt`, used by `utilities-diff-test.rkt`

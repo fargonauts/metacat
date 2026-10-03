@@ -1085,3 +1085,113 @@ textual difference is the program name in the usage message.
   | single-letter problems: object category not activated | 3 / 3 |
   | strings made left to right in init-workspace | 0 (equivalent, above) |
   | no `garbage-collect` to the Themespace window | 0 (a null window) |
+
+## The SGL interpreter on racket/draw (item 12)
+
+**Files**: `racket/gui/sgl.rkt` (sgl-interpreter.ss), `racket/gui/fonts.rkt`
+(fonts.ss), `racket/gui/colors.rkt` (the colour part of constants.ss:
+`swl-color`, `*color-names*`, `=white=` … `=orange=`). They require racket/draw
+and racket/class, plus compat.rkt and utilities.rkt, never racket/gui, so they
+render offscreen without a display (sgl-test.rkt checks that racket/gui/base is
+not even declared). They are ordinary modules, not part of engine.rkt: the
+engine still knows nothing about drawing. Item 13 decides how the panel files
+reach them (the panels read engine globals).
+
+**What is verbatim**: `draw!`, `erase!`, `draw-exps`, `draw-exp`, `lookup`,
+`extend`, `extend*`, `empty-env`, `init-env`, `graphics-dash-pattern`,
+`generate-polyline-coords`, `nop-event-handler`, `default-press-handler`, and
+fonts.ss's `make-mfont`, `get-actual-font-values`, `get-actual-font-size`,
+`make-fixed-font` (but for the measuring line), the face lists, `select-face`,
+`serif`/`sans-serif`/`fancy`. racket/class's `send` has SWL's syntax
+`(send obj msg arg ...)`, so `send vp draw-...` lines are unchanged.
+
+**What changed, and why** (marked `port:` in the files):
+- SWL's `<viewport>` class (a Tk canvas) → `viewport%`. It takes the same
+  four coordinate procedures (`pixel->x` … `y->pixel`, made by
+  general-graphics.ss's `make-graphics-window`) and keeps every `draw-...`
+  method with its arguments and its `unless` guards. Where the original made a
+  Tk item with `tcl-eval ... 'create`, the port appends the same item (kind
+  rectangle/oval/arc/line/polygon/text, the same pixel coordinates, the same
+  options: outline, fill, width, dash string, start, extent, style, text,
+  anchor, font, state) to a display list. `move`, `move-pixels`, `raise`,
+  `unhide`, `retag`, `rescale`, `delete` act on the list as Tk acts on
+  items with a tag (`all` matches everything; `raise` keeps the raised items'
+  order). `render dc` paints the list; `set-changed-callback!` lets a GUI
+  canvas repaint; `set-scroll-position!` replaces Tk's `canvasx`/`canvasy`
+  in `mouse-press`, whose button argument is now `'left`, `'right` or
+  `'shift-left` instead of an SWL event-modifier set.
+- Painting emulates Tk 8.5 on X11: shapes unsmoothed (aliased, like the
+  dissertation's screenshots), Tk's dash strings converted as tkCanvUtil.c's
+  `DashConvert` does (`"- "` → 6 on 6 off, `". "` → 2 on 6 off, scaled by
+  the width), thin lines ending one pixel before their end point as X11's
+  butt caps do (anomalies), pie slices with their radii, text anchored at the
+  bottom centre (`-anchor s`). Solid arcs and ovals use racket/draw's own
+  curves; dashed ones are flattened to polylines first.
+- `tcl-eval`, `remove-unsupported-tcl-args` (Tk 8.0 workarounds) and
+  `my-screen->canvas-x/y` (an SWL 0.9u workaround) have no counterpart.
+- `*flush-event-queue*` was `swl:sync-display`; it is `void` until a GUI sets
+  it with `set-flush-event-queue!`.
+- `*platform*` (`'unix`), `*tcl/tk-version-8_3?*` and `%nice-graphics%` are
+  module constants; `graphics-dash-pattern` is their only reader and gives
+  `"- "` on Unix either way.
+- fonts.ss: SWL's `<font>` → `swl-font%` (face, size, style list; methods
+  `get-family`, `get-size`, `get-style`, `get-actual-values`, and `get-font`
+  for the racket/draw font). Sizes: positive = points, converted at a fixed
+  96 dpi; negative = pixels, as in Tk. Faces go to Pango by name with a
+  family fallback (times → roman, helvetica → swiss), so fontconfig picks
+  the substitute as Tk's Xft did. `swl:font-families` is racket/draw's face
+  list as lower-case symbols; on this machine none of the preferred faces is
+  installed, so `select-face` falls back to `times`, `helvetica`, `times`, as
+  it would have under Tk. `get-pixel-size` measures on a private bitmap dc
+  (`*hidden-canvas*`), so no logo window is needed; `create-mcat-logo` (a
+  racket/gui window) comes with the control panel, as do
+  `*scrollbar-width*`/`*scrollbar-height*` (`#f` until then). Text
+  antialiasing is greyscale (`'partly-smoothed`). These are in
+  divergences.md.
+- constants.ss's `(make <rgb> r g b)` → an immutable `color%`;
+  `swl-color-rgb` gives the components back (for tests).
+
+**Tests**:
+- `tests/diff/sgl-battery.scm` (50 tests) + `racket/tests/sgl-diff-test.rkt`:
+  the interpreter against the original. The prelude's `send` throws its
+  arguments away, so the Chez side (`tests/diff/sgl-chez-setup.ss`, a new
+  `#:chez-setup` option of `diff-runner.rkt`'s `check-battery`) redefines
+  `send` to call the receiver, defines a recording viewport and **reloads the
+  original's sgl-interpreter.ss** against it. The Racket side
+  (`racket/tests/sgl-recorder.rkt`) is a `recorder%` with the same methods.
+  Every message to the viewport, with every argument (colours as `(rgb r g b)`,
+  fonts as `'obj`), must be identical, for every form, every `let-sgl`
+  binding, nested and rational origins, all three justifications, erasing
+  (top level, nested, inside `let-sgl`, with a colour object), tags, `clear`,
+  `rule`, invalid expressions (both raise after drawing what came before),
+  and the environment (`lookup`'s dash strings and colours, `extend` ignoring
+  `origin`).
+- `racket/tests/sgl-test.rkt` (71 checks): colours; dash conversion; fonts
+  (styles, sizes, `print`, `show-char-info`, `resize`, the pixel matrix and
+  baseline offset); the viewport's items for shapes and text (centre and
+  baseline exactly as `draw-text` computes them, image-mode background),
+  degenerate shapes, `clear`, every tag operation, mouse presses with scroll
+  offset; painted pixels (fill, outline, background, hidden items, a dashed
+  line's 6-on-6-off pixels); change callbacks; and a pixel-for-pixel snapshot
+  of `racket/tests/sgl-fixture.rkt` (every form, plus the tag operations) in
+  `racket/tests/snapshots/sgl-fixture.png`. `METACAT_UPDATE_SNAPSHOTS=1`
+  rewrites the snapshot; on a mismatch the actual image goes to
+  `/tmp/sgl-fixture-actual.png`. The snapshot depends on the installed fonts.
+- Mutation checks on sgl.rkt, each restored afterwards:
+
+  | Mutation | sgl-diff-test / sgl-test failures |
+  | --- | --- |
+  | origin y taken from x | 2 / 5 |
+  | full oval from sweep > 360 instead of ≥ | 2 / 0 |
+  | dotted → dashed string | 2 / 1 |
+  | arc box y1 sign | 5 / 1 |
+  | `extend` binds `origin` | 1 / 0 |
+  | left justification offset sign | 0 / 4 |
+  | text-relative y without the baseline | 0 / 2 |
+  | dash lengths scaled by width+1 | 0 / 7 |
+  | dashed polypoint 3 pixels instead of 4 | 0 / 1 |
+  | `raise` puts the raised items below | 0 / 4 |
+  | thin lines not shortened | 0 / 2 |
+  | text 1 pixel higher | 0 / 1 |
+  | hidden items painted | 0 / 2 |
+  | ring's inner disc outlined in fg | 0 / 1 (after a fix: filled ovals ignored their outline colour) |

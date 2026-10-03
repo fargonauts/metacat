@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 12/18 SOLVED
+- **Current**: 13/18 SOLVED
 
 ---
 
@@ -1250,3 +1250,156 @@ printed output equals the live oracle's byte for byte.
     `group-event-pexp-text-string`, `relation-name`) and the graphics
     stand-ins move back to their graphics files as those are ported.
   - The gate is about 6 min.
+
+---
+
+## Iteration 13 — 2026-10-03 02:01
+Item 12 (The SGL interpreter on racket/draw): **SOLVED**.
+
+### Completed
+- **Dissertation and screenshots** in `docs/reference/`:
+  - `dissertation.pdf` (306 pages, 2.2 MB), fetched from Marshall's site.
+  - `figures/`: all 197 raster images larger than 100 × 100 pixels, extracted
+    unchanged with `pdfimages -png -p` and named by page (`pPPP-NNN.png`),
+    1.2 MB.
+  - `README.md` indexes them by panel: Workspace (Figs. 2.4–2.6, 3.1,
+    3.11–3.18 and the Chapter 5 runs), the Trace's event views, Answer
+    Description, Slipnet (Copycat's, Fig. 1.2) and the concept-pattern
+    views, Coderack, Top/Bottom/Vertical Themes, Temporal Trace,
+    Commentary, Episodic Memory. No figure shows the Temperature or EEG
+    windows on their own.
+- **`racket/gui/sgl.rkt`**: sgl-interpreter.ss on racket/draw. It requires
+  racket/draw and never racket/gui, so it renders offscreen.
+  - The interpreter (`draw!`, `erase!`, `draw-exps`, `draw-exp`, `lookup`,
+    `extend`, `extend*`, `init-env`, …) is line for line the original's.
+    racket/class's `send` has SWL's syntax.
+  - SWL's `<viewport>` becomes `viewport%`. It has the same `draw-...` methods
+    and guards. Where the original created a Tk canvas item, it records the
+    same item (kind, pixel coordinates, options, tags) in a display list.
+  - Tag operations work on that list as Tk's do: `move`, `move-pixels`,
+    `raise`, `unhide`, `retag`, `rescale`, `delete`. So do `clear` and
+    `draw-hidden-filled-rectangle`.
+  - `render dc` paints the list on any `dc<%>`, emulating Tk on X11:
+    - shapes are aliased;
+    - Tk's dash strings follow tkCanvUtil.c's `DashConvert`;
+    - pie slices are drawn with their radii;
+    - text is anchored at its bottom centre;
+    - thin lines stop one pixel short, as X11's do.
+  - The GUI items get hooks: a change callback, a scroll position for
+    `mouse-press`, and `set-flush-event-queue!`.
+- **`racket/gui/fonts.rkt`**: fonts.ss.
+  - SWL's `<font>` becomes `swl-font%`. Tk sizes are kept: points (converted
+    at a fixed 96 dpi) or negative pixels.
+  - Faces go to Pango with a family fallback. `select-face` falls back to
+    times/helvetica here, as it would have under Tk.
+  - Text is measured on a private bitmap dc instead of the logo window's
+    hidden canvas. `make-mfont` and `make-fixed-font` are verbatim apart
+    from that measuring line.
+  - **`racket/gui/colors.rkt`**: `swl-color`, the 752-entry
+    `*color-names*` and `=white=` … `=orange=` from constants.ss. Colours
+    are immutable `color%` objects.
+- **Tests**:
+  - **Differential battery**: `tests/diff/sgl-battery.scm` (50 tests) with
+    `racket/tests/sgl-diff-test.rkt`.
+    - The prelude's `send` drops its arguments. So the Chez side
+      (`tests/diff/sgl-chez-setup.ss`) redefines `send` to record, and
+      reloads the *original* sgl-interpreter.ss against a recording
+      viewport. `diff-runner.rkt`'s `check-battery` got a `#:chez-setup`
+      option for this.
+    - The Racket side is `racket/tests/sgl-recorder.rkt`.
+    - Every viewport message and every argument must match the original's:
+      every form, every `let-sgl` binding, nested and rational origins,
+      justifications, erasing, tags, `clear`, `rule`, invalid expressions
+      and the environment.
+  - **`racket/tests/sgl-test.rkt`** (71 checks):
+    - colours, dash conversion and fonts;
+    - the recorded items, including text centre and baseline exactly as
+      `draw-text` computes them;
+    - every tag operation, mouse presses, change callbacks;
+    - painted pixels (fill, outline, background, hidden items, a dashed
+      line's 6-on-6-off pixels);
+    - that racket/gui/base is never declared;
+    - **a pixel-for-pixel snapshot** of `racket/tests/sgl-fixture.rkt`
+      against `racket/tests/snapshots/sgl-fixture.png`.
+      `METACAT_UPDATE_SNAPSHOTS=1` regenerates it, and a mismatch writes
+      `/tmp/sgl-fixture-actual.png`.
+    - The fixture covers every SGL form plus move/raise/delete/retag/
+      hidden/unhide. `racket racket/tests/sgl-fixture.rkt OUT.png` renders
+      it by hand.
+- Tests first, honestly:
+  - The battery and the Chez setup came first. Under Chez they printed 50
+    results, which showed that `init-env` has no background colour and that
+    erased items are tagged `eraser`.
+  - Next came the recorder and the Racket test. That test failed: `cannot
+    open module file … racket/gui/sgl.rkt`.
+  - After the port, all 50 tests agreed on the first run.
+  - sgl-test.rkt and the fixture were written after the code. They then
+    found three rendering bugs, fixed below.
+- **What I saw in the renderings** (Read on the PNG and on 3–4× crops):
+  - First render: every cell came out right. Problems found:
+    - The label text had colour fringes: `'smoothed` is subpixel on this
+      desktop, so the port now uses `'partly-smoothed`, i.e. greyscale. I
+      checked that no pixel of the label has a hue now.
+    - The dash test showed 7-pixel dashes, because racket/draw's 1-pixel
+      lines include their end point.
+  - Fixing the dashes by shortening every segment wiped out the flattened
+    arcs (sub-pixel segments). Now each whole run, whether a path or a
+    single dash, stops one pixel step short.
+  - The width-2 circle looked octagonal. Solid arcs and ovals now use
+    racket/draw's own curves.
+  - Final image: dashed and dotted rectangles, a width-3 red square with
+    mitred corners, the arc, the oval, the dashed lower half-arc and the
+    pie are all clean. Polypoints are single pixels, and dashed polypoints
+    are 4-pixel dashes.
+  - The three justifications sit correctly against the red guide lines;
+    `text-relative` offsets by M-widths, and the image-mode text has its
+    background box.
+  - Of the erase cells, only the drawn parts are covered. The nested-origin
+    squares step as intended.
+  - Moved, raised, deleted (including a retagged text item) and
+    unhidden items all behave as expected.
+  - Against the dissertation's Workspace screenshots (e.g. figures
+    p077-093, p150-280): the same aliased one-pixel lines, bold italic serif
+    letters and short-dash rule boxes.
+- **Mutation checks**: 14 mutations of sgl.rkt, each restored afterwards. All
+  are caught, by the battery, the pixel tests or both (table in
+  porting-notes.md). The last of them exposed a real bug: filled ovals
+  ignored their outline colour, which matters for rings. Fixed.
+- Docs:
+  - porting-notes.md: new item 12 section.
+  - divergences.md, its first entry: Tk's canvas is emulated on racket/draw,
+    with fonts at a fixed 96 dpi, measuring without the logo window, and
+    `get-actual-values` reporting the request.
+  - anomalies_and_quirks.md, three new entries:
+    1. `init-env`'s default font is a bare SWL font that `draw-text`
+       cannot `tell` (latent; the port fails the same way).
+    2. racket/draw's thin lines include their end point.
+    3. Erasing adds items instead of deleting them.
+  - chez_scheme/oracle/README.md mentions the new battery.
+- `python3 ralph_loops/loop0001/gate.py`: **GATE PASSED** (`raco test
+  racket/`: 1112 tests). `chez_scheme/original/` is untouched, and so are
+  the goldens.
+
+### Blockers
+- None. Not done here, on purpose:
+  - `create-mcat-logo` (a racket/gui window) waits for the control panel;
+    until then `*scrollbar-width*`/`*scrollbar-height*` are `#f`.
+  - The panel colour and font constants of constants.ss come with the
+    panels.
+
+### Next
+- Item 13 (Workspace, bridge, group and rule graphics). Notes:
+  - general-graphics.ss's `make-graphics-window` should create a
+    `viewport%` with its `pixel->x` … `y->pixel` procedures. It must keep
+    `width-per-pixel`/`height-per-pixel` mutable, because the viewport
+    calls the procedures afresh for every item. racket/tests/sgl-fixture.rkt's
+    `make-test-viewport` copies those formulas.
+  - The panel files read engine globals and the engine's pending stand-ins
+    (`find-next-space-position`, `group-event-pexp-text-string`,
+    `relation-name`, the colour and font `#f`s). One option is a GUI module
+    that requires engine.rkt and sgl.rkt and includes the panel `.rktl`
+    files. Graphics then reach the engine only through its hooks, and the
+    headless goldens must still match with views attached.
+  - Always bind a font before `text` (see anomalies).
+  - For PNG inspection: `render-viewport` in sgl-fixture.rkt shows how to
+    paint a viewport into a bitmap.

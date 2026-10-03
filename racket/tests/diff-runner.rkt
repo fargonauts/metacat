@@ -18,14 +18,14 @@
 (define helpers (build-path repo "tests" "diff" "helpers.scm"))
 (define diff-eval (build-path repo "chez_scheme" "oracle" "diff-eval.ss"))
 
-(define (chez-output battery)
+(define (chez-output battery [setup '()])
   (define scheme (or (find-executable-path "scheme") (find-executable-path "chezscheme")))
   (unless scheme (error 'diff-runner "Chez Scheme not found"))
   (define out (open-output-string))
   (define ok?
     (parameterize ([current-output-port out]
                    [current-directory repo])
-      (system* scheme "--script" diff-eval helpers battery)))
+      (apply system* scheme "--script" diff-eval helpers (append setup (list battery)))))
   (unless ok? (error 'diff-runner "diff-eval.ss failed:\n~a" (get-output-string out)))
   (get-output-string out))
 
@@ -90,8 +90,11 @@
        (loop (cdr lines) (cons (string-append (car acc) "\n" (car lines)) (cdr acc)))]
       [else (loop (cdr lines) (cons (car lines) acc))])))
 
-(define (check-battery battery modules #:set-global! [set-global! #f])
-  (define chez (split-tests (chez-output battery)))
+;; chez-setup: Chez-only files evaluated between helpers.scm and the battery
+;; (the Racket side gets the same definitions from its modules)
+(define (check-battery battery modules #:set-global! [set-global! #f]
+                       #:chez-setup [chez-setup '()])
+  (define chez (split-tests (chez-output battery chez-setup)))
   (define rkt (split-tests (racket-output battery modules set-global!)))
   (define test-count
     (with-input-from-file battery
