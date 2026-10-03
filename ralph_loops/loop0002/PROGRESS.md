@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 6/18 SOLVED
+- **Current**: 7/18 SOLVED
 
 ---
 
@@ -665,3 +665,138 @@ Item 06, workspace. Engine modules may now import `slipnet` directly (`slipnet.p
 only if it resets slipnodes; trace.py's monitor is still a stand-in. Test files that
 change engine state should restore it when they end (see the new anomalies entry).
 test_slipnet.py's module fixture is a model for that.
+
+---
+
+## Iteration 7 — 2026-10-03 21:04
+
+### Completed
+Item 06, the Workspace: **SOLVED**.
+- **Tests first.** `python/tests/test_workspace.py` has one case for each of the 75 tests of
+  `tests/diff/workspace-battery.scm`, with the procedures of `tests/diff/workspace-dump.scm`
+  it loads translated in the test (`b:init-problem` as `init_problem`, the dumps,
+  `b:update-workspace-values`). Each case rebuilds the battery expression in Python with
+  the same order of draws and effects and compares its `b:canon` text with the frozen
+  fixture. `tests/problems.txt` is read at run time the way the battery reads it (36
+  problems, every seed). So the initial workspace of every problem is compared for every
+  seed, and so are the generator state after each seed, the slipnet activations and the
+  EEG messages. Other cases cover:
+  - live queries on 10 problem shapes;
+  - fakes for bonds, groups, bridges and rules;
+  - strings' tables and storage expansion;
+  - `update-temperature`, structure strengths and `wins-fight?`;
+  - the formulas and `tanh`.
+
+  Stand-ins (`engine_stubs.engine_module`) cover run.ss's `%update-cycle-length%` and
+  `*temperature-clamped?*`, plus the battery's own fake `*themespace*`, logging `*EEG*`
+  and `contains?`. The module fixture restores the setup and workspace globals, the top
+  level and the slipnodes. Structural tests check that:
+  - every `define` of the six files has its Python name;
+  - docstrings name their origin;
+  - no module imports tkinter;
+  - the modules load in order and `*workspace*` exists after load;
+  - building a workspace draws nothing.
+
+  I wrote the file before any of the six modules existed and ran it: **90 failed, 7
+  passed**. The 7 were the two meta tests, `ws-problem-count`, `ws-problem-rest` (an empty
+  list) and the three `tanh` tests, which only exercise chez.py. The failures were
+  `ModuleNotFoundError` for `metacat.workspace_strings` etc.
+- **Code** (new): `metacat/workspace.py` (`Workspace`; `load()` makes `*workspace*`),
+  `workspace_objects.py` (`Letter`, `WorkspaceObject`), `workspace_strings.py`
+  (`WorkspaceString`), `workspace_structures.py` (`WorkspaceStructure`, `wins-fight?`),
+  `workspace_structure_formulas.py` and `formulas.py`. Two subagents translated them into a
+  staging directory while I wrote the tests, and I copied them into the package only after
+  the failing run. I reviewed them against the originals. With the modules in place, all
+  97 tests passed on the first run.
+
+  One fix to item 04's code: descriptions.py's `print-name` returned `format`'s plain str,
+  which `b:canon` prints as a symbol. It now returns a `chez.String`; the dumps print it
+  as `"StringPos:lmost"`.
+- **Mutation checks** (`/tmp/mut6/mutate.py`, not kept; each mutant applied, then
+  test_workspace.py run with `-x`, then the file restored; `git status` confirmed). 38
+  mutants in two batches:
+  - **caught by the frozen battery (25):**
+    - workspace objects: the 2/3 factor in a group, the 300 cap, the 1/3 and 1/6 bond
+      factors, the 1/2 factor on a group's horizontal bridge;
+    - unhappiness and salience: the target's horizontal unhappiness without justify mode,
+      the justify-mode average with 2 terms, clamped salience 99, intra salience with
+      `floor`, inter salience weights swapped, average salience not rounded, the target's
+      justify-mode salience test inverted;
+    - strings: bond-scan values reversed, capacity 2n+1, relative importance 1/(n+1),
+      random letter reversed;
+    - workspace: mapping not halved, tanh 1/50, `~` with `<=`, built bridge left out of
+      the coincident bridges;
+    - formulas: temp-adjusted-values exponent, temperature weights 60/40, an exact
+      `low-prob-factor`, intrinsic-strength weights, challenger strength not updated, the
+      length-description cases `> 4` and `= 2`.
+  - **killed by a new local battery (8):** the 1/2 factor on a group's *vertical* bridge,
+    choosing a description by depth instead of activation, neighbours reversed,
+    relevance over n rather than n − 1 objects, `unrelated?` of a middle letter with
+    `< 1`, the oldest structures taken as the youngest, an exact `(min 1 ...)` in
+    `get-activity`, and the bond density compared as a float.
+    `python/oracle/batteries/workspace-extra-battery.scm` (8 tests: `group-vertical-bridge`,
+    `relevant-description-choices`, `neighbours-with-groups`, `relevance-with-bonds`,
+    `unrelated-one-bond`, `density-boundaries`, `activity-and-ages`, `activity-float-ties`)
+    loads the unedited workspace-dump.scm. It is captured into
+    `python/fixtures/workspace-extra/` through the unedited diff-eval.ss and covered by the
+    slow re-capture test. It was written *after* the code; its Python cases passed at once,
+    and the mutants now fail. For the `(min 1 ...)` mutant I first searched every average
+    age k/1, k/2 and k/3 up to 3000 for one where exact and flonum rounding differ: 545/2
+    and 575/2.
+  - **equivalent (2):** `(>= density 0.6)` → `>`, since no exact density equals the double
+    nearest 0.6; and `(> compatibility 0)` → `>=`, since at compatibility 0 the thematic
+    weight is 0.
+- **A quirk of the original, found by the new battery:** `current-translation-temperature-
+  threshold-distribution` compares an exact density with `0.8`/`0.6`/`0.4`/`0.2`. The
+  doubles nearest 0.8, 0.4 and 0.2 lie above 4/5, 2/5 and 1/5, so those densities fall into
+  the next-hotter class. `get-activity`'s `(min 1.0 ...)` has the same kind of edge. Logged
+  in anomalies_and_quirks.md, with a Python entry: `Fraction`/`float` comparisons are exact,
+  as Chez's are, and converting first would break them. Both sites carry `# 1.2:` comments.
+- **Evaluation order.** No call or `let` in the six files has two effectful parts, as the
+  Racket port found. The draws are:
+  - `stochastic-pick`: `choose-object`, `choose-description-for-rule`, `wins-fight?`;
+  - `stochastic-pick-by-method`: neighbours, descriptions, the leftmost object;
+  - `random-pick` (`get-random-letter`), the bond-scan distribution, and `~` in
+    `rough-num-of-objects` (the second `~` only when the first test fails).
+
+  `wins-all-fights?` stops drawing at the first loss (`andmap`). In the battery, the one
+  list with effects (`ws-string-names`, around `mark-as-translated`) is evaluated left to
+  right, as the fixture shows.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: the two entries above;
+  - `docs/python-translation-plan.md`: "As built (item 06)";
+  - `docs/porting-notes.md`: a correction to where three stand-ins are defined
+    (`equivalent-workspace-objects?` is trace.ss's, `rule-describable-bridge?` rules.ss's,
+    `break-bridge` bridges.ss's);
+  - `python/README.md`: the new modules and tests;
+  - `test_fixtures.py` now expects the local battery `workspace-extra`.
+- Speed, for item 12: building the initial workspace of `abc abd xyz` takes 1.6 ms,
+  `update-workspace-values` 1.1 ms, and the Workspace's `choose-object` 24 µs.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (605 tests, 37 s).
+
+### Blockers
+None. Left for later items, by design:
+- Translated but not run yet, because they need later files:
+  - bond and group equality (`get-equivalent-bond`/`-group` call bonds.ss's and groups.ss's
+    predicates);
+  - `get-equivalent-bridge` (bridges.ss's `bridge-between?`);
+  - `delete-invalid-string-position-middle-descriptions` (`break-bridge`);
+  - `get-reference-objects` (`verbatim-clause?`);
+  - `get-real-object` (trace.ss);
+  - `delete-proposed-structure` with graphics on;
+  - workspace objects' `print` (`full-workspace-object-name`).
+
+  Items 07–09 and the golden runs exercise them.
+- `*temperature-clamped?*` is read as `_metacat.run.g_temperature_clamped_p`; run.py (item
+  10) must define it (`False`), since run.ss creates it with `set!`.
+- `*EEG*` is `_metacat.eeg_graphics.g_EEG`; the headless driver must give it a null object
+  until eeg_graphics.py exists.
+
+### Next
+Item 07: bonds, groups and concept mappings. Groups delegate to
+`workspace_objects.make_workspace_object(...)`, as letters do, and to
+`workspace_structures.make_workspace_structure()`. The workspace modules already reach
+`_metacat.bonds.same_bond_category_p`, `_metacat.groups.same_group_category_p`/
+`same_group_direction_p` and `contains_p` through the package. test_workspace.py's
+`init_problem` and stand-ins are a model for building a real initial workspace in the
+bond and group tests.

@@ -138,6 +138,26 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   porting-notes.md, item 14.
 - **Status:** not a bug (harmless redundancy); ported verbatim.
 
+### Exact bond densities meet flonum thresholds: 1/5, 2/5 and 4/5 fall into the hotter class
+- **Seen:** loop0002 iteration 7 (item 06), writing python/oracle/batteries/workspace-extra-battery.scm.
+- **What:** formulas.ss's `current-translation-temperature-threshold-distribution` computes
+  the bond density as an exact rational (bonds over letters minus one) and compares it with
+  `(>= density 0.8)`, `0.6`, `0.4`, `0.2`. Chez compares an exact rational with a flonum
+  exactly, and the doubles nearest 0.8, 0.4 and 0.2 lie just *above* 4/5, 2/5 and 1/5
+  (the one nearest 0.6 lies below 3/5). So a density of exactly 1/5, 2/5 or 4/5 picks the
+  next-hotter distribution, while 3/5 picks "low" as written. For 15 possible bonds
+  (`abcdef abcdeg ijklmn`), k = 3, 6, 12 give classes 4, 3, 1 rather than 3, 2, 0. The
+  same thing happens in the Workspace's `get-activity`: `(min 1.0 (/ age 500))` makes the
+  ratio a flonum before `100*` rounds it, and an average age of 545/2 or 575/2 rounds
+  the other way from the exact value (activity 45 and 43; exact rounding would give 46
+  and 42).
+- **Evidence:** `density-boundaries`, `activity-float-ties` in
+  python/oracle/batteries/workspace-extra-battery.scm (fixtures in
+  python/fixtures/workspace-extra/).
+- **Status:** won't fix (it's the original's behaviour). Python's `Fraction` compares with
+  `float` exactly too, so a plain `>=` reproduces it; `float(density) >= 0.8` would not
+  (a mutation the battery catches).
+
 ## 🌀 Anomalies
 
 ### Most documented demo seeds replay exactly; a few don't
@@ -558,6 +578,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `chez.TOP_LEVEL` after their cases (module fixtures), and test_slipnet.py resets the
   slipnodes and the coderack when it ends. Later test files that change engine state should
   do the same.
+
+### Python's comparisons of `Fraction` with `float` are exact, like Chez's
+- **Seen:** loop0002 iteration 7 (item 06), formulas.py.
+- **What:** `Fraction(4, 5) >= 0.8` is `False` in Python, as `(>= 4/5 0.8)` is `#f` in
+  Chez: both compare the exact value of the double. This is what the model needs (see
+  "Exact bond densities meet flonum thresholds"), but it is easy to break by converting
+  first (`float(x) >= 0.8` is `True`), or by computing a quantity as a float where Chez keeps it exact.
+- **Evidence:** `density-boundaries` in python/oracle/batteries/workspace-extra-battery.scm.
+- **Status:** not a bug. Model code compares the exact value directly and never converts
+  it first.
 
 ## 🔗 Hidden couplings
 

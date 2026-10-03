@@ -522,6 +522,33 @@ from symbols").
 - **Test isolation**: test files share one engine; files whose cases change engine state or
   the top level restore it afterwards (anomalies entry).
 
+### As built (item 06)
+
+- **Modules**: workspace.py (`Workspace`; `load()` makes `*workspace*`), workspace_objects.py
+  (`Letter` delegating to `WorkspaceObject`, which groups will share), workspace_strings.py
+  (`WorkspaceString`), workspace_structures.py (`WorkspaceStructure`), and the plain
+  functions of workspace_structure_formulas.py and formulas.py. They import each other
+  qualified at the top (cycles are fine: attributes are read at call time).
+- **Names from files not translated yet** are read through the package only where the
+  original evaluates them: `_metacat.bonds.same_bond_category_p`, `_metacat.groups`,
+  `_metacat.bridges.bridge_between_p`/`break_bridge`, `_metacat.rules.verbatim_clause_p`/
+  `rule_describable_bridge_p` (inside a lambda, so that filtering an empty bridge list never
+  touches the module), `_metacat.trace`, `_metacat.group_graphics.group_graphics("erase",
+  s)`, `_metacat.eeg_graphics.g_EEG` and `_metacat.run.g_temperature_clamped_p` (run.ss
+  creates `*temperature-clamped?*` with `set!`; run.py must define it).
+- **Tables** are `chez.Vector`s of rows. `flatten` doesn't descend into a `Vector`, so
+  `get-proposed-bridges` turns rows into lists first, as `vector->list` does.
+- **Scheme strings**: `print-name`, `ascii-name` and `generic-name` return `chez.String`;
+  `symbol-name` a plain str. descriptions.py's `print-name` now returns a `String` too (it
+  returned format's plain str, which b:canon took for a symbol).
+- **Exactness**: unhappiness, salience and importance stay exact (`102/5`-style averages are
+  rounded by `utilities.round_`). Flonums enter only through `temp-adjusted-*`,
+  `(min 1.0 ...)` in `get-activity`, `tanh` in mapping strengths and `get-weakness`'s
+  `expt`. Thresholds compare the exact value with the flonum (anomalies entry "Exact bond
+  densities meet flonum thresholds").
+- Measured (this machine): building the initial workspace of `abc abd xyz` 1.6 ms,
+  `update-workspace-values` 1.1 ms, the Workspace's `choose-object` 24 µs.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

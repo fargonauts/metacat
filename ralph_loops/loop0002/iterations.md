@@ -52,7 +52,7 @@
     `slipnet-battery.scm`; the initial slipnet dump equals Chez's; activation spreading
     and decay over 20 updates match to the last bit.
 
-- [ ] **06 Workspace.** Translate `workspace.ss`, `workspace-objects.ss`,
+- [x] **06 Workspace.** Translate `workspace.ss`, `workspace-objects.ss`,
     `workspace-structures.ss`, `workspace-strings.ss`, `workspace-structure-formulas.ss`
     and `formulas.ss`. Tests: `workspace-battery.scm`, and `workspace-dump.scm` for the
     initial workspace of every problem in `tests/problems.txt`.

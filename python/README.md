@@ -83,3 +83,22 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   initial slipnet, 20 updates from fixed states to the last bit, images) plus
   `oracle/batteries/slipnet-extra-battery.scm` (`replace-all` stopped midway, `extend`'s
   length-first order, `number->platonic-number` bounds).
+- `metacat/workspace.py`: workspace.ss (the Workspace: strings, bridge tables, rules,
+  averages and mapping strengths, `unrelated?`/`ungrouped?`/`unmapped?`); `load()` makes
+  `*workspace*`.
+- `metacat/workspace_objects.py`: workspace-objects.ss (letters and the workspace-object
+  closure that letters and groups delegate to).
+- `metacat/workspace_strings.py`: workspace-strings.ss (strings, their bond and group
+  tables, storage expansion, relevance, reference objects).
+- `metacat/workspace_structures.py`: workspace-structures.ss (structure strength,
+  `wins-fight?`).
+- `metacat/workspace_structure_formulas.py` and `metacat/formulas.py`: the group
+  probabilities and supports; temperature-adjusted probabilities and values, the
+  translation threshold distribution, `update-temperature`.
+
+  Tests: `tests/test_workspace.py`, every test of `tests/diff/workspace-battery.scm`
+  (with `tests/diff/workspace-dump.scm`: the initial workspace of every problem of
+  `tests/problems.txt` for each seed, live queries, fakes for bonds, groups, bridges and
+  rules) plus `oracle/batteries/workspace-extra-battery.scm` (a group's vertical bridge,
+  relevant descriptions, neighbours among groups, relevance with bonds, the bond-density
+  and activity boundaries).

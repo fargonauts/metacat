@@ -20,6 +20,7 @@ from __future__ import annotations
 import metacat as _metacat
 from metacat import chez, sugar
 from metacat import coderack, setup
+from metacat.chez import String
 from metacat.objects import SchemeObject, delegate, message, tell
 from metacat.sugar import say
 from metacat.utilities import (average, count, exists_p, first, letter_p, maximum, member_p,
@@ -47,9 +48,10 @@ class Description(SchemeObject):
     # This is solely for the purposes of (say <description>):
     @message("print-name")
     def print_name(this, self):
-        return chez.format_("~a:~a",
-                            tell(this.description_type, "get-short-name"),
-                            tell(this.descriptor, "get-short-name"))
+        # a Scheme string (b:canon tells it from a symbol)
+        return String(chez.format_("~a:~a",
+                                   tell(this.description_type, "get-short-name"),
+                                   tell(this.descriptor, "get-short-name")))
 
     @message("print")
     def print_(this, self):

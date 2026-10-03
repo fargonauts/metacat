@@ -465,6 +465,8 @@ operations, `change-length-first?`, `enumerate-letter`.
   `same-group-category?`, `same-group-direction?` (groups.ss);
   `bridge-between?`, `equivalent-workspace-objects?`, `rule-describable-bridge?`
   (bridges.ss); `break-bridge` (breakers.ss); `verbatim-clause?` (rules.ss);
+  (correction, loop0002 item 06: the original defines `equivalent-workspace-objects?`
+  in trace.ss, `rule-describable-bridge?` in rules.ss and `break-bridge` in bridges.ss);
   `full-workspace-object-name` (trace.ss, used by workspace objects' `print`);
   `group-graphics`, `bridge-graphics`; and `*EEG*` (eeg-graphics.ss), which the
   Workspace's `initialize` messages. Removed: `*workspace*`, `%proposed%`,
