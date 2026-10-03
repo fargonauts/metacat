@@ -1,0 +1,150 @@
+#lang racket/base
+;; Item 10: the port against the golden traces.  With themes.ss, justify.ss,
+;; trace.ss, jootsing.ss and memory.ss ported, every run of
+;; tests/problems.txt is run by the engine (golden-harness.rkt: the oracle's
+;; headless windows and trace instrumentation around a copy of run.ss) and
+;; its JSON-lines trace must equal tests/golden/<run>.jsonl byte for byte:
+;; codelets, structures built and broken, temperature, slipnet activations,
+;; the Themespace's themes, the Temporal Trace's events (answer, snag, clamp,
+;; rule, group, concept-mapping, concept-activation), answers, commentary and
+;; the end of the run.  The first differing line of each run is reported.
+;;
+;; As the oracle runs each golden in a fresh Chez process, each run here
+;; gets a fresh instance of the engine (a new namespace): the Memory, for
+;; one, keeps its answers from one run to the next.  Runs are spread over
+;; places.
+;;
+;; Part of the Racket port of Metacat (GPL v2 or later, like Metacat itself).
+(require rackunit
+         compiler/cm
+         racket/file
+         racket/list
+         racket/place
+         (only-in racket/future processor-count)
+         racket/runtime-path
+         racket/port
+         racket/string
+         racket/system)
+
+(define-runtime-path harness "golden-harness.rkt")
+(define-runtime-path problems "../../tests/problems.txt")
+(define-runtime-path golden-dir "../../tests/golden")
+
+;; the first line where two traces differ, or #f
+(define (first-difference got want)
+  (let loop ([g (string-split got "\n")] [w (string-split want "\n")] [n 1])
+    (cond
+      [(and (null? g) (null? w)) #f]
+      [(null? g) (list n "<end of trace>" (car w))]
+      [(null? w) (list n (car g) "<end of trace>")]
+      [(string=? (car g) (car w)) (loop (cdr g) (cdr w) (add1 n))]
+      [else (list n (car g) (car w))])))
+
+(define (short s) (if (> (string-length s) 400) (string-append (substring s 0 400) " ...") s))
+
+;; one run, in a fresh engine: (list file-name trace-or-error-message ok?)
+(define (run-one harness run)
+  (with-handlers ([(lambda (e) #t)
+                   (lambda (e) (list (car run) (if (exn? e) (exn-message e) (format "~s" e)) #f))])
+    (define golden-trace
+      (parameterize ([current-namespace (make-base-namespace)])
+        (dynamic-require (string->path harness) 'golden-trace)))
+    (list (car run) (apply golden-trace (cdr run)) #t)))
+
+(define (start-worker)
+  (place ch
+    (let loop ()
+      (define msg (place-channel-get ch))
+      (when msg
+        (place-channel-put ch (run-one (car msg) (cdr msg)))
+        (loop)))))
+
+(module+ test
+  ;; through the compilation manager, which recompiles the engine when an
+  ;; included engine/*.rktl changed (the default load handler would load a
+  ;; stale .zo: docs/anomalies_and_quirks.md); the places then load the
+  ;; fresh .zo files
+  (define golden-runs
+    (parameterize ([current-load/use-compiled (make-compilation-manager-load/use-compiled-handler)])
+      (dynamic-require harness 'golden-runs)))
+  (define runs (golden-runs problems))
+  (check-equal? (sort (map car runs) string<?)
+                (sort (for/list ([f (directory-list golden-dir)]
+                                 #:when (regexp-match? #rx"[.]jsonl$" (path->string f)))
+                        (path->string f))
+                      string<?)
+                "problems.txt lists exactly the runs of tests/golden/")
+  (define n-workers (max 1 (min 16 (processor-count) (length runs))))
+  (define workers (for/list ([i n-workers]) (start-worker)))
+  ;; longest runs first (by golden size), handed out as workers free up
+  (define queue
+    (sort runs > #:key (lambda (r) (file-size (build-path golden-dir (car r))))
+          #:cache-keys? #t))
+  (define results
+    (let loop ([queue queue] [idle workers] [busy 0] [acc '()])
+      (cond
+        [(and (null? queue) (zero? busy)) acc]
+        [(and (pair? queue) (pair? idle))
+         (place-channel-put (car idle) (cons (path->string harness) (car queue)))
+         (loop (cdr queue) (cdr idle) (add1 busy) acc)]
+        [else
+         (define-values (w result)
+           (apply sync (for/list ([w workers] #:unless (memq w idle))
+                         (wrap-evt w (lambda (r) (values w r))))))
+         (loop queue (cons w idle) (sub1 busy) (cons result acc))])))
+  (for ([w workers]) (place-channel-put w #f) (place-wait w))
+  (define themes-lines 0)
+  (define event-lines 0)
+  (for ([result (sort results string<? #:key car)])
+    (define name (car result))
+    (define want (file->string (build-path golden-dir name)))
+    (cond
+      [(not (caddr result)) (fail (format "~a: the port raised: ~a" name (cadr result)))]
+      [else
+       (define d (first-difference (cadr result) want))
+       (if d
+           (fail (format "~a: traces differ at line ~a\n  golden: ~a\n  port:   ~a"
+                         name (car d) (short (caddr d)) (short (cadr d))))
+           (check-true #t))
+       (set! themes-lines (+ themes-lines (length (regexp-match* #rx"\"ev\":\"themes\"" want))))
+       (set! event-lines (+ event-lines (length (regexp-match* #rx"\"ev\":\"event\"" want))))]))
+  ;; what the goldens cover of the self-watching half
+  (check-true (> themes-lines 10000) "the goldens have themes events")
+  (check-true (> event-lines 1000) "the goldens have Temporal Trace events")
+  (define all (apply string-append (map (lambda (r) (file->string (build-path golden-dir (car r))))
+                                        runs)))
+  (for ([type '("answer" "snag" "clamp" "rule" "group" "concept-mapping" "concept-activation")])
+    (check-true (regexp-match? (regexp (format "\"ev\":\"event\",\"type\":\"~a\"" type)) all)
+                (format "a ~a event" type)))
+  (for ([type '("thematic-bridge-scout" "answer-justifier" "progress-watcher" "jootser")])
+    (check-true (regexp-match? (regexp (format "\"ev\":\"codelet\",\"type\":\"~a\"" type)) all)
+                (format "a ~a codelet" type))))
+
+;; The original crashes on abc ccbbaa ijk, seed 3 (a Chez error, caddr of #f,
+;; in transcribe-to-english: docs/anomalies_and_quirks.md), so the golden
+;; set leaves it out.  The port must crash at the same point: the oracle is
+;; run here, and its trace up to the error must equal the port's.
+(module+ test
+  (define-runtime-path oracle-run "../../chez_scheme/oracle/run.ss")
+  (define scheme (or (find-executable-path "scheme") (find-executable-path "chezscheme")))
+  (define chez-file (make-temporary-file "metacat-crash-~a.jsonl"))
+  (define chez-ok?
+    (parameterize ([current-output-port (open-output-nowhere)]
+                   [current-error-port (open-output-nowhere)])
+      (system* scheme "--script" oracle-run "abc" "ccbbaa" "ijk" "--seed" "3"
+               "--max-codelets" "10000" "--trace" (path->string chez-file))))
+  (check-false chez-ok? "the original crashes on abc ccbbaa ijk, seed 3")
+  (define-values (raised partial)
+    (parameterize ([current-namespace (make-base-namespace)])
+      (define golden-trace (dynamic-require harness 'golden-trace))
+      (define golden-partial-trace (dynamic-require harness 'golden-partial-trace))
+      (with-handlers ([exn:fail? (lambda (e) (values (exn-message e) (golden-partial-trace)))])
+        (golden-trace '(abc ccbbaa ijk) 3 10000 #f)
+        (values #f #f))))
+  (check-true (and raised (regexp-match? #rx"^caddr: " raised) #t)
+              (format "the port crashes in caddr too: ~a" raised))
+  (define chez-trace (file->string chez-file))
+  (delete-file chez-file)
+  (check-true (> (length (string-split chez-trace "\n")) 1000))
+  (check-equal? (and partial (first-difference partial chez-trace)) #f
+                "the traces up to the crash are the same"))

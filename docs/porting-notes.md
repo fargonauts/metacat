@@ -881,3 +881,116 @@ Added:
   - The snag mutation is equivalent: `delete-all-codelets`, called right
     after, deletes every proposed structure that has a codelet, and every
     proposed bridge does. The original's comment there says the same.
+
+## Themes, justification, trace, jootsing, memory (item 10)
+
+**Changes**: `themes.ss`, `justify.ss`, `trace.ss`, `jootsing.ss` and
+`memory.ss` → `racket/engine/*.rktl`, verbatim apart from the GPL header's
+"Ported to Racket" lines, included by engine.rkt right after answers.rktl
+(metacat.ss's load order). No model line changed. Load time now also builds
+the real `*themespace*`, `*trace*` and `*memory*` (each file ends by
+defining its object), as the original's load does.
+
+**Evaluation order, audited**: the draws are in themes.ss (theme
+activation's `stochastic-if*`, `pick-positive-theme`, thematic-bridge-scout's
+`stochastic-pick`, cluster `filter` with `prob?`, `stochastic-pick-by-method`,
+`stochastic-select`, `look-for-auxiliary-slippages`' `prob?`,
+`propose-description-based-on-theme`), justify.ss (answer-justifier's
+`stochastic-pick-by-method` and `stochastic-pick`, the theme pattern's
+`(filter (compose prob? get-probability) ...)`), jootsing.ss (jootser's and
+progress-watcher's `stochastic-if*`, `stochastic-filter`). Each sits in a
+`let*`, a sequence, a utilities.ss `filter`, or a `map`/`tell-all` (whose
+order compat.rkt reproduces: `(tell-all clusters 'pick-positive-theme)`
+draws once per cluster). No call has two drawing arguments. The goldens
+check this on 109 runs.
+
+**Stand-ins** (engine/pending.rktl). Removed: everything of themes.ss,
+justify.ss, trace.ss and memory.ss, including the early copies of items
+08–09 (`bridge-type->theme-type`, `descriptions-affect-themespace?`,
+`ignore-descriptions?`, `beta`, `bridge-theme-compatibility-sigmoid`, `diff`,
+`equivalent-workspace-objects?`), which are now the files' own. Added:
+- run.ss: `*this-run*` (memory.ss records it with each answer and snag;
+  init-mcat sets it);
+- `complement-codelet-pattern`, which the original never defines: the
+  Temporal Trace's `get-complement-codelet-pattern` message (never sent)
+  returns it. An identifier macro that raises "variable ... is not bound",
+  as Chez would;
+- general-graphics.ss's `%default-fg-color%` and `*fg-color*`, and 18
+  constants.ss colours that trace.ss's events keep for their drawings;
+- **early verbatim copies** of trace-graphics.ss's
+  `group-event-pexp-text-string` (every group event's print name is made
+  with it, and the print name is in the trace) and theme-graphics.ss's
+  `relation-name` (trace.ss's debugging `print-pattern`). Both are pure.
+
+**`set-global!`** also lists what a run's driver or trace replaces:
+`*coderack*`, `build-bond`, `break-bond`, `build-group`, `break-group`,
+`build-bridge`, `break-bridge`, `build-description`, `update-temperature`,
+`update-slipnet-activations`, `*this-run*`, `*display-mode?*`. utilities.rkt
+exports `set-report-error-and-halt!` (marked `port:`), since importers cannot
+`set!` `report-error-and-halt`, which run.ss's driver replaces.
+
+**The golden comparison** (`racket/tests/golden-test.rkt`, on
+`racket/tests/golden-harness.rkt`): the harness is the Racket counterpart of
+the oracle's prelude.ss headless windows, trace.ss instrumentation and
+run.ss driver, around a copy of the original run.ss's `init-mcat`,
+`run-mcat`, `update-everything` and helpers (item 11 ports run.ss itself and
+replaces the copy). Notes:
+- Each run needs a **fresh engine** (a new namespace): the oracle runs every
+  golden in its own Chez process, and the Memory keeps its answers and snags
+  from one run to the next (init-mcat only clears their activations), as do
+  other counters. Reusing one engine made the second run's `start` line
+  differ at once.
+- The Commentary window is commentary-graphics.ss's (its eliza/non-eliza
+  paragraph logic) on a recording text window, as in the oracle.
+- `*EEG*` (eeg-graphics.ss) is a null object accepting `initialize`: a
+  headless run only initializes it (the Workspace's `initialize`); recording
+  is gated by `%workspace-graphics%` and the model never reads it.
+- Runs are spread over places (16 at most); about 25 s on a loaded 32-core
+  machine, 60 s on one core.
+
+**Tests**:
+- `racket/tests/golden-test.rkt`: **all 109 golden runs match byte for byte**
+  (272,957 codelets; 12,952 `themes` lines; 1,326 Temporal Trace `event`
+  lines of all seven types; 115 answers; 608 commentary paragraphs; the
+  `halt` of `eqe qeq abbba aaabaaa` seed 3). Every codelet type runs,
+  thematic-bridge-scout, answer-justifier, progress-watcher and jootser
+  included. It also runs the oracle on `abc ccbbaa ijk` seed 3, which crashes
+  the original (anomalies_and_quirks.md), and checks that the port raises
+  the same `caddr` error after the same 1062 trace lines.
+- `racket/tests/engine-test.rkt` (+15 checks): the three objects exist at
+  load time, the four codelet types and the new procedures, the early copy
+  of `relation-name`.
+- Tests-first, honestly: the five `.rktl` files and the engine includes were
+  written first, to find what the engine needed in order to compile (the
+  stand-ins above). The harness and the test came next. Against a scratch
+  worktree of HEAD (no port; only the harness's hooks added to `set-global!`
+  and utilities.rkt), the test fails 111 of 123 checks: every run raises
+  `application: not a procedure ... given: #f` (`*trace*`, `*themespace*`,
+  `*memory*` are still stand-ins). With the port, the first run (`a b z`
+  seed 1) matched at once; the full set first failed from the second run
+  on, which was the harness reusing one engine (above). With a fresh engine
+  per run, all 109 matched, with no change to the ported model code.
+- Mutation checks, each restored afterwards (1 s pauses around the edits):
+
+  | Mutation | Runs differing (of 109) |
+  | --- | --- |
+  | themes: theme boost 7 → 6 | 109 |
+  | themes: theme decay 25 → 20 | 109 |
+  | themes: positive→negative weight −75 → −70 | 5 |
+  | themes: thematic-bridge-scout cluster probability `^2` → `^3` | 0 (equivalent, below) |
+  | themes: bridge-theme sigmoid `beta` 4 → 3 | 17 |
+  | justify: retention probability of identity 50 → 60 | 5 |
+  | justify: answer-justifier's other-rule weights, difference doubled | 25 |
+  | trace: answer quality weights 60:40 → 50:50 | 87 |
+  | trace: rule-event threshold 67 → 70 | 3 |
+  | trace: group-event threshold 100 → 90 | 66 |
+  | trace: concept-activation threshold 85 → 80 | 102 |
+  | jootsing: settling period 250 → 200 | 29 |
+  | jootsing: maximum clamp period 750 → 700 | 14 |
+  | memory: distance threshold 5 → 4 | 5 |
+
+  The `^2` → `^3` mutation is equivalent on these runs: when a thematic
+  bridge scout runs, every cluster of an active theme type has a maximum
+  positive activation of 0 or 100 (the goldens' `themes` lines: 900 clusters
+  at 100, 117 at 0, none between), and `prob?` answers 0 and 1 without
+  drawing.

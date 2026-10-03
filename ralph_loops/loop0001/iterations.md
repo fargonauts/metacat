@@ -76,7 +76,7 @@
 - [x] **09 Rules and answers.** Port `rules.ss` and `answers.ss`. Tests: rules are
     abstracted and applied identically; the first answer on every golden run matches.
 
-- [ ] **10 Themes, justification, trace, jootsing, memory.** Port `themes.ss`,
+- [x] **10 Themes, justification, trace, jootsing, memory.** Port `themes.ss`,
     `justify.ss`, `trace.ss`, `jootsing.ss` and `memory.ss`: the self-watching half of
     Metacat. Tests: theme and trace events match the goldens.
 

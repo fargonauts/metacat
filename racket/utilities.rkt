@@ -76,6 +76,10 @@
       (2nd message)
       (tell object 'object-type))
     (reset)))
+;; port: importers cannot set! report-error-and-halt, which a run's driver
+;; replaces (as chez_scheme/oracle/run.ss does with set!); this sets it.
+(define set-report-error-and-halt!
+  (lambda (proc) (set! report-error-and-halt proc)))
 
 (define tell-all
   (lambda (objects . message)

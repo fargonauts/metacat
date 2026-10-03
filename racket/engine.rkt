@@ -59,6 +59,11 @@
 (include "engine/images.rktl")         ; images.ss
 (include "engine/rules.rktl")          ; rules.ss
 (include "engine/answers.rktl")        ; answers.ss
+(include "engine/themes.rktl")         ; themes.ss
+(include "engine/justify.rktl")        ; justify.ss
+(include "engine/trace.rktl")          ; trace.ss
+(include "engine/jootsing.rktl")       ; jootsing.ss
+(include "engine/memory.rktl")         ; memory.ss
 (include "engine/group-graphics.rktl") ; group-graphics.ss (group-graphics only)
 (include "engine/pending.rktl")        ; stand-ins for the files not ported yet
 
@@ -93,12 +98,20 @@
     *all-strings*
     ;; formulas.ss
     temp-adjusted-probability
-    ;; not ported yet (engine/pending.rktl)
-    *themespace* *trace* *display-mode?* *temperature-clamped?* *EEG*
+    ;; themes.ss, trace.ss, memory.ss (item 10); the batteries of items
+    ;; 05-09 replace them with fakes
+    *themespace* *trace* *memory*
     monitor-slipnode-activation-change monitor-new-groups
-    monitor-new-concept-mappings monitor-new-rules *memory*
+    monitor-new-concept-mappings monitor-new-rules
     make-answer-event make-snag-event
     abstract-answer-description abstract-snag-description
+    ;; not ported yet (engine/pending.rktl)
+    *temperature-clamped?* *EEG*
     suspend update-everything post-initial-codelets
     ;; groups.ss
-    contains?))
+    contains?
+    ;; wrapped by a run's trace (chez_scheme/oracle/trace.ss does it by set!)
+    *coderack* build-bond break-bond build-group break-group build-bridge
+    break-bridge build-description update-temperature update-slipnet-activations
+    ;; run.ss (not ported yet)
+    *this-run* *display-mode?*))

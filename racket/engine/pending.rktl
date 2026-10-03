@@ -18,6 +18,8 @@
   (begin (define name #f) ...))
 ;; run.ss
 (pending-variables *display-mode?* *step-mode?* %step-cycles%)
+;; memory.ss records the run (init-mcat sets it) with each answer and snag
+(pending-variables *this-run*)
 ;; *temperature-clamped?* has no definition in the original: init-mcat
 ;; creates it by set! on the top level (formulas.ss reads it).
 (pending-variables *temperature-clamped?*)
@@ -27,70 +29,15 @@
 ;; same-direction? is not bound"; this raises too.  Not pending on any item.
 (define (same-direction? . args)
   (error 'same-direction? "variable same-direction? is not bound"))
-;; themes.ss
-(pending-variables *themespace*)
-;; Called by bridges only with an active theme (none can exist yet):
-(pending-procedures check-descriptions conflicts-with-theme? supported-by-theme?)
-;; Called on every bridge: early verbatim copies of themes.ss's definitions
-;; (pure: no draws, no state), so that bridges can be built and their
-;; strength computed before themes.ss is ported (item 10 moves them back).
-(define bridge-type->theme-type
-  (lambda (theme-type)
-    (case theme-type
-      (top 'top-bridge)
-      (bottom 'bottom-bridge)
-      (vertical 'vertical-bridge))))
-(define descriptions-affect-themespace?
-  (lambda (d1 d2)
-    (and (tell d1 'description-type? (tell d2 'get-description-type))
-         (not (ignore-descriptions? d1 d2)))))
-(define ignore-descriptions?
-  (lambda (d1 d2)
-    (or (not (tell d1 'relevant?))
-        (not (tell d2 'relevant?))
-	(and (tell d1 'description-type? plato-object-category)
-	     (both-spanning-groups? (tell d1 'get-object) (tell d2 'get-object)))
-        (and (tell d1 'description-type? plato-string-position-category)
-	     (both-spanning-objects? (tell d1 'get-object) (tell d2 'get-object)))
-	(and (eq? (tell d1 'get-descriptor) plato-middle)
-	     (eq? (tell d2 'get-descriptor) plato-middle)))))
-;; answers.ss's theme phrases compare against themes.ss's abbreviation diff
-;; (the "different" relation, which is #f): an early verbatim copy.
-(define diff #f)
-(define beta 4)
-(define bridge-theme-compatibility-sigmoid
-  (lambda (x) (sub1 (/ 2 (add1 (exp (* -2 beta x)))))))
 ;; run.ss: answers.ss calls these when it reports an answer or a snag
 (pending-procedures go post-initial-codelets suspend update-everything)
-;; justify.ss
-(pending-procedures remove-whole/single-concept-mappings compare-rule-clause-lists)
-;; trace.ss
-(pending-variables *trace*)
-(pending-procedures monitor-slipnode-activation-change monitor-new-groups
-                    monitor-new-concept-mappings
-                    full-workspace-object-name entries
-                    monitor-new-rules make-answer-event make-snag-event
-                    theme-pattern-entries-equal?)
-;; Called by the Workspace's get-real-object (rules.ss, set-translated-rule-
-;; information, for every answer): an early verbatim copy of trace.ss's
-;; definition (pure: no draws, no state), moved back by item 10.
-(define equivalent-workspace-objects?
-  (lambda (object1 object2)
-    (and (eq? (tell object1 'object-type) (tell object2 'object-type))
-         (eq? (tell object1 'which-string) (tell object2 'which-string))
-	 (= (tell object1 'get-left-string-pos) (tell object2 'get-left-string-pos))
-	 (= (tell object1 'get-right-string-pos) (tell object2 'get-right-string-pos))
-	 (if (letter? object1)
-	   (same-letter-category? object1 object2)
-	   (and (same-group-category? object1 object2)
-	        (same-group-direction? object1 object2)
-		(= (tell object1 'get-group-length) (tell object2 'get-group-length))
-		(andmap equivalent-workspace-objects?
-		  (tell object1 'get-constituent-objects)
-		  (tell object2 'get-constituent-objects)))))))
-;; memory.ss
-(pending-variables *memory*)
-(pending-procedures abstract-answer-description abstract-snag-description)
+;; Never defined in the original: the Temporal Trace's
+;; get-complement-codelet-pattern message (trace.ss), never sent, returns
+;; it.  Not pending on any item.
+(define-syntax complement-codelet-pattern
+  (syntax-id-rules ()
+    [_ (error 'complement-codelet-pattern
+              "variable complement-codelet-pattern is not bound")]))
 
 ;; Graphics (the GUI items)
 ;; constants.ss, graphics part
@@ -103,6 +50,8 @@
                    %dim-coattail-inducing-slippage-color%)
 ;; general-graphics.ss
 (pending-procedures solid-box outline-box arrowhead)
+;; the Temporal Trace's display-workspace-state (trace.ss) sets *fg-color*
+(pending-variables %default-fg-color% *fg-color*)
 ;; Called by make-rule on every rule (transcribe-to-english, rules.ss): an
 ;; early verbatim copy of general-graphics.ss's definition (pure string
 ;; code), moved back by the GUI items.
@@ -112,6 +61,52 @@
       ((>= i (string-length s)) (string-length s))
       ((char=? (string-ref s i) #\space) i)
       (else (find-next-space-position s (+ i 1))))))
+;; constants.ss colours that trace.ss's events keep or draw with
+(pending-variables %faded-workspace-structure-color% %bridge-label-background-color%
+                   %faded-bridge-label-background-color% %vertical-bridge-color%
+                   %top-bridge-color% %bottom-bridge-color% %top-rule-color%
+                   %bottom-rule-color% %theme-supporting-concept-mapping-color%
+                   %clamp-event-concept-pattern-color%
+                   %concept-activation-event-concept-pattern-color%
+                   %concept-mapping-event-concept-pattern-color%
+                   %workspace-event-structure-color% %group-event-concept-pattern-color%
+                   %top-rule-event-concept-pattern-color%
+                   %bottom-rule-event-concept-pattern-color%
+                   %snag-event-concept-pattern-color% %snag-color%)
+;; trace-graphics.ss: every group event's print name (make-group-event,
+;; trace.ss) is made by group-event-pexp-text-string.  An early verbatim
+;; copy (pure string code), moved back by the GUI items.
+(define group-event-pexp-text-string
+  (lambda (group)
+    (let* ((bond-facet (tell group 'get-bond-facet))
+	   (constituent-objects (tell group 'get-constituent-objects))
+	   (descriptors (tell-all constituent-objects 'get-descriptor-for bond-facet))
+	   (descriptor-strings
+	     (map (lambda (object descriptor)
+		    (cond
+		      ((platonic-number? descriptor)
+		       (format "~a" (platonic-number->number descriptor)))
+		      ((letter? object) (tell descriptor 'get-lowercase-name))
+		      ((group? object) (tell descriptor 'get-uppercase-name))))
+	       constituent-objects
+	       descriptors)))
+      (apply string-append
+	(cons (1st descriptor-strings)
+	  (adjacency-map
+	    (lambda (x y) (format "-~a" y))
+	    descriptor-strings))))))
+;; theme-graphics.ss: trace.ss's print-pattern (a debugging printer) names
+;; relations with relation-name.  An early verbatim copy (pure), moved back
+;; by the GUI items.
+(define relation-name
+  (lambda (relation)
+    (cond
+      ((eq? relation #f) "diff")
+      ((eq? relation plato-identity) "iden")
+      ((eq? relation plato-opposite) "opp")
+      ((eq? relation plato-successor) "succ")
+      ((eq? relation plato-predecessor) "pred")
+      (else #f))))
 ;; rule-graphics.ss
 (pending-procedures initialize-rule-graphics)
 ;; group-graphics.ss (group-graphics itself is in engine/group-graphics.rktl)
@@ -130,3 +125,4 @@
 ;; gui.ss
 (pending-variables %num-of-flashes% %flash-pause% %snag-pause%
                    %codelet-highlight-pause% %text-scroll-pause%)
+

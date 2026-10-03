@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 10/18 SOLVED
+- **Current**: 11/18 SOLVED
 
 ---
 
@@ -1009,3 +1009,114 @@ Item 09 (Rules and answers): **SOLVED**, with one criterion moved to item 11
     exist;
   - the gate is about 5 min now. If a new test adds a lot, lower
     `b:codelet-cap` in bridge-battery.scm (1000) or rule-battery.scm (2500).
+
+---
+
+## Iteration 11 — 2026-10-03 00:55
+Item 10 (Themes, justification, trace, jootsing, memory): **SOLVED**. All 109
+golden runs now match the port byte for byte, which covers more than the
+item asked for (theme and trace events).
+
+### Completed
+- Ported `themes.ss`, `justify.ss`, `trace.ss`, `jootsing.ss` and
+  `memory.ss` to `racket/engine/*.rktl`, verbatim apart from the GPL
+  headers' "Ported to Racket" lines (checked with `diff`). engine.rkt
+  includes them right after answers.rktl, in metacat.ss's load order. No
+  model line changed.
+  - Evaluation-order audit: every draw (theme activation, thematic bridge
+    scout, answer-justifier, theme-pattern retention, jootser,
+    progress-watcher) sits in a `let*`, a sequence, a utilities.ss `filter`
+    or a compat `map`/`tell-all`. No call has two drawing arguments.
+- `engine/pending.rktl`:
+  - removed the stand-ins of the five files, and the early copies from items
+    08–09 (`bridge-type->theme-type`, `descriptions-affect-themespace?`,
+    `ignore-descriptions?`, `beta`, the sigmoid, `diff`,
+    `equivalent-workspace-objects?`), which are now the files' own;
+  - added `*this-run*` (run.ss), `*fg-color*`/`%default-fg-color%` and 18
+    constants.ss colours that events keep for drawing;
+  - added `complement-codelet-pattern`, which the original never defines,
+    as an identifier macro that raises as Chez would;
+  - added early verbatim copies of trace-graphics.ss's
+    `group-event-pexp-text-string` (it makes every group event's name, which
+    is in the trace) and theme-graphics.ss's `relation-name`.
+- `set-global!` also lists the procedures and objects a run's trace wraps
+  (`*coderack*`, the build/break procedures, `update-temperature`,
+  `update-slipnet-activations`), plus `*this-run*` and `*display-mode?*`.
+  utilities.rkt exports `set-report-error-and-halt!` (marked `port:`).
+- **`racket/tests/golden-harness.rkt`**: the port's trace in the golden
+  format. It is the Racket counterpart of the oracle's prelude.ss headless
+  windows (with commentary-graphics.ss's comment-window logic on a
+  recording window), trace.ss's JSON writer and wrappers, and run.ss's
+  driver, around a copy of the original run.ss's `init-mcat`, `run-mcat`,
+  `update-everything` and helpers. Item 11 ports run.ss into the engine and
+  replaces that copy.
+- **`racket/tests/golden-test.rkt`**: runs every golden of
+  `tests/problems.txt` in a fresh engine, spread over up to 16 places
+  (about 25 s), and requires byte-for-byte equality, reporting the first
+  differing line.
+  - Result: **109/109 identical**. That is 272,957 codelets, 12,952
+    `themes` lines and 1,326 Temporal Trace events (all seven types: answer,
+    snag, clamp, rule, group, concept-mapping, concept-activation). It also
+    covers 115 answers, 608 commentary paragraphs and the original's `halt`
+    on `eqe qeq abbba aaabaaa` seed 3.
+  - It also checks that problems.txt lists exactly the golden files, and
+    that the goldens contain every event type and the thematic,
+    justification and jootsing codelets.
+  - It runs the oracle live on `abc ccbbaa ijk` seed 3, which crashes the
+    original. The port raises the same `caddr` error after the same 1062
+    trace lines.
+- `racket/tests/engine-test.rkt` (+15 checks): the Themespace, Temporal Trace
+  and Memory exist at load time; the new codelet types and procedures; the
+  `relation-name` copy.
+- Tests-first, honestly:
+  - The five `.rktl` files came first, to find what the engine needed in
+    order to compile. Then the harness and the test.
+  - Against a scratch worktree of HEAD (no port; only the harness's hooks
+    added), the test fails 111 of 123 checks: every run raises `application:
+    not a procedure ... given: #f`.
+  - With the port, `a b z` seed 1 matched at once. The full set first failed
+    from the second run on, because the harness reused one engine. The
+    Memory and the codelet count outlive a run, and the oracle uses a fresh
+    process per golden. With a fresh engine per run, all 109 matched, with no
+    change to the ported code.
+- **Mutation checks**: 14 mutations across the five files, each restored
+  afterwards. 13 are caught, with 3 to 109 runs differing (porting-notes.md
+  has the table). The one not caught, thematic-bridge-scout's cluster
+  probability `^2` → `^3`, is equivalent on these runs: active clusters'
+  maximum activations are always exactly 0 or 100 (900 vs 117 in the
+  goldens), and `prob?` short-circuits at both.
+- Docs:
+  - porting-notes.md: new item 10 section.
+  - trace-format.md: a note on the port's traces.
+  - anomalies_and_quirks.md:
+    - new entries: `complement-codelet-pattern` is never defined; the
+      Memory outlives a run; trace events and the EEG reach into graphics
+      files;
+    - updated entries: the halt run and the `caddr` crash, both reproduced
+      by the port.
+- `python3 ralph_loops/loop0001/gate.py`: GATE PASSED (`raco test racket/`:
+  661 tests; gate about 5 min). `chez_scheme/original/` untouched.
+
+### Blockers
+- None.
+
+### Next
+- Item 11 (full runs and the CLI). Notes:
+  - Port run.ss into the engine (`racket/engine/run.rktl`, in load order
+    after workspace-structure-formulas.rktl), and delete the run.ss stand-ins
+    from pending.rktl (`go`, `suspend`, `update-everything`,
+    `post-initial-codelets`, `*this-run*`, `*display-mode?*`, …). Then make
+    golden-harness.rkt use the engine's `init-mcat`/`run-mcat` instead of its
+    copy.
+    - `break`/`quiet-break` need a hook (a settable global) for headless
+      drivers.
+    - `waiter-prompt-and-read`, `console-input-port` and `swl:` names at
+      run.ss's top level need care.
+  - The trace writer in golden-harness.rkt (JSON, wrappers, headless windows)
+    can move to a non-test module that `racket/cli.rkt` uses for `--trace`.
+  - **Each run needs a fresh engine** (new namespace or process). Otherwise
+    the Memory carries answers over.
+  - golden-test.rkt already compares every golden; item 11 must keep it
+    (with the engine's run.ss) and add the CLI vs `chez_scheme/oracle/run.ss`
+    stdout comparison and run times per problem. Racket takes about 60 s on
+    one core for all 109 runs; Chez about 13 s on 32 cores in parallel.

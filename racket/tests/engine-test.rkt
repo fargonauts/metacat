@@ -81,11 +81,11 @@
 (check-true (procedure? (engine 'group-graphics)))
 
 ;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'make-answer-event))))
+(check-exn #rx"not ported yet" (lambda () ((engine 'post-initial-codelets))))
 
 ;; rules.ss and answers.ss (item 09), and the early copies in
-;; engine/pending.rktl of general-graphics.ss's find-next-space-position and
-;; themes.ss's diff
+;; engine/pending.rktl of general-graphics.ss's find-next-space-position;
+;; themes.ss's diff, now themes.ss's own (item 10)
 (for ([name '(make-rule rule-describable-bridge? verbatim-clause? apply-rule
               transcribe-to-english translate report-new-answer give-up
               make-translated-string make-slippage-log)])
@@ -97,8 +97,8 @@
 (check-equal? ((engine 'find-next-space-position) "abcd" 0) 4)
 (check-false (engine 'diff))
 
-;; bridges.ss and breakers.ss (item 08), and the early copies of themes.ss's
-;; pure helpers in engine/pending.rktl
+;; bridges.ss and breakers.ss (item 08), and themes.ss's pure helpers (early
+;; copies in engine/pending.rktl until item 10)
 (for ([name '(make-horizontal-bridge make-vertical-bridge bridge-between? break-bridge
               build-bridge propose-bridge incompatible-horizontal-CMs?
               incompatible-vertical-CMs?)])
@@ -107,6 +107,22 @@
 (check-equal? (map (engine 'bridge-type->theme-type) '(top bottom vertical))
               '(top-bridge bottom-bridge vertical-bridge))
 (check-equal? ((engine 'bridge-theme-compatibility-sigmoid) 0) 0)
+
+;; themes.ss, justify.ss, trace.ss, jootsing.ss, memory.ss (item 10): their
+;; objects exist at load time, as in the original, and their codelet types
+;; have procedures
+(check-equal? (tell (engine '*themespace*) 'object-type) 'themespace)
+(check-equal? (tell (engine '*trace*) 'object-type) 'temporal-trace)
+(check-equal? (tell (engine '*memory*) 'object-type) 'memory)
+(for ([name '(thematic-bridge-scout answer-justifier progress-watcher jootser)])
+  (check-true (and (memq (engine name) (engine '*codelet-types*)) #t)
+              (symbol->string name)))
+(for ([name '(make-answer-event make-snag-event monitor-new-rules abstract-answer-description
+              compare-rule-clause-lists theme-pattern-entries-equal?)])
+  (check-true (procedure? (engine name)) (symbol->string name)))
+;; early copies from the graphics files (engine/pending.rktl)
+(check-equal? ((engine 'relation-name) #f) "diff")
+(check-equal? ((engine 'relation-name) (engine 'plato-successor)) "succ")
 
 ;; the engine never requires racket/gui (CLAUDE.md, TASK.md): loading it
 ;; into a fresh namespace declares no racket/gui or racket/draw module

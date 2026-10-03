@@ -25,8 +25,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   abandons the run and under `scheme --script` exits 255.
 - **Evidence:** `tests/golden/` contains this run, ending in a `halt` event;
   `chez_scheme/oracle/run.ss eqe qeq abbba aaabaaa --seed 3` prints `Stopped: halt`.
-- **Status:** won't fix (it's the original's behaviour). The port must halt at the same
-  codelet.
+- **Status:** won't fix (it's the original's behaviour). The port halts at the same
+  codelet: since iteration 11 (item 10) racket/tests/golden-test.rkt compares this run's
+  whole trace, `halt` event included.
 
 ### `caddr` of `#f` in `transcribe-to-english`
 - **Seen:** iteration 3 (item 02), `abc ccbbaa ijk` seed 3.
@@ -36,6 +37,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   with a backtrace.
 - **Status:** open. The golden set uses seed 4 instead. Nobody knows whether it happened
   under 1999-era Chez, where argument evaluation order may have differed.
+- **Update (iteration 11, item 10):** the port crashes at the same point, raising
+  `caddr: contract violation ... given: #f`, after the same 1062 trace lines.
+  racket/tests/golden-test.rkt runs the oracle on this problem and checks both.
 
 ### `bonds-equal?` calls `same-direction?`, which nothing defines
 - **Seen:** iteration 8 (item 07), compiling bonds.ss.
@@ -46,6 +50,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `grep -n "same-direction?" chez_scheme/original/*.ss` (one hit);
   racket/tests/engine-test.rkt checks the port's stand-in raises.
 - **Status:** won't fix (latent). engine/pending.rktl defines a stand-in that raises.
+
+### `complement-codelet-pattern` is never defined
+- **Seen:** iteration 11 (item 10), compiling trace.ss.
+- **What:** the Temporal Trace answers `get-complement-codelet-pattern` with the variable
+  `complement-codelet-pattern`, which no file defines (trace.ss has the procedure
+  `get-complement-codelet-pattern`, a different thing). Nothing sends that message, so
+  Chez never notices.
+- **Evidence:** `grep -n "complement-codelet-pattern" chez_scheme/original/*.ss`.
+- **Status:** won't fix (latent). engine/pending.rktl makes it an identifier macro that
+  raises "variable complement-codelet-pattern is not bound", as Chez would.
 
 ### A string image's `new-alpha-position-category` sends `new-start-letter`
 - **Seen:** iteration 6 (item 05), reading images.ss and checking it under Chez.
@@ -210,6 +224,33 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
     `set-shrunk-singleton?` on groups.
 - **Status:** worked around in the oracle with null windows that reject unknown messages.
   It's open for the GUI items, which must show that a GUI run equals a headless run.
+
+### The Memory outlives a run
+- **Seen:** iteration 11 (item 10), running several goldens in one Racket process.
+- **What:** `init-mcat` clears the Memory's activations and highlights, not its answers
+  and snags, so a second problem in the same session starts with the first problem's
+  answers in the Memory (that is the point of the Memory in the GUI: answers from earlier
+  runs). Running the goldens one after another in one engine gave different traces from
+  the second run on (the first difference being a stale codelet count). The oracle runs
+  every golden in a fresh Chez process.
+- **Evidence:** racket/tests/golden-test.rkt gives each run a fresh engine (a new
+  namespace); without that, only the first run matches.
+- **Status:** explained; not a bug. Any batch runner (item 11's CLI, tests) must start
+  each golden run with a fresh engine, or clear the Memory, to reproduce the oracle.
+
+### Trace events and the EEG reach into graphics files
+- **Seen:** iteration 11 (item 10).
+- **What:**
+  - Every group event's print name, which is in the trace (`"name":"[a-b-c]"`), is made
+    by `group-event-pexp-text-string` from trace-graphics.ss.
+  - The Temporal Trace's `display-workspace-state` sets `*fg-color*` and
+    `%bridge-label-background-color%`, globals of general-graphics.ss and constants.ss.
+  - workspace.ss's `initialize` sends `initialize` to `*EEG*`, an object defined only in
+    eeg-graphics.ss; headless runs never read it.
+- **Evidence:** `grep -n "group-event-pexp-text-string\|\*EEG\*" chez_scheme/original/*.ss`.
+- **Status:** worked around: engine/pending.rktl has an early verbatim copy of
+  `group-event-pexp-text-string` (pure); racket/tests/golden-harness.rkt gives a null
+  `*EEG*`. The GUI items move them back.
 
 ### Urgencies are exact rationals
 - **Seen:** iteration 3 (item 02).
