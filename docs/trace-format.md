@@ -218,11 +218,12 @@ aaabaaa`, whose documented run answers at 16668); misc3–misc5 run with
 1–8 s; `make-golden.ss` runs them in parallel (`nproc` jobs), about 13 s
 on 32 cores. Total about 40 MB uncompressed, under 5 MB compressed.
 
-### The port's traces (item 10)
-`racket/tests/golden-harness.rkt` writes the same format from the Racket
-engine: the same JSON writer (exact rationals as `"n/d"`, flonums through
+### The port's traces (items 10-11)
+`racket/headless.rkt` (since item 11; `racket/tests/golden-harness.rkt` in
+item 10) writes the same format from the Racket engine, and
+`racket racket/cli.rkt ... --trace FILE` writes it to a file: the same JSON writer (exact rationals as `"n/d"`, flonums through
 compat.rkt's Chez `number->string`), the same wrappers set through the
 engine's `set-global!`, the same headless windows, and the same driver.
 `racket/tests/golden-test.rkt` runs every golden of `tests/problems.txt`
 in a fresh engine and requires byte-for-byte equality; since item 10 all
-109 match.
+109 match, and since item 11 with the engine's own run.ss.

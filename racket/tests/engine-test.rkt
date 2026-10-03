@@ -81,7 +81,19 @@
 (check-true (procedure? (engine 'group-graphics)))
 
 ;; names from files not ported yet raise when called
-(check-exn #rx"not ported yet" (lambda () ((engine 'post-initial-codelets))))
+(check-exn #rx"not ported yet" (lambda () ((engine 'restore-current-state))))
+
+;; run.ss (item 11)
+(for ([name '(ss step-mode-on step-mode-off runtil clear-breakpoint break quiet-break go
+              suspend rerun run-mcat step-mcat init-mcat init-workspace
+              clamp-initial-slipnodes post-initial-codelets
+              add-string-position-descriptions-to-letters update-everything
+              update-workspace-values update-all-graphics)])
+  (check-true (procedure? (engine name)) (symbol->string name)))
+(check-equal? (list (engine '%update-cycle-length%) (engine '%initial-slipnode-clamp-cycles%)
+                    (engine '%garbage-collect-cycles%) (engine '*this-run*)
+                    (engine '*break-time*) (engine '*step-mode?*) (engine '%step-cycles%))
+              '(15 50 100 #f #f #f 1))
 
 ;; rules.ss and answers.ss (item 09), and the early copies in
 ;; engine/pending.rktl of general-graphics.ss's find-next-space-position;

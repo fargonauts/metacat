@@ -54,6 +54,7 @@
 (include "engine/workspace-strings.rktl") ; workspace-strings.ss
 (include "engine/concept-mappings.rktl") ; concept-mappings.ss
 (include "engine/workspace-structure-formulas.rktl") ; workspace-structure-formulas.ss
+(include "engine/run.rktl")            ; run.ss (without prompt, no-prompt)
 (include "engine/formulas.rktl")       ; formulas.ss
 (include "engine/slipnet.rktl")        ; slipnet.ss
 (include "engine/images.rktl")         ; images.ss
@@ -105,13 +106,16 @@
     monitor-new-concept-mappings monitor-new-rules
     make-answer-event make-snag-event
     abstract-answer-description abstract-snag-description
-    ;; not ported yet (engine/pending.rktl)
+    ;; never defined by the original (engine/pending.rktl); not ported yet
     *temperature-clamped?* *EEG*
-    suspend update-everything post-initial-codelets
     ;; groups.ss
     contains?
     ;; wrapped by a run's trace (chez_scheme/oracle/trace.ss does it by set!)
     *coderack* build-bond break-bond build-group break-group build-bridge
     break-bridge build-description update-temperature update-slipnet-activations
-    ;; run.ss (not ported yet)
-    *this-run* *display-mode?*))
+    ;; run.ss: the run's state, set by the GUI's control panel in the
+    ;; original; break and quiet-break are replaced by headless drivers
+    *this-run* *display-mode?* *running?* *interrupt?* *break-time*
+    *step-mode?* %step-cycles% break quiet-break
+    ;; run.ss: the rules battery (item 09) replaces them with fakes
+    suspend update-everything post-initial-codelets))

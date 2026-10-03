@@ -211,6 +211,23 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `ffi/unsafe/vm`'s `vm-primitive` (Racket CS's Chez is 10.3; the battery checks 500+
   values bit for bit against Chez 10.0).
 
+### `go` is the one place the original re-enters a continuation
+- **Seen:** iteration 12 (item 11), porting run.ss.
+- **What:** `break` and `quiet-break` capture a continuation with `continuation-point*`
+  (a full `call/cc` in syntactic-sugar.ss) and then `(reset)` to the REPL; `go` resumes
+  the run by calling that continuation after the REPL has moved on. Every other use of
+  `continuation-point*` only escapes upwards, which is why compat.rkt implements it with
+  `call/ec` (item 03). With `call/ec`, `go` would jump into a dead escape continuation.
+- **Evidence:** racket/tests/run-test.rkt stops a run at codelets 150, 300 and 450 with
+  the engine's own `break` and resumes it with `go`; the generator state, codelet count
+  and temperature equal those of the same run never stopped.
+- **Status:** worked around: run.rktl's `break` and `quiet-break` use Racket's `call/cc`
+  directly (marked `port:`). Racket's full continuations reach up to the nearest prompt,
+  so the caller of `run-mcat` and of `go` must each install one
+  (`call-with-continuation-prompt`), and the reset handler must be set, not
+  parameterized: a parameterization is part of the captured continuation, so `go` would
+  bring back the first caller's dead escape. The GUI item has to respect both.
+
 ## 🔗 Hidden couplings
 
 ### Model state that only a window can provide
@@ -268,6 +285,11 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `init-mcat` would raise "variable not bound".
 - **Status:** worked around: engine/pending.rktl defines it as `#f` (porting-notes.md,
   item 06); the run.ss item should keep a definition.
+- **Update (iteration 12, item 11):** run.ss does the same with
+  `*initial-slipnode-unclamp-time*`: `run-mcat` compares the codelet count with it,
+  `init-mcat` and `clamp-initial-slipnodes` `set!` it, and no file defines it. Racket
+  rejected run.rktl at compile time ("unbound identifier"). engine/pending.rktl now
+  defines both, as never-defined names (not pending on any item).
 
 ### Fonts the model reads but nothing defines
 - **Seen:** iteration 8 (item 07), compiling groups.ss.

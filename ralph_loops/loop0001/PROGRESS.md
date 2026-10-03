@@ -3,7 +3,7 @@
 ## Ralph Loop 0001 Status
 - **Started**: 2026-10-02
 - **Target**: 18 items
-- **Current**: 11/18 SOLVED
+- **Current**: 12/18 SOLVED
 
 ---
 
@@ -1120,3 +1120,133 @@ item asked for (theme and trace events).
     (with the engine's run.ss) and add the CLI vs `chez_scheme/oracle/run.ss`
     stdout comparison and run times per problem. Racket takes about 60 s on
     one core for all 109 runs; Chez about 13 s on 32 cores in parallel.
+
+---
+
+## Iteration 12 — 2026-10-03 01:31
+Item 11 (Full runs and the CLI): **SOLVED**. The engine now runs on its own
+ported run.ss. All 109 golden runs match event for event, and on all 109 the
+printed output equals the live oracle's byte for byte.
+
+### Completed
+- **`run.ss` → `racket/engine/run.rktl`**, included right after
+  workspace-structure-formulas.rktl (metacat.ss's load order). It is verbatim
+  apart from three `port:` changes:
+  - `prompt`/`no-prompt` (an SWL 0.9u REPL workaround) are left out, along
+    with `swl:sync-display`;
+  - `break` and `quiet-break` use Racket's re-entrant `call/cc`, so `go`
+    resumes a stopped run. compat's `continuation-point*` is an escape-only
+    `call/ec`, and `go` is the original's only re-entrant use of a
+    continuation;
+  - `init-workspace`'s `let` is written as a `let*` in Chez's order
+    (right to left). The mutation check shows this order makes no difference.
+- `engine/pending.rktl`:
+  - removed the run.ss stand-ins;
+  - added `restore-current-state` (workspace-graphics.ss);
+  - added `*initial-slipnode-unclamp-time*`, which the original never
+    defines. It is like `*temperature-clamped?*`: init-mcat creates it by
+    `set!`, and Racket refused to compile run.rktl without it.
+  - `set-global!` now also lists `*running?*`, `*interrupt?*`,
+    `*break-time*`, `*step-mode?*`, `%step-cycles%`, `break` and
+    `quiet-break`.
+- **`racket/headless.rkt`** (no racket/gui) is the port's counterpart of
+  `chez_scheme/oracle/run.ss` + prelude.ss's headless windows + trace.ss.
+  - It holds the code moved out of item 10's test harness.
+  - `run-problem` calls the engine's own `init-mcat`/`run-mcat`. It prints
+    what the oracle prints and writes the trace to an optional port.
+  - `racket/tests/golden-harness.rkt` is now a thin wrapper around it.
+- **`racket/cli.rkt`**: `racket racket/cli.rkt INITIAL MODIFIED TARGET
+  [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE]`.
+  - It uses the oracle's argument rules, output and exit codes: 2 for bad
+    arguments, 1 when the run raises.
+  - Without `--seed` the seed comes from the clock (`randomize`) and is
+    printed.
+- Tests:
+  - `racket/tests/golden-test.rkt` (kept, now on the engine's run.ss):
+    **109/109 traces identical to tests/golden/**. It now also runs the
+    oracle live in parallel and compares each run's printed output with
+    it: **109/109 identical**. It also checks that the outputs cover
+    commentary, answers, suspend's message, `Codelets run:` at a cap,
+    `Stopped: cap`, `Stopped: halt` with `Ooops:`, and `Answers: none`.
+    The crash run (`abc ccbbaa ijk` seed 3) is still checked. Takes about
+    40 s.
+  - **`racket/tests/cli-test.rkt`** runs the CLI as a program against the
+    oracle program on these runs: an answer, no cap, a cap before any
+    answer, a justify run, keep-going, and the halt run. In each, stdout
+    and the exit code must match and stderr must be empty.
+    - `--trace` writes the golden file byte for byte and leaves the output
+      unchanged.
+    - A clock seed is printed, and the oracle replays the run from it.
+    - The crash run fails in both programs, with the same stdout up to the
+      crash and the `caddr` error.
+    - 9 bad argument lists exit 2 in both programs.
+    - 69 checks, about 15 s.
+  - **`racket/tests/run-test.rkt`**: the engine's own `break`/`go`.
+    - One run is stopped at codelets 150, 300 and 450 and resumed with
+      `go`. Its RNG state, count, temperature and output equal those of
+      an unstopped run, and the control panel gets the expected
+      input/run mode switches.
+    - Step mode (`ss 40`) and `go` without a break are covered too.
+  - `racket/tests/engine-test.rkt`: run.ss's procedures and constants. The
+    pending check now uses `restore-current-state`.
+- Tests-first, honestly:
+  - `cli-test.rkt` was written before `cli.rkt` existed and failed 39 of 69
+    checks (cannot open module file).
+  - The stdout comparison in golden-test.rkt was written after
+    headless.rkt. It failed only on my own too-specific regex
+    (`Codelets run: 10000`; caps differ), which I fixed.
+  - run.rktl came before its tests. Compiling it found the undefined
+    `*initial-slipnode-unclamp-time*`. The first full suite then failed 1
+    of 956 checks: engine-test still expected the `post-initial-codelets`
+    stand-in.
+  - run-test.rkt was written after the port. It passed once its helper
+    used compat's `random-seed`.
+  - With the engine's run.ss replacing item 10's copy, all 109 goldens
+    matched at once.
+- **Mutation checks** on run.rktl, 10 mutations (table in porting-notes.md).
+  - 8 are caught, with 3 to 109 runs differing in trace and output: update
+    cycle, clamp cycles, initial codelets, spread order, unclamp, snag
+    undo, middle description, single-letter activation.
+  - 2 are equivalent: the string-making order, and the null window's
+    `garbage-collect`.
+- **Run times** (`tests/bench-runs.rkt`, outside the suite; table per problem
+  in **`docs/run-times.md`**). Each of the 109 runs was timed as a process,
+  one at a time, and the outputs were identical on 109 of 109.
+  - Totals: Chez 104 s, Racket 70 s.
+  - Startup: Chez 0.71 s (it compiles the original's sources on every
+    start), Racket 0.14 s.
+  - Per codelet the port is about 2× slower: ≈200 vs ≈97 ms per 1000
+    codelets.
+  - On the longest problem (`eqe qeq abbba aaabaaa`, 34,601 codelets over
+    3 seeds) the port's processes are 1.35× slower in total.
+  - Short runs finish sooner in the port, because of its faster startup.
+- Docs:
+  - porting-notes.md: new item 11 section.
+  - anomalies_and_quirks.md: a new entry, `go` is the one re-entrant
+    continuation, with what the GUI must respect (a prompt per caller; set
+    the reset handler, don't parameterize it). The entry on
+    `*temperature-clamped?*` now also covers `*initial-slipnode-unclamp-time*`.
+  - trace-format.md, chez_scheme/oracle/README.md, and the CLI line in
+    CLAUDE.md.
+- `python3 ralph_loops/loop0001/gate.py`: **GATE PASSED** (about 6 min on
+  this machine). `chez_scheme/original/` untouched. divergences.md: still none.
+
+### Blockers
+- None.
+
+### Next
+- Item 12 (the SGL interpreter on racket/draw). Notes for the GUI items:
+  - Drive runs through the engine's own run.ss, as `racket/headless.rkt`
+    does, but keep the engine's `break`/`go`.
+    - Run `run-mcat` and `go` each inside `call-with-continuation-prompt`
+      in the engine thread.
+    - Set (don't parameterize) compat's `reset-handler`, as
+      racket/tests/run-test.rkt does.
+    - The control panel must accept `switch-to-input-mode`,
+      `switch-to-run-mode` and `set-verbose-step-mode`.
+  - Use one engine instance per run, or accept the original's behaviour
+    (the Memory keeps answers across runs, as in the original program).
+  - The early copies in pending.rktl (`find-next-space-position`,
+    `group-event-pexp-text-string`, `relation-name`) and the graphics
+    stand-ins move back to their graphics files as those are ported.
+  - The gate is about 6 min.

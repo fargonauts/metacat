@@ -24,6 +24,9 @@ port (`tests/golden/`).
   `Stopped:` says why the run ended: `suspend`, `cap` or `halt` (the
   original called `report-error-and-halt`). `--trace FILE` also writes the
   JSON-lines trace (`docs/trace-format.md`) without changing the run.
+  The port's `racket racket/cli.rkt` takes the same arguments and prints the
+  same output; `racket/tests/golden-test.rkt` and `cli-test.rkt` run this
+  script live to check it.
 - `trace.ss` is the trace instrumentation: it wraps top-level procedures
   (`build-bond`, `break-group`, `update-temperature`, …), forwards
   `*coderack*` and `*workspace*` through closures that note codelets and

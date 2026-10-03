@@ -80,7 +80,7 @@
     `justify.ss`, `trace.ss`, `jootsing.ss` and `memory.ss`: the self-watching half of
     Metacat. Tests: theme and trace events match the goldens.
 
-- [ ] **11 Full runs and the CLI.** Port `run.ss` (headless parts) and write
+- [x] **11 Full runs and the CLI.** Port `run.ss` (headless parts) and write
     `racket/cli.rkt`. Tests: **every golden run in `tests/golden/` matches event
     for event**, and the CLI prints the same answers and commentary as `chez_scheme/oracle/run.ss`.
     This test stays in `run-tests.sh` for the rest of the loop. Record run time per

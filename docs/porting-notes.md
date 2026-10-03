@@ -994,3 +994,94 @@ replaces the copy). Notes:
   positive activation of 0 or 100 (the goldens' `themes` lines: 900 clusters
   at 100, 117 at 0, none between), and `prob?` answers 0 and 1 without
   drawing.
+
+## Full runs and the CLI (item 11)
+
+**Changes**: `run.ss` → `racket/engine/run.rktl`, included by engine.rkt right
+after workspace-structure-formulas.rktl (metacat.ss's load order: run.ss comes
+before formulas.ss). Three changes, marked `port:`:
+- `prompt` and `no-prompt` are left out. They patch the SWL 0.9u REPL's
+  waiter (`waiter-prompt-and-read`, `console-input-port`); `prompt` even calls
+  the waiter at load time. `break` and `quiet-break` drop their calls to them
+  and to `swl:sync-display`.
+- `break` and `quiet-break` capture their continuation with Racket's
+  `call/cc` instead of `continuation-point*`, which compat.rkt implements
+  with `call/ec` (item 03). `go` resumes a stopped run by calling that
+  continuation after `(reset)` has left it: the only re-entrant use of a
+  continuation in the original (anomalies_and_quirks.md). The caller of
+  `run-mcat` and of `go` each needs a continuation prompt, and the reset
+  handler must be set rather than parameterized (racket/tests/run-test.rkt
+  shows how).
+- `init-workspace`'s `let` becomes a `let*` listing the inits last to first,
+  Chez's order. It is equivalent: making the strings draws nothing and
+  numbers nothing (the mutation that makes them left to right changes no
+  golden).
+
+Everything else is verbatim: the step mode (`ss`, `step-mode-on/off`),
+`runtil`, `go`, `suspend` (whose "Type (go) or click on the Workspace to
+continue..." is part of the oracle's output), `rerun`, `run-mcat` (whose
+"Codelets run: K" at the breakpoint is too), `init-mcat`, `update-everything`.
+
+**Stand-ins** (engine/pending.rktl): removed the run.ss names (`go`,
+`suspend`, `update-everything`, `post-initial-codelets`, `*this-run*`,
+`*display-mode?*`, `*step-mode?*`, `%step-cycles%`, `%update-cycle-length%`).
+Added `restore-current-state` (workspace-graphics.ss; `go` calls it when
+`*display-mode?*` is on). `*initial-slipnode-unclamp-time*` joins
+`*temperature-clamped?*` as a name the original never defines (init-mcat
+creates it by `set!`). `set-global!` also lists `*running?*`, `*interrupt?*`,
+`*break-time*`, `*step-mode?*`, `%step-cycles%`, `break`, `quiet-break` (the
+GUI's control panel and headless drivers set them).
+
+**racket/headless.rkt** is the port's counterpart of chez_scheme/oracle/run.ss
+with prelude.ss's headless windows and trace.ss's instrumentation (moved out
+of item 10's racket/tests/golden-harness.rkt, which is now a thin wrapper).
+`(run-problem strings seed cap keep-going? [trace-port])` calls the engine's
+`init-mcat` and `run-mcat`, prints what the oracle prints (Problem line,
+`Comment:` as each paragraph is drawn, `Answer:`, `Ooops:` from
+`report-error-and-halt`, the summary) and writes the trace. `break` and
+`quiet-break` are replaced, as the oracle does, by a procedure that ends the
+run (or with keep-going returns as `go` would). One problem per engine
+instance: the Memory and the codelet counters outlive a run.
+
+**racket/cli.rkt**: `racket racket/cli.rkt INITIAL MODIFIED TARGET [ANSWER]
+[--seed N] [--max-codelets K] [--keep-going] [--trace FILE]`, with the oracle's
+argument rules, output and exit codes (2 for bad arguments; 1 when the run
+raises, as on `abc ccbbaa ijk` seed 3). Without `--seed` the seed comes from
+the clock through utilities.ss's `randomize`, as in the oracle. The only
+textual difference is the program name in the usage message.
+
+**Tests**:
+- `racket/tests/golden-test.rkt` now runs the engine's own run.ss, and also
+  runs the oracle live (Chez processes in parallel, while the places run
+  the port) and compares each run's printed output with the oracle's, byte
+  for byte: **109/109 traces and 109/109 outputs identical**. It checks that
+  the outputs include commentary, answers, suspend's message, a cap's
+  `Codelets run:`, `Stopped: cap`, `Stopped: halt` with `Ooops:`, and
+  `Answers: none`. About 40 s.
+- `racket/tests/cli-test.rkt` runs `racket racket/cli.rkt` as a program against
+  `scheme --script chez_scheme/oracle/run.ss`: an answer, no cap, a cap before
+  any answer, a justify run, keep-going, the halt run (same stdout, same exit
+  code, empty stderr); `--trace` writes the golden file and doesn't change the
+  output; a clock seed is printed and replays the same run in the oracle; the
+  crash run fails in both with the same stdout up to the crash; nine bad
+  argument lists exit 2 in both, with nothing on stdout.
+- `racket/tests/run-test.rkt`: the engine's own `break`/`go` (above) and
+  step mode.
+- `racket/tests/engine-test.rkt`: run.ss's procedures and constants.
+- Run times: `racket tests/bench-runs.rkt docs/run-times.md` (not in the
+  suite) times each run as a process, one at a time; see docs/run-times.md.
+- Mutation checks on run.rktl, against golden-test.rkt, each restored
+  afterwards (1 s pauses around the edits):
+
+  | Mutation | Traces / outputs differing (of 109) |
+  | --- | --- |
+  | update cycle 15 → 16 | 108 (+1 raises) / 108 |
+  | initial clamp cycles 50 → 49 | 21 / 21 |
+  | initial codelets 2× → 3× objects | 109 / 109 |
+  | Themespace spreads before the Workspace spreads to it | 109 / 6 |
+  | initially clamped nodes never unfrozen | 71 / 71 |
+  | snag condition never undone | 15 / 15 |
+  | middle description for even lengths | 106 / 106 |
+  | single-letter problems: object category not activated | 3 / 3 |
+  | strings made left to right in init-workspace | 0 (equivalent, above) |
+  | no `garbage-collect` to the Themespace window | 0 (a null window) |

@@ -16,21 +16,17 @@
 
 (define-syntax-rule (pending-variables name ...)
   (begin (define name #f) ...))
-;; run.ss
-(pending-variables *display-mode?* *step-mode?* %step-cycles%)
-;; memory.ss records the run (init-mcat sets it) with each answer and snag
-(pending-variables *this-run*)
-;; *temperature-clamped?* has no definition in the original: init-mcat
-;; creates it by set! on the top level (formulas.ss reads it).
-(pending-variables *temperature-clamped?*)
-(define %update-cycle-length% 15)       ; run.ss's constant (slipnode 'reset)
+;; *temperature-clamped?* and *initial-slipnode-unclamp-time* have no
+;; definition in the original: init-mcat (run.ss) creates them by set! on
+;; the top level (formulas.ss reads the first, run-mcat the second).  Not
+;; pending on any item.
+(define *temperature-clamped?* #f)
+(define *initial-slipnode-unclamp-time* #f)
 ;; Never defined in the original: bonds.ss's bonds-equal? (itself never
 ;; called) refers to it.  Under Chez a call would raise "variable
 ;; same-direction? is not bound"; this raises too.  Not pending on any item.
 (define (same-direction? . args)
   (error 'same-direction? "variable same-direction? is not bound"))
-;; run.ss: answers.ss calls these when it reports an answer or a snag
-(pending-procedures go post-initial-codelets suspend update-everything)
 ;; Never defined in the original: the Temporal Trace's
 ;; get-complement-codelet-pattern message (trace.ss), never sent, returns
 ;; it.  Not pending on any item.
@@ -109,6 +105,8 @@
       (else #f))))
 ;; rule-graphics.ss
 (pending-procedures initialize-rule-graphics)
+;; workspace-graphics.ss: run.ss's go calls it when *display-mode?* is on
+(pending-procedures restore-current-state)
 ;; group-graphics.ss (group-graphics itself is in engine/group-graphics.rktl)
 (pending-procedures make-group-pexp draw-group-grope)
 (pending-variables %small-group-arrowhead-length% %group-arrowhead-angle%)

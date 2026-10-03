@@ -1,4 +1,11 @@
 #lang racket/base
+;; Items 10-11: the port against the golden traces and the oracle's output.
+;; Since item 11 the runs use the engine's own run.ss (init-mcat, run-mcat),
+;; driven by racket/headless.rkt, and each run's printed output (what
+;; racket/cli.rkt prints) must also equal what chez_scheme/oracle/run.ss
+;; prints for the same run, run live here: commentary, answers, the model's
+;; own messages and the summary.
+;;
 ;; Item 10: the port against the golden traces.  With themes.ss, justify.ss,
 ;; trace.ss, jootsing.ss and memory.ss ported, every run of
 ;; tests/problems.txt is run by the engine (golden-harness.rkt: the oracle's
@@ -42,14 +49,50 @@
 
 (define (short s) (if (> (string-length s) 400) (string-append (substring s 0 400) " ...") s))
 
-;; one run, in a fresh engine: (list file-name trace-or-error-message ok?)
+;; one run, in a fresh engine:
+;; (list file-name trace-or-error-message ok? stdout seconds)
 (define (run-one harness run)
   (with-handlers ([(lambda (e) #t)
-                   (lambda (e) (list (car run) (if (exn? e) (exn-message e) (format "~s" e)) #f))])
-    (define golden-trace
+                   (lambda (e) (list (car run) (if (exn? e) (exn-message e) (format "~s" e)) #f
+                                     "" 0))])
+    (define golden-run
       (parameterize ([current-namespace (make-base-namespace)])
-        (dynamic-require (string->path harness) 'golden-trace)))
-    (list (car run) (apply golden-trace (cdr run)) #t)))
+        (dynamic-require (string->path harness) 'golden-run)))
+    (define start (current-inexact-milliseconds))
+    (define-values (trace stdout) (apply golden-run (cdr run)))
+    (list (car run) trace #t stdout (/ (- (current-inexact-milliseconds) start) 1000.0))))
+
+;; chez_scheme/oracle/run.ss's arguments for a run of golden-runs
+(define (oracle-args run)
+  (append (map symbol->string (list-ref run 1))
+          (list "--seed" (number->string (list-ref run 2)))
+          (if (list-ref run 3) (list "--max-codelets" (number->string (list-ref run 3))) '())
+          (if (list-ref run 4) (list "--keep-going") '())))
+
+;; the oracle's stdout for every run, n processes at a time:
+;; hash file-name -> (cons stdout exit-code)
+(define (oracle-outputs scheme oracle-run runs n)
+  (define results (make-hash))
+  (let loop ([queue runs] [running '()])
+    (cond
+      [(and (null? queue) (null? running)) results]
+      [(and (pair? queue) (< (length running) n))
+       (define run (car queue))
+       (define-values (proc stdout stdin stderr)
+         (apply subprocess #f #f 'stdout scheme "--script" (path->string oracle-run)
+                (oracle-args run)))
+       (close-output-port stdin)
+       ;; read the output as it comes, so that a full pipe never blocks Chez
+       (define text (open-output-string))
+       (define reader (thread (lambda () (copy-port stdout text) (close-input-port stdout))))
+       (loop (cdr queue) (cons (list run proc reader text) running))]
+      [else
+       (define done
+         (apply sync (for/list ([r running]) (wrap-evt (car (cdr r)) (lambda (_) r)))))
+       (thread-wait (caddr done))
+       (hash-set! results (car (car done))
+                  (cons (get-output-string (cadddr done)) (subprocess-status (cadr done))))
+       (loop queue (remq done running))])))
 
 (define (start-worker)
   (place ch
@@ -74,6 +117,15 @@
                         (path->string f))
                       string<?)
                 "problems.txt lists exactly the runs of tests/golden/")
+  ;; the oracle, live, in a background thread while the port runs
+  (define-runtime-path oracle-run-script "../../chez_scheme/oracle/run.ss")
+  (define chez (or (find-executable-path "scheme") (find-executable-path "chezscheme")))
+  (define oracle-results #f)
+  (define oracle-thread
+    (thread (lambda ()
+              (set! oracle-results
+                    (oracle-outputs chez oracle-run-script runs
+                                    (max 1 (quotient (processor-count) 2)))))))
   (define n-workers (max 1 (min 16 (processor-count) (length runs))))
   (define workers (for/list ([i n-workers]) (start-worker)))
   ;; longest runs first (by golden size), handed out as workers free up
@@ -93,6 +145,8 @@
                          (wrap-evt w (lambda (r) (values w r))))))
          (loop queue (cons w idle) (sub1 busy) (cons result acc))])))
   (for ([w workers]) (place-channel-put w #f) (place-wait w))
+  (thread-wait oracle-thread)
+  (define output-lines 0)
   (define themes-lines 0)
   (define event-lines 0)
   (for ([result (sort results string<? #:key car)])
@@ -106,8 +160,23 @@
            (fail (format "~a: traces differ at line ~a\n  golden: ~a\n  port:   ~a"
                          name (car d) (short (caddr d)) (short (cadr d))))
            (check-true #t))
+       ;; the printed output against the oracle's
+       (define oracle (hash-ref oracle-results name))
+       (check-equal? (cdr oracle) 0 (format "~a: the oracle exits 0" name))
+       (define o (first-difference (list-ref result 3) (car oracle)))
+       (if o
+           (fail (format "~a: output differs from the oracle's at line ~a\n  oracle: ~a\n  port:   ~a"
+                         name (car o) (short (caddr o)) (short (cadr o))))
+           (check-true #t))
+       (set! output-lines (+ output-lines (length (string-split (car oracle) "\n"))))
        (set! themes-lines (+ themes-lines (length (regexp-match* #rx"\"ev\":\"themes\"" want))))
        (set! event-lines (+ event-lines (length (regexp-match* #rx"\"ev\":\"event\"" want))))]))
+  ;; what the outputs cover: commentary, answers, the summary, cap and halt
+  (define all-output (apply string-append (map (lambda (r) (list-ref r 3)) results)))
+  (for ([rx (list #rx"\nComment: " #rx"\nAnswer: " #rx"\nType \\(go\\) or click"
+                  #rx"\nCodelets run: [0-9]+\n" #rx"\nStopped: cap\n" #rx"\nStopped: halt\n"
+                  #rx"\nOoops: bad message" #rx"\nAnswers: none\n")])
+    (check-true (regexp-match? rx all-output) (format "the outputs have ~a" (object-name rx))))
   ;; what the goldens cover of the self-watching half
   (check-true (> themes-lines 10000) "the goldens have themes events")
   (check-true (> event-lines 1000) "the goldens have Temporal Trace events")
