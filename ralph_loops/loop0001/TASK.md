@@ -99,6 +99,12 @@ The loop is complete when every item in `iterations.md` is DONE or BLOCKED. Only
   interrupt the REPL thread from GUI buttons (`thread-break *repl-thread*`). In the port
   the engine runs in its own Racket thread and the GUI talks to it by messages; Step,
   Run, Pause and Stop must work without races.
+- **GUI tests run on a virtual display, never the owner's screen.** `xvfb-run` is
+  installed: run every test or script that opens a `racket/gui` window as
+  `xvfb-run -a racket ...`, including from `tests/run-tests.sh`. A GUI script must
+  exit by itself (`(exit 0)` or closing its frames and returning from the
+  eventspace), otherwise it hangs the gate. Offscreen rendering with `racket/draw`
+  bitmaps needs no display at all.
 - Marshall's dissertation (`https://science.slc.edu/~jmarshall/metacat/dissertation.pdf`)
   describes every panel and the intended behaviour; use it when the code is unclear.
 - Do not commit or push yourself; the driver commits after the gate passes and pushes to `origin` (git@github.com:fargonauts/metacat.git).
