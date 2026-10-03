@@ -74,3 +74,12 @@ unchanged `SOURCES` (fast), and a byte-identical re-capture (slow).
   `oracle/batteries/coderack-extra-battery.scm` (urgency clipping with flonums, clamp
   exactness). Globals of modules not translated yet are stand-ins
   (`tests/engine_stubs.py`).
+- `metacat/slipnet.py`: slipnet.ss (slipnodes, links, activation spreading and decay,
+  `update-slipnet-activations`); `load()` builds the 59 nodes, their codelet types,
+  descriptor predicates and the 202 links.
+- `metacat/images.py`: images.ss (letter, group and string images for rule application).
+
+  Tests: `tests/test_slipnet.py`, every test of `tests/diff/slipnet-battery.scm` (the
+  initial slipnet, 20 updates from fixed states to the last bit, images) plus
+  `oracle/batteries/slipnet-extra-battery.scm` (`replace-all` stopped midway, `extend`'s
+  length-first order, `number->platonic-number` bounds).

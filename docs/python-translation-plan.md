@@ -500,6 +500,28 @@ from symbols").
 - **Arithmetic on values that may be `#f`** goes through `chez.add`/`sub`/`mul`, since
   Python's `bool` is an `int` (anomalies entry).
 
+### As built (item 05)
+
+- **slipnet.py**: make-slipnode's closure is `Slipnode`, make-slipnet-link's `SlipnetLink`.
+  Link lists are rebuilt on every cons, never mutated. `load()` runs the file's top-level
+  forms in order: `*slipnet-nodes*` through `slipnet_node_list_star(..., module=slipnet)`
+  (each node a module attribute `slipnet.plato_a` and a top-level value), the four node
+  lists, top-down codelet types, intrinsic link lengths, descriptor predicates, then the
+  202 links through the sugar link functions (each link only a top-level value, `a-b-link`).
+  `%update-cycle-length%` (run.ss), `monitor-slipnode-activation-change` (trace.ss),
+  `temp-adjusted-probability` (formulas.ss), `*themespace*` and `*workspace*` are read
+  through the package at call time, so `engine.set_global` can replace them.
+- **images.py**: `Image` and `StringImage`. `fail` is any procedure that does not return
+  (it raises in the tests; rules.py will pass its escape). `replace-all` and every
+  `tell-all` keep `chez.map_`'s order, since `fail` can escape midway and leave the images
+  map already reached changed (pinned by `slipnet-extra`'s `image-replace-all-fail`).
+  `make-letter`, `make-group` and `make-group-pexp` are read through the package.
+- **Arithmetic**: activations stay exact; `reset`, `decay-activation`, `spread-activation` and
+  `flush-activation-buffer` still go through `chez.expt`/`mul`/`div`/`min_`/`add`, so a flonum
+  from a theme would be handled as in Chez.
+- **Test isolation**: test files share one engine; files whose cases change engine state or
+  the top level restore it afterwards (anomalies entry).
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

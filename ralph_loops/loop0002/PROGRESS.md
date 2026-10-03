@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 5/18 SOLVED
+- **Current**: 6/18 SOLVED
 
 ---
 
@@ -563,3 +563,105 @@ builds the nodes (`sugar.slipnet_node_list_star(specs, module=slipnet)`), the li
 the battery's stand-ins from `tests/engine_stubs.py` and call `engine.load()` once.
 `engine.set_global` finds any module in `LOAD_ORDER` that exists, stand-ins included.
 Reach modules that don't exist yet through `_metacat.<module>` at call time.
+
+---
+
+## Iteration 6 — 2026-10-03 20:39
+
+### Completed
+Item 05, slipnet and images: **SOLVED**.
+- **Tests first.** `python/tests/test_slipnet.py` has one case for each of the 47 tests of
+  `tests/diff/slipnet-battery.scm`. Each case rebuilds the battery expression in Python
+  with the same order of draws and effects (every battery `map` is `chez.map_`) and compares
+  its `b:canon` text with the frozen fixture. The two `ERROR` fixtures
+  (`relationship-between-one`/`-none`) must raise. The cases run in the battery's order in
+  one engine. The battery's top-level forms (its logging monitor, the fake Themespace, the
+  logging `temp-adjusted-probability`, the reset before the images) run before the test
+  they precede. Globals of files not translated yet are stand-ins from
+  `tests/engine_stubs.py`: run.ss's `%update-cycle-length%`, trace.ss's monitor, formulas.ss's
+  `temp-adjusted-probability`, `*themespace*` and `*workspace*`. rules.ss's `format-slipnode`
+  (for `reveal`) is a temporary top-level value. The battery covers:
+  - the **initial slipnet dump**: all 59 nodes, every link list with its degrees of
+    association, 202 links, the nodes and links as top-level values;
+  - **20 calls of `update-slipnet-activations`** from 8 fixed states, plus 15 seeds and the
+    start-of-run state. All activations, frozen flags and the generator state after every
+    call are compared exactly.
+  Other tests check that every `define` of slipnet.ss and images.ss has its Python
+  function, that the nodes are module attributes and top-level values, that docstrings
+  name their origin, that there is no tkinter import, and the load order. I wrote the file
+  before either module existed and ran it: collection failed with
+  `ImportError: cannot import name 'slipnet' from 'metacat'`.
+- **Code** (new):
+  - `metacat/slipnet.py`: `Slipnode`, `SlipnetLink`, the relations (`get-label`,
+    `relationship-between`, `linked?` …), `update-slipnet-activations` and the platonic
+    helpers. `load()` runs the file's top-level forms in order: the node lists, the
+    top-down codelet types, intrinsic link lengths, descriptor predicates and the links,
+    through sugar.py's link functions.
+  - `metacat/images.py`: `Image`, `StringImage`, `change-length-first?` and
+    `enumerate-letter`.
+
+  All 53 tests passed on the first run.
+- **Mutation checks** (`/tmp/mut5/mutate.py`, not kept; each mutant run against
+  test_slipnet.py, then restored; `git status` confirmed). 37 mutants:
+  - **caught (28):** decay with a float rate; flush without `min`; clamp/update-activation
+    without the monitor; set-activation ignoring frozen; links appended; outgoing order;
+    relationship-between without `all-same?`; similar property links without
+    `temp-adjusted-probability`; apply-slippages without the CM-type test; top-down
+    urgency without `%`; top-down posting without its coin; predecessor links ascending;
+    `>` in above-threshold; `>=` in number->platonic; leftmost ignoring string-spanning;
+    the `LettCtgy` short name; string replace-all left to right; new-start-letter's
+    `tell-all` left to right; string reset keeping its direction; string
+    `new-alpha-position-category` "fixed"; enumerate-letter without its relation check;
+    image print's `>`; image reset keeping the swapped image; shorten `< 1`; leaf-walk
+    not reversed; reverse-medium's start letter; change-length-first `<=`.
+  - **killed by a new local battery (3):** Image's `replace-all` left to right, `extend`
+    always changing the start letter first, and `number->platonic-number` without the
+    `n` < 1 guard. `python/oracle/batteries/slipnet-extra-battery.scm` (4 tests:
+    `image-replace-all-fail`, `extend-length-first`, `number-to-platonic-number-range`,
+    `-zero`) is captured into `python/fixtures/slipnet-extra/` through the unedited
+    diff-eval.ss, and the slow re-capture test covers it. It was written *after* the
+    code; its Python cases passed at once, and the three mutants now fail.
+  - **equivalent (6):**
+    - the partially-active jump with its probability computed before the coin, or with
+      `<=`: the probability draws nothing, and a tie needs coin = p exactly;
+    - spread with `floor`: only fully active nodes spread, at activation 100, so the
+      amount is an integer;
+    - the shrunk link length with `floor`: 40% of 60, 0 and 80 are integers;
+    - get-related-node taking the last match: on this slipnet the same-category node is
+      always last (the four cases are leftmost, rightmost, left and right over Opposite);
+    - new-length `n <= len` → `n < len`: both do nothing when `n` = `len`.
+- **Evaluation order.** No call or `let` in slipnet.ss or images.ss has two effectful
+  parts (as the Racket port found). The draws are the `stochastic-if*` in
+  `update-slipnet-activations` and `attempt-to-post-top-down-codelets` (coin first,
+  with `# chez:` comments), `prob?` in `get-similar-property-links` (filter order) and in
+  `apply-slippages`. Order matters in images through `fail`: `replace-all` and `tell-all`
+  use `chez.map_`.
+- **A test-isolation trap**, found and fixed. pytest runs every file in one engine.
+  test_utilities.py's slipnet-macro cases leave fake `plato-p`/`plato-q`/`plato-z` and
+  links in the top level, so any later file would have seen them. A probe test showed
+  it. test_utilities.py now restores `chez.TOP_LEVEL` in a module fixture, and so does
+  test_slipnet.py, which also resets the slipnodes and the coderack at the end.
+- **Docs.**
+  - `docs/anomalies_and_quirks.md`: two Python entries, negative indexes wrapping where
+    Chez raises, and the shared engine leaking fakes across test files.
+  - `docs/python-translation-plan.md`: "As built (item 05)".
+  - `python/README.md`: the new modules and tests.
+  - `test_fixtures.py` now expects the local battery `slipnet-extra`.
+- Speed, for item 12: `update-slipnet-activations` takes 224 µs (59 nodes, no themes),
+  `get-related-node` 1.9 µs and `get-label` 1.1 µs.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (496 tests, 32 s).
+
+### Blockers
+None. Left for later items, by design:
+- `Image`'s `instantiate-as-letter` and `instantiate-as-group` are translated but not run.
+  They need workspace-objects.py's `make-letter`, groups.py's `make-group`,
+  group-graphics.py's `make-group-pexp` and workspace.py's `%built%`, all read through
+  the package. Items 06–07 and rules (item 17) exercise them.
+- `draw-activation-graphics` is untested; it waits for the slipnet panel (item 14).
+
+### Next
+Item 06, workspace. Engine modules may now import `slipnet` directly (`slipnet.plato_a`,
+`slipnet.relationship_between`). The workspace test needs `run.p_update_cycle_length`
+only if it resets slipnodes; trace.py's monitor is still a stand-in. Test files that
+change engine state should restore it when they end (see the new anomalies entry).
+test_slipnet.py's module fixture is a model for that.

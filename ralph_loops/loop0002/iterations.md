@@ -48,7 +48,7 @@
     temperature, `choose-codelet` over seeds with the RNG state after each choice,
     overflow deletion, deferred posting, …).
 
-- [ ] **05 Slipnet and images.** Translate `slipnet.ss` and `images.ss`. Tests: every test of
+- [x] **05 Slipnet and images.** Translate `slipnet.ss` and `images.ss`. Tests: every test of
     `slipnet-battery.scm`; the initial slipnet dump equals Chez's; activation spreading
     and decay over 20 updates match to the last bit.
 

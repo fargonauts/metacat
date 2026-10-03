@@ -41,6 +41,17 @@ import metacat
 from metacat import objects, sugar, utilities as u
 from metacat.objects import INVALID, Lambda, SchemeObject, message, tell
 
+
+@pytest.fixture(scope="module", autouse=True)
+def restore_top_level():
+    """The battery's slipnet-macro cases define fake plato-p, plato-q, plato-z ...
+    and links as top-level values; restore the engine's afterwards, so that
+    the test files that run later see the real slipnodes."""
+    saved = dict(chez.TOP_LEVEL)
+    yield
+    chez.TOP_LEVEL.clear()
+    chez.TOP_LEVEL.update(saved)
+
 CASES: dict = {}
 
 

@@ -25,7 +25,7 @@ def test_every_battery_is_captured():
     frozen = [b for b in BATTERIES if capture.battery_path(b).parent == capture.DIFF]
     local = [b for b in BATTERIES if capture.battery_path(b).parent == capture.LOCAL]
     assert len(frozen) == 10              # tests/diff/*-battery.scm
-    assert local == ["chez", "coderack-extra", "utilities-extra"]   # python/oracle/batteries/ (items 02-04)
+    assert local == ["chez", "coderack-extra", "slipnet-extra", "utilities-extra"]   # python/oracle/batteries/ (items 02-05)
     assert sorted(p.name for p in FIXTURES.iterdir() if p.is_dir()) == BATTERIES
 
 

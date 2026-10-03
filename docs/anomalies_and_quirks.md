@@ -529,6 +529,36 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   then asserts `same` with a message showing the first differing character and its
   context.
 
+### Python's negative indexes wrap around where Chez's `list-ref` and `car` raise
+- **Seen:** loop0002 iteration 6 (item 05), translating slipnet.ss's
+  `number->platonic-number`, `(nth (- n 1) *slipnet-numbers*)`.
+- **What:** for `n` = 0, Chez's `(list-ref l -1)` is an error; Python's `l[-1]` quietly
+  gives the last element (`plato-five`). In the same way, utilities.py's `first`, `nth`
+  and `last` are plain indexing, so `(1st '())` raises `IndexError`, not a
+  `chez.SchemeError` (both stop the run, which is what matters, but tests that expect a
+  Chez `ERROR` have to accept either).
+- **Evidence:** `python/oracle/batteries/slipnet-extra-battery.scm`,
+  `number-to-platonic-number-zero` (Chez: `ERROR`); `relationship-between-one` in
+  `tests/diff/slipnet-battery.scm` (the `1st` of `'()`).
+- **Status:** worked around: `slipnet.number_to_platonic_number` raises `SchemeError` for
+  `n` < 1. Elsewhere an index is never negative in the model; a translation that computes
+  one (`n - 1`, `len - k`) should check it.
+
+### The test files share one engine, so one battery's fake top-level values leak into later files
+- **Seen:** loop0002 iteration 6 (item 05).
+- **What:** pytest runs every test file in one process, and `engine.load()` runs once. The
+  Chez batteries each ran in a fresh Chez. test_utilities.py's slipnet-macro cases define
+  `plato-p`, `plato-q`, `plato-z` and some links as fake top-level values (as
+  utilities-battery.scm does), and they stayed there: any later file (test_workspace.py
+  and after, alphabetically) would have seen `(top-level-value 'plato-z)` → `"node-z"`,
+  and the link macros would have reached the fakes.
+- **Evidence:** before the fix, running `tests/test_slipnet.py tests/test_utilities.py`
+  and then a probe asserting `chez.top_level_value("plato-z") is slipnet.plato_z` failed.
+- **Status:** worked around: test_utilities.py and test_slipnet.py restore
+  `chez.TOP_LEVEL` after their cases (module fixtures), and test_slipnet.py resets the
+  slipnodes and the coderack when it ends. Later test files that change engine state should
+  do the same.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
