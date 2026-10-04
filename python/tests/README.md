@@ -63,6 +63,7 @@ The counts are the tests pytest collects (fast + slow).
 | `test_gui_panels_a.py` | 25 | The Slipnet, Temperature, Coderack, Commentary and EEG windows against their `.ss` files and a recording window | |
 | `test_views.py` | 1 + 112 | Watching changes nothing: goldens with every window attached give the golden traces, and every window was drawn into. Fast: one short golden. Slow: all 109, the crash run, and eight scenes drawn on Tk (`render_views.py`) | slow: xvfb |
 | `test_gui.py` | 20 + 1 | The control panel: `gui-battery.scm` (parser, Step/Go/Reset decisions, speed settings, titles, demos, clamp patterns), structure, and that a headless run loads no tkinter or `metacat.gui` module. Slow: `drive_gui.py` drives the GUI, and each run's trace must equal its golden | slow: xvfb |
+| `test_tk_gui_inventory.py` | 5 + 1 | The inventory of the tkinter GUI (`data/tk-gui-inventory.json`, loop0003 item 00) lists every window, its mouse handlers, every menu item `gui.py` defines (read from its source), the run states, the dialogs and the bindings. Slow: `tk_gui_inventory.py` regenerates it under Xvfb, and it must equal the committed one (font keys aside) | slow: xvfb |
 | `test_install.py` | 5 + 4 | Packaging. Fast: the declared commands, packages and help text. Slow: a clean copy of `python/`, `pip install -e` and a regular install into fresh venvs, each running Run 7 (stdout equal to the live oracle's, trace equal to the golden) and opening the GUI | slow: Chez, xvfb |
 | `test_engine_modules.py` | 3 | Each engine module imports alone in a fresh interpreter (no load, no random draw). Cross-module `from`-imports are limited to the allowed ones | |
 | `test_quirk_sites.py` | 2 | The list of `# chez:` and `# 1.2:` sites in `docs/python-translation-plan.md` equals the code's | |
@@ -88,6 +89,7 @@ Totals: 1412 tests, 990 fast and 422 slow.
 | `render_sgl_fixture.py` | `xvfb-run -a python3 python/tests/render_sgl_fixture.py OUT.png [--check]`: draws the SGL fixture on a 640×480 Canvas, grabs it from the X server, and checks pixels |
 | `render_views.py` | `xvfb-run -a -s "-screen 0 3000x2000x24" python3 python/tests/render_views.py OUTDIR [SCENE ...]`: draws the windows at points of golden runs on Tk and grabs each one as `WINDOW-SCENE.png` |
 | `drive_gui.py` | `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 2560x1600x24" python3 python/tests/drive_gui.py OUTDIR`: builds the GUI as `python3 -m metacat.gui` does and drives it from a second thread. It covers a full run, step mode, Stop and Go, a demo, a breakpoint, a click on the Workspace, Reset, the menus and dialogs (clamps included), saving the commentary and a resize, and grabs the screen. A watchdog ends it after 10 minutes |
+| `tk_gui_inventory.py` | `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 1920x1200x24" python3 python/tests/tk_gui_inventory.py python/tests/data/tk-gui-inventory.json`: builds the GUI as `python3 -m metacat.gui` does and walks it: windows, control-panel widgets and their states in each run mode, menus, dialogs (opened and closed), bindings and the speed table. Writes the JSON that `docs/qt-gui-plan.md` summarises |
 
 ## How a battery test works
 

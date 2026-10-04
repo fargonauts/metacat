@@ -1,3 +1,9 @@
 [2026-10-04 14:57:33] loop start: up to 30 iterations, cap 3.0 h each, model default
 [2026-10-04 14:57:33] === iteration 1: 00 Inventory and design. Write `docs/qt-gui-plan.md`.
 [2026-10-04 14:57:33] claude session it01 (cap 3.00 h) -> session_it01.log
+[2026-10-04 15:04:19] loop start: up to 30 iterations, cap 3.0 h each, model default
+[2026-10-04 15:04:19] === iteration 1: 00 Inventory and design. Write `docs/qt-gui-plan.md`.
+[2026-10-04 15:04:19] claude session it01 (cap 3.00 h) -> session_it01.log
+[2026-10-04 15:29:35] session it01: error (exit 1, 40 tool calls)
+[2026-10-04 15:29:35] item not marked by the agent (error); marking - [!] so the loop advances
+[2026-10-04 15:37:23] tests passed: GATE PASSED
