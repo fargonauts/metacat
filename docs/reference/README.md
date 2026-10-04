@@ -1,19 +1,37 @@
-# Reference figures
+# Reference: Marshall's dissertation and its figures
 
-`dissertation.pdf` is James B. Marshall's dissertation, *Metacat: A Self-Watching
-Cognitive Architecture for Analogy-Making and High-Level Perception* (Indiana
-University, 1999; 306 pages), fetched on 2026-10-03 from
-<https://science.slc.edu/~jmarshall/metacat/dissertation.pdf>.
+This folder holds the primary source behind Metacat. It has James B. Marshall's
+dissertation as a PDF, and every screenshot and diagram in it extracted as a PNG and indexed
+below by the window (panel) it shows. The Racket and Python ports use the dissertation in
+two ways. It explains what the code is meant to do where the code is unclear. Its figures
+show what each window should look like, and the "look at what you draw" steps of both Ralph
+loops compared every rendered panel against them. For run-by-run differences between the
+dissertation and the program, see [`../demos.md`](../demos.md). For pictures of the ports
+themselves, see [`../screenshots/`](../screenshots/README.md).
 
-`figures/` holds every raster image in it larger than 100 × 100 pixels (197
+## Contents
+
+| Path | What |
+| --- | --- |
+| `dissertation.pdf` | James B. Marshall, *Metacat: A Self-Watching Cognitive Architecture for Analogy-Making and High-Level Perception*, Indiana University, 1999; 306 pages. Fetched on 2026-10-03 from <https://science.slc.edu/~jmarshall/metacat/dissertation.pdf> (loop0001 item 12). |
+| `figures/` | 197 PNGs: every raster image in the PDF larger than 100 × 100 pixels. |
+
+The dissertation is Marshall's work. It is included here as a reference, and its home is
+the [Metacat home page](https://science.slc.edu/~jmarshall/metacat/).
+
+## How the figures were extracted
+
+`figures/` holds every raster image in the PDF larger than 100 × 100 pixels (197
 of them, greyscale, about 100–200 dpi), extracted unchanged with
 `pdfimages -png -p dissertation.pdf` and named `pPPP-NNN.png` (PDF page,
 image number). Smaller images (rule boxes, stray glyphs) were left out. The
 screenshots come from the 1999 program (Chez Scheme + SchemeXM/SGL on X), so
-they show the SGL drawings that sgl-interpreter.ss reproduces on Tk.
-Captions: `pdftotext -f P -l P dissertation.pdf -`.
+they show the SGL drawings that `sgl-interpreter.ss` reproduces on Tk.
 
-## By panel
+To read a figure's caption, use `pdftotext -f P -l P dissertation.pdf -`, where P is the
+page number from the file name. For example, `p224-538.png` is on PDF page 224.
+
+## Figures by panel
 
 | Panel (original file) | Figures |
 | --- | --- |
@@ -33,3 +51,15 @@ Captions: `pdftotext -f P -l P dissertation.pdf -`.
 
 No figure shows the Temperature thermometer or the EEG window by
 themselves.
+
+## Useful starting points
+
+- File names use **PDF page numbers**. The dissertation's printed page numbers are 16
+  lower on these pages: PDF page 224 is printed page 208. [`../demos.md`](../demos.md)
+  quotes the dissertation's own page numbers ("p. 240").
+- **Chapter 5, "Sample Runs of the Program"**, starts on PDF page 223. Its Runs 1–8 are
+  checked against the oracle in [`../demos.md`](../demos.md). The screenshots on PDF page
+  224 (`p224-538.png` … `p224-547.png`) are the panels of Run 1 (`abc → abd; mrrjjj →
+  mrrjjjj`) after about 500 codelets. Loop0001 compared them with the Racket port's
+  `abc abd mrrjjj` Workspace after 513 codelets
+  ([`../screenshots/mrrjjj-513-workspace.png`](../screenshots/mrrjjj-513-workspace.png)).

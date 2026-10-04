@@ -1,186 +1,198 @@
-# Metacat, in modern Scheme
+# Metacat, in Racket and Python
 
-A faithful port of **Metacat 1.2**, James B. Marshall's model of analogy-making and
-self-watching perception, to [Racket](https://racket-lang.org), with a native GUI built on
-`racket/gui`.
+Two faithful ports of **Metacat 1.2**, James B. Marshall's model of analogy-making and
+self-watching perception. One is in [Racket](https://racket-lang.org), with a native
+`racket/gui` interface. The other is in Python 3, using only the standard library, with a
+tkinter interface. Both reproduce the original program's runs **event for event**, checked
+against the original itself running headless under Chez Scheme 10.
 
 **Metacat home page:** <https://science.slc.edu/~jmarshall/metacat/>
 
-![Metacat after answering wyz to "abc → abd; xyz → ?" (Run 7 of Marshall's dissertation)](docs/screenshots/run7-wyz.png)
+![Metacat (Racket port) after answering wyz to "abc → abd; xyz → ?" (Run 7 of Marshall's dissertation)](docs/screenshots/run7-wyz.png)
+
+*The Racket port on Run 7 of Marshall's dissertation, `abc → abd; xyz → ?` with seed
+3852097033. The `c → d` rule can't be applied to `z`, which has no successor. After several
+snags ("All right, I've had enough of this!") Metacat sees `abc` and `xyz` as mirror images
+and answers **`wyz`**: "I think this answer is great!" More screenshots are in the
+[gallery](docs/screenshots/README.md).*
+
+## Contents
+
+- [What Metacat is](#what-metacat-is)
+- [Quick start](#quick-start)
+- [Problems to try](#problems-to-try)
+- [How the ports are checked](#how-the-ports-are-checked-an-oracle)
+- [Repository map](#repository-map)
+- [How it was made](#how-it-was-made)
+- [Credits and license](#credits-and-license)
 
 ## What Metacat is
 
 Metacat solves letter-string analogy problems: *if `abc` changes to `abd`, what does `xyz`
-change to?* It builds its interpretation of a problem out of many small, partly random
-actions (*codelets*). They notice bonds between letters, group letters, map one string onto
-another, describe the change as a rule, and apply the rule to the target string. A
-network of concepts (the *Slipnet*) decides what seems relevant, and a *temperature*
-measures how coherent the current interpretation is.
+change to?* It builds an interpretation of a problem out of many small, partly random
+actions called *codelets*. Codelets notice bonds between letters, group letters, map one
+string onto another, describe the change as a rule, and apply the rule to the target string.
+A network of concepts, the *Slipnet*, decides what seems relevant. A *temperature* measures
+how coherent the current interpretation is: high when things are a mess, low when they hang
+together.
 
-Metacat is the successor to **Copycat**, by Melanie Mitchell and Douglas Hofstadter
-(Mitchell's Copycat was written in Common Lisp). Metacat adds self-watching. It keeps a
-*Temporal Trace* of its own processing, notices when it keeps hitting the same snag, "jumps
-out of the system" by clamping a pattern of concepts, remembers its answers in an *Episodic
-Memory*, compares answers, and justifies an answer it is given. It says what it is doing in
-a running *Commentary*. All of this is described in Marshall's dissertation,
+Metacat is the successor to **Copycat**, by Melanie Mitchell and Douglas Hofstadter. What it
+adds is *self-watching*:
+- it keeps a **Temporal Trace** of its own processing;
+- it notices when it keeps hitting the same snag, and "jumps out of the system" by clamping
+  a pattern of concepts;
+- it remembers its answers in an **Episodic Memory**, and can compare answers;
+- it can **justify** an answer it is given;
+- it says what it is doing in a running **Commentary**.
+
+All of this is described in Marshall's dissertation,
 [*Metacat: A Self-Watching Cognitive Architecture for Analogy-Making and High-Level
 Perception*](https://science.slc.edu/~jmarshall/metacat/dissertation.pdf) (Indiana
-University, 1999).
+University, 1999). A copy and its figures are in [`docs/reference/`](docs/reference/README.md).
 
 The original Metacat 1.2 (released 2020) is written in Chez Scheme, with a GUI built on the
-Scheme Widget Library (SWL), which is no longer maintained. Today the only easy way to run
-the original is a VirtualBox image. This port runs on a current Racket.
+Scheme Widget Library (SWL), which is no longer maintained. Until now, the easy way to run it
+was a VirtualBox image.
 
-## Also in Python
+## Quick start
 
-[`python/`](python/README.md) holds a second port, to **Python 3.12** with the standard
-library only and a tkinter GUI. Like the Racket port, it reproduces the original's seeded
-runs event for event (the 109 golden traces and 720 more runs), and it was checked
-against the same Chez oracle:
+| | Racket port | Python port |
+|---|---|---|
+| Needs | Racket 8.x CS with `racket/gui` (`sudo apt install racket`) | Python 3.12, standard library + tkinter |
+| GUI | `racket racket/main.rkt` | `cd python && python3 -m metacat.gui` |
+| Headless | `racket racket/cli.rkt abc abd xyz --seed 3852097033` | `cd python && python3 -m metacat abc abd xyz --seed 3852097033` |
+| Install | `bash make-dist.sh` builds a standalone program in `build/metacat/` | `pip install -e python` installs `metacat` and `metacat-gui` |
+| More | [`racket/README.md`](racket/README.md) | [`python/README.md`](python/README.md) |
 
-```bash
-cd python
-python3 -m metacat abc abd xyz --seed 7   # headless, the same output as the original's
-python3 -m metacat.gui                    # the windows and control panel
-pip install -e .                          # installs the commands metacat and metacat-gui
-```
-
-![The Python port's windows after Run 7's answer wyz](docs/screenshots/python-run7-wyz.png)
-
-## Credits and license
-
-Metacat is © 1999, 2003 **James B. Marshall**. It is based on **Copycat**, originally
-written in Common Lisp by **Melanie Mitchell**, from the Fluid Analogies Research Group of
-Douglas Hofstadter. The Racket port keeps Marshall's copyright headers on every ported file
-and adds a "Ported to Racket" line.
-
-Both the original and this port are free software under the **GNU General Public License,
-version 2 or later**; see [`chez_scheme/original/LICENSE`](chez_scheme/original/LICENSE).
-Metacat comes with no warranty.
-
-## Running it
-
-Requirements: Racket 8.x (CS) with `racket/gui` (on Ubuntu: `sudo apt install racket`).
 Chez Scheme 10 (`sudo apt install chezscheme`) is needed only to run the original and the
 equivalence tests.
 
-**The GUI:**
+**Using the GUI.** Type a problem into the control panel's box and press **Enter**. Enter
+starts the run; **Go** stays greyed out until a run is under way. Then:
+- **Go** continues the run;
+- **Step** runs one step at a time (the step interval is under Options);
+- **Stop** interrupts the run;
+- **Reset** starts the problem again;
+- the speed slider slows the run down so you can watch the structures being built.
 
-```bash
-racket racket/main.rkt          # or: racket racket/main.rkt 1.5  (scale the windows)
+When Metacat finds an answer it stops. Press **Go**, or click the Workspace, to have it look
+for another. The **Demos** menu loads the runs from Marshall's dissertation with their
+seeds; see [`docs/demos.md`](docs/demos.md) for which of them replay as documented.
+
+The box accepts:
+- `abc abd xyz` asks what `xyz` changes to;
+- `abc abd xyz 7` does the same with random seed 7, so the run can be replayed exactly;
+- `abc abd xyz wyz` asks Metacat to *justify* the answer `wyz`;
+- `abc abd xyz wyz 7` justifies it with a seed.
+
+**Headless**, a run prints its commentary and answers:
+
+```
+$ racket racket/cli.rkt abc abd xyz --seed 3852097033
+...
+Comment: The answer "wyz" occurs to me.  I think this answer is great!
+Answer: wyz  quality 91  codelet 2170  temperature 15
 ```
 
-The control panel and the windows open: Workspace, Slipnet, Coderack, Temperature, Temporal
-Trace, Commentary, Episodic Memory, and the Top, Bottom and Vertical Themes. Type a problem
-in the control panel's command line and press Enter:
+The CLI's flags (`--max-codelets`, `--keep-going`, `--trace FILE`, `--verbose`) are the same
+in both ports; see their READMEs.
 
-- `abc abd xyz` asks what `xyz` changes to.
-- `abc abd xyz 7` does the same with random seed 7, so the run can be replayed.
-- `abc abd xyz wyz` asks Metacat to *justify* the answer `wyz`.
+## Problems to try
 
-Then press **Go** to run, **Step** to run one step (the step interval is under Options),
-**Stop** to interrupt, and **Reset** to start the problem again. When Metacat finds an
-answer it stops; Go (or a click on the Workspace) makes it look for another. The **Demos**
-menu loads the runs of Marshall's dissertation, with their seeds (see the caveat in
-[`docs/demos.md`](docs/demos.md)). **Help** shows the original's help text.
-
-**Headless**, the same run without windows prints the commentary and the answers:
-
-```bash
-racket racket/cli.rkt abc abd xyz --seed 7
-racket racket/cli.rkt INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going] [--trace FILE] [--verbose]
-```
-
-A run stops at its first answer, as the GUI does, unless `--keep-going` is given.
-`--trace FILE` writes a JSON-lines trace of every codelet, structure, temperature, theme and
-event ([`docs/trace-format.md`](docs/trace-format.md)). `--verbose` prints the model's own
-running commentary on each codelet, as the original's verbose mode did.
-
-**The standalone program** doesn't need Racket installed:
-
-```bash
-bash make-dist.sh                      # builds build/metacat/ (raco exe + raco distribute)
-build/metacat/bin/metacat              # the GUI
-build/metacat/bin/metacat abc abd xyz  # headless, with the CLI's arguments
-```
-
-Copy the `build/metacat/` directory anywhere. It holds `bin/metacat`, the Racket runtime
-it needs in `lib/`, this README and the license.
+| Problem | What happens |
+|---|---|
+| `abc abd ijk` | the easy one: `ijl`, or the literal-minded `ijd` |
+| `abc abd iijjkk` | letters or groups? `iijjkl` or `iijjll` |
+| `abc abd mrrjjj` | `mrrjjk`, or, if Metacat sees the lengths 1-2-3, `mrrjjjj` |
+| `abc abd xyz` | `z` has no successor: snags, then `xyd`, `wyz`, … |
+| `eqe qeq abbbc` | a symmetry problem; seed 2302461154 finds `qcccb` ("really terrible") |
+| `rst rsu xyz` | another end-of-the-alphabet problem |
 
 <p>
-<img src="docs/screenshots/mrrjjj-513-workspace.png" width="49%"
-     alt="The Workspace of abc → abd; mrrjjj → ? after 513 codelets">
-<img src="docs/screenshots/run7-workspace.png" width="49%"
-     alt="The Workspace with the answer wyz, both rules and the crossed bridges">
+<img src="docs/screenshots/racket-mrrjjj-mrrjjk.png" width="49%"
+     alt="abc → abd; mrrjjj → ? answered mrrjjk">
+<img src="docs/screenshots/racket-justify-xyd.png" width="49%"
+     alt="Metacat justifying the answer xyd to abc → abd; xyz → ?">
 </p>
 
-*Left: `abc → abd; mrrjjj → ?`, seed 1, after 513 codelets: bonds, groups and bridges
-under construction. Right: Run 7's answer `wyz`, with its top rule (red), its bottom rule
-(blue) and the crossed bridges that map `a`–`z` and `c`–`x`.*
+*Left: `abc → abd; mrrjjj → ?` (seed 1) answered `mrrjjk`, with the `rr` and `jjj` groups
+mapped onto `b` and `c`. Right: asked to justify `xyd`, Metacat builds both rules and
+concludes "Aha! I see why this answer makes sense. I think it's a pretty mediocre answer."*
 
-## How the port is checked: an oracle
+## How the ports are checked: an oracle
 
-The aim is a *faithful* port, not a reinterpretation. Given the same seed, the port makes the
-same run as the original: the same codelets in the same order, the same structures, the
+The aim is a *faithful* port, not a reinterpretation. Given the same seed, each port makes
+the same run as the original: the same codelets in the same order, the same structures, the
 same temperature, the same answers and the same commentary.
 
-1. **The original is kept unchanged** in `chez_scheme/original/`. A gate checks its git
-   tree hash against the import commit on every change.
-2. **The original runs headless as an oracle.** [`chez_scheme/oracle/`](chez_scheme/oracle/)
+1. **The original is kept unchanged** in [`chez_scheme/original/`](chez_scheme/README.md). A
+   gate checks its git tree hash against the import commit.
+2. **The original runs headless as an oracle.** [`chez_scheme/oracle/`](chez_scheme/oracle/README.md)
    loads those 44 files, unmodified, into Chez Scheme 10 through a prelude. The prelude
-   stubs out SWL, provides the old `extend-syntax` macros, and instruments the program by
-   wrapping its top-level procedures from outside. `scheme --script chez_scheme/oracle/run.ss
-   abc abd xyz --seed 7` is the original's own headless run.
-3. **Golden traces.** The oracle recorded 109 seeded runs of 36 problems (`tests/problems.txt`,
-   including every demo of the dissertation) as traces in `tests/golden/`. These traces are
-   only ever produced by the oracle.
-4. **The port reproduces them event for event.** All 109 traces match byte for byte, and so
-   does the printed output. This needs Chez's random-number generator (bit for bit), Chez's
-   order of evaluating arguments where it matters, its `sort`, its exact arithmetic and its
-   number printing. Smaller differential tests compare the port with the original file by
-   file (utilities, coderack, slipnet, workspace, bonds and groups, bridges, rules, the SGL
-   drawing language and the panels' graphics).
-5. **The GUI only watches.** The engine in `racket/` never depends on `racket/gui`. With
-   every window attached, the 109 golden runs still match.
+   stubs out SWL, provides the old `extend-syntax` macros, and instruments the program from
+   outside.
+3. **Golden traces.** The oracle recorded 109 seeded runs of 36 problems as JSON-lines
+   traces in `tests/golden/` ([`tests/README.md`](tests/README.md)). Every demo of the
+   dissertation is included.
+4. **Both ports reproduce them event for event**, byte for byte. So do **720 more runs** with
+   seeds neither port was developed against, and so does the printed output. This takes
+   Chez's random-number generator bit for bit, Chez's order of evaluating arguments where it
+   matters, its `map` order, its `sort`, its exact arithmetic and its number printing.
+5. **Differential tests, layer by layer.** Smaller Chez test batteries compare each layer
+   with the original: utilities, coderack, slipnet, workspace, bonds and groups, bridges,
+   rules, the SGL drawing language and the panels' graphics.
+6. **The GUI only watches.** Neither engine depends on its GUI. With every window attached,
+   the golden runs still match.
 
-What the port does differently, and why, is in [`docs/divergences.md`](docs/divergences.md)
-(drawing on racket/draw instead of Tk, the control panel's widgets). Porting decisions are
-in [`docs/porting-notes.md`](docs/porting-notes.md). Bugs and oddities found in the original
-along the way are in [`docs/anomalies_and_quirks.md`](docs/anomalies_and_quirks.md).
+What the ports do differently, and why, is in [`docs/divergences.md`](docs/divergences.md).
+Bugs and oddities found in the original along the way, including two crashes, a copy-paste
+bug and Chez's surprising evaluation order, are in
+[`docs/anomalies_and_quirks.md`](docs/anomalies_and_quirks.md).
 
 ```bash
-bash tests/run-tests.sh            # every test (about 9 minutes): the Racket tests,
-                                   # the GUI tests on a virtual display (xvfb-run),
-                                   # and the Chez oracle checks
-python3 ralph_loops/loop0001/gate.py   # the same, plus the check that the original is untouched
+bash tests/run-tests.sh                  # the Racket port and the Chez checks (about 10 min)
+bash python/run-tests.sh                 # the Python port (about 7 min)
+python3 ralph_loops/loop0001/gate.py     # Racket, plus the check that the original is untouched
+python3 ralph_loops/loop0002/gate.py     # Python, plus the checks on the frozen references
 ```
 
-The GUI tests need `xvfb-run` (Xvfb), `xwininfo` (x11-utils) and, optionally, `bwrap`
-(bubblewrap), which runs the standalone program in a sandbox without Racket.
+GUI tests run on a virtual display and need `xvfb-run` (Xvfb) and `xwininfo` (x11-utils).
 
-## Layout
+## Repository map
 
-```
-chez_scheme/original/   Metacat 1.2 by James B. Marshall, as distributed (read-only)
-chez_scheme/oracle/     the headless harness that runs the original under Chez Scheme 10
-python/                 the Python port (python/README.md): metacat/ (the model, one
-                        module per original file; gui/ the tkinter windows), its
-                        Chez fixtures, oracle capture scripts and tests
-racket/                 the port: compat.rkt (Chez-isms), engine.rkt + engine/*.rktl
-                        (the model, one file per original file), headless.rkt, cli.rkt,
-                        main.rkt and metacat.rkt (entry points), gui/ (the windows)
-tests/                  run-tests.sh, golden traces, the problem × seed list, batteries
-docs/                   code map, porting notes, divergences, anomalies, trace format,
-                        demos, run times, the dissertation and its figures (reference/)
-ralph_loops/            the loop driver, its plan and progress log
-make-dist.sh            builds the standalone program
-```
+Every folder has a README.
+
+| Folder | What's there |
+|---|---|
+| [`chez_scheme/`](chez_scheme/README.md) | the original Metacat 1.2 (read-only) and the headless [oracle](chez_scheme/oracle/README.md) |
+| [`racket/`](racket/README.md) | the Racket port: [engine](racket/engine/README.md), [GUI](racket/gui/README.md), [tests](racket/tests/README.md) |
+| [`python/`](python/README.md) | the Python port: [package](python/metacat/README.md), [GUI](python/metacat/gui/README.md), [oracle captures](python/oracle/README.md), [fixtures](python/fixtures/README.md), [tests](python/tests/README.md) |
+| [`tests/`](tests/README.md) | shared test data: golden traces, problem list, Chez differential batteries |
+| [`docs/`](docs/README.md) | code map, porting notes, trace format, anomalies, essays, the [dissertation](docs/reference/README.md), the [screenshot gallery](docs/screenshots/README.md) |
+| [`ralph_loops/`](ralph_loops/README.md) | the loops that built the ports: [loop0001](ralph_loops/loop0001/README.md) (Racket), [loop0002](ralph_loops/loop0002/README.md) (Python) |
+| `make-dist.sh` | builds the standalone Racket program |
 
 ## How it was made
 
-The Racket port was built by a "Ralph loop" (`ralph_loops/loop0001/loop.py`), which runs one fresh
-Claude Code session per work item in [`iterations.md`](ralph_loops/loop0001/iterations.md).
-After each session it runs the gate, then commits and pushes. Each session's work is logged
-in [`PROGRESS.md`](ralph_loops/loop0001/PROGRESS.md), and
-[`ralph_loops/ralph_loop_guide.md`](ralph_loops/ralph_loop_guide.md) describes the method. A second loop, `ralph_loops/loop0002/`, made the
-Python port the same way.
+Both ports were built by "Ralph loops". A driver (`loop.py`) runs one fresh Claude Code
+session per work item. After each session it runs a regression gate, allows up to three fix
+attempts, then commits and pushes. The Racket port took 18 iterations
+([loop0001](ralph_loops/loop0001/README.md)). The Python port was a test-driven translation
+that wrote every test before its code, with expected values frozen from Chez; it also took 18
+iterations ([loop0002](ralph_loops/loop0002/README.md)). The method is in
+[`ralph_loops/ralph_loop_guide.md`](ralph_loops/ralph_loop_guide.md).
+
+Two essays in `docs/` place Metacat beside Numbo and Ganesalingam and Gowers's theorem prover:
+[the similarities](docs/robotone_numbo_metacat_similarities.md) and
+[a family resemblance](docs/robotone_numbo_metacat_family_resemblance.md).
+
+## Credits and license
+
+Metacat is © 1999, 2003 **James B. Marshall**. It is based on **Copycat**, originally written
+in Common Lisp by **Melanie Mitchell**, from Douglas Hofstadter's Fluid Analogies Research
+Group. Both ports keep Marshall's copyright headers on every translated file, with a line
+saying what was ported.
+
+The original and both ports are free software under the **GNU General Public License,
+version 2 or later**; see [`chez_scheme/original/LICENSE`](chez_scheme/original/LICENSE).
+Metacat comes with no warranty.

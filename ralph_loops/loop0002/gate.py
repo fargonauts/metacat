@@ -51,10 +51,12 @@ def original_untouched() -> bool:
 def references_frozen() -> bool:
     ok = True
     for path in FROZEN:
-        if git("diff", "--quiet", FROZEN_AT, "--", path).returncode != 0:
+        # README.md files are documentation, not reference code: they may be added later.
+        spec = [path, ":(exclude,glob)**/README.md"]
+        if git("diff", "--quiet", FROZEN_AT, "--", *spec).returncode != 0:
             print(f"{path}/ differs from {FROZEN_AT} (committed or not); this loop must not edit it")
             ok = False
-        untracked = git("ls-files", "--others", "--exclude-standard", path).stdout.strip()
+        untracked = git("ls-files", "--others", "--exclude-standard", *spec).stdout.strip()
         if untracked:
             print(f"untracked files in {path}/:\n{untracked}")
             ok = False

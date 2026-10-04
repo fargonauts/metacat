@@ -1,0 +1,128 @@
+# `python/tests/`: the Python port's tests
+
+These are pytest tests for the Python port, with their helpers. Almost every expected value
+comes from Chez Scheme 10 running the unedited original. It reaches the tests either through
+the frozen fixtures in [`python/fixtures/`](../fixtures/README.md), or live, by running the
+oracle next to the Python. The checks range from Chez's random generator and printer up to
+the 109 golden traces, 720 extra-seed runs, and the GUI driven through its own widgets.
+Each test file was written before the code it checks, and failed first; that is recorded in
+[`ralph_loops/loop0002/PROGRESS.md`](../../ralph_loops/loop0002/PROGRESS.md).
+
+## Running
+
+```bash
+bash python/run-tests.sh            # full tier: all 1412 tests, about 7 min on 32 idle cores
+bash python/run-tests.sh --fast     # fast tier: 990 tests, about 10 s; no display
+bash python/run-tests.sh -k golden  # extra arguments go to pytest
+cd python && python3 -m pytest tests/test_chez.py -q   # one file
+```
+
+`run-tests.sh` runs `python3 -m pytest -x -q` from `python/`, so it stops at the first
+failure. The tier is the `slow` marker, declared in `pyproject.toml`: `--fast` adds
+`-m "not slow"`. The gate `ralph_loops/loop0002/gate.py` runs the full tier. `conftest.py`
+puts `python/tests/` and `python/oracle/` on `sys.path`, so tests can import the helpers and
+`capture.py`.
+
+Requirements:
+
+- **Fast tier:** Python 3.12 and pytest. No display. Chez runs nothing here, but two
+  freshness tests (`test_extra_seeds.py` and `test_sgl.py`, the `SOURCES` checks) ask
+  `scheme --version`, so they fail without Chez.
+- **Slow tier:** Chez Scheme 10 as `scheme` or `chezscheme` (the live-oracle comparisons
+  and the re-captures), `xvfb-run` (every test that opens Tk windows), and many cores. The
+  golden and extra-seed runs fork one process per run, in parallel.
+
+GUI tests never open windows on the real screen. They run their scripts under
+`xvfb-run -a`, with `WAYLAND_DISPLAY` unset, and every script exits by itself.
+
+## Test files
+
+The counts are the tests pytest collects (fast + slow).
+
+| File | Tests (fast + slow) | What it checks | Needs |
+|---|---:|---|---|
+| `test_fixtures.py` | 66 + 1 | The fixture pipeline: a folder per battery, one fixture per test (counted independently), the split/join round trip, `SOURCES` unchanged. Slow: every battery re-captured, byte-identical | slow: Chez |
+| `test_name_mapping.py` | 29 | The Scheme → Python name mapping is valid and injective on the original's ~1,300 names | |
+| `test_object_prototype.py` | 32 | Item 01's object-system candidates against the utilities battery's object tests, plus a micro-benchmark | |
+| `test_chez.py` | 62 | `metacat/chez.py`: the PRNG (every draw and state), exactness, rounding, libm bits, the printer, `sort` and `map` orders (`chez-battery.scm` and the utilities battery) | |
+| `test_utilities.py` | 213 | `objects.py`, `sugar.py`, `utilities.py`: all 197 tests of `utilities-battery.scm`, plus `utilities-extra` | |
+| `test_coderack.py` | 53 | `constants.py`, `setup.py`, `coderack.py`, `descriptions.py`: `coderack-battery.scm` (bin choice at every temperature, `choose-codelet` over seeds...), plus `coderack-extra` | |
+| `test_slipnet.py` | 58 | `slipnet.py`, `images.py`: the initial Slipnet, 20 activation updates to the last bit, images, plus `slipnet-extra` | |
+| `test_workspace.py` | 106 | The Workspace modules and `formulas.py`: the initial workspace of every problem and seed, live queries, fakes, plus `workspace-extra` | |
+| `test_codelets.py` | 22 + 67 | Bonds, groups, concept mappings, codelet by codelet: 400-codelet traces of every problem and seed (`codelet-battery.scm`). Fast: the first seed of problem 0 | |
+| `test_bridges.py` | 11 + 48 | Bridges and breakers: 1000-codelet traces of every problem and seed, plus nine bridge matrices. Fast: 300 codelets of problem 0 | |
+| `test_rules.py` | 29 + 51 | Rules and answers: traces up to the first answer, the first-answers summary, twelve rule matrices, plus `rule-extra` (the `caddr`-of-`#f` crash) | |
+| `test_golden.py` | 28 + 110 | The 109 golden traces, byte for byte, through the package's headless driver. Fast: `a b z` seed 1, plus `trace-extra` and structural checks of item 10's files. Slow: all 109, and the original's crash on `abc ccbbaa ijk` seed 3 against the live oracle (the 1062 trace lines before it) | slow: Chez |
+| `test_run.py` | 14 | `run.py`: break, go and step mode, each scenario in a fresh process (`run_scenarios.py`). A run stopped at 150, 300 and 450 codelets and resumed equals the run never stopped | |
+| `test_cli.py` | 6 + 24 | `python3 -m metacat` next to the live oracle's `run.ss`: same stdout and exit code on an answer, no cap, a cap, justify, keep-going, verbose, the halt run, the crash run, twelve bad argument lists, `--trace`, a clock seed. Fast: the usage errors alone | slow: Chez |
+| `test_extra_seeds.py` | 3 + 2 | The 720 extra-seed runs, each in a fresh fork: exit code, stdout, first stderr line, trace hash and length (about 2 min). Then the oracle's side re-captured, byte-identical (about 1.5 min). Fast: the fixture's sources and job list | slow: Chez |
+| `test_sgl.py` | 67 + 2 | `gui/sgl.py`, `gui/fonts.py`: `sgl-battery.scm`, the Tcl command stream against `fixtures/sgl-tcl/`, fonts, colours, mouse handling. Slow: the stream re-captured, and the fixture drawn on a real Canvas (`render_sgl_fixture.py --check`) | slow: Chez, xvfb |
+| `test_graphics.py` | 71 | The engine's part of the graphics files (`graphics-battery.scm`, flonum coordinates to the last bit), the EEG object, structure and no tkinter | |
+| `test_panels.py` | 47 | The panels against `panels-battery.scm`, on offscreen views | |
+| `test_gui_windows.py` | 17 | Graphics and text windows against a recording canvas (transforms, caching, erase, clear, flash, text metrics), the Workspace window, and structure | |
+| `test_gui_panels_a.py` | 25 | The Slipnet, Temperature, Coderack, Commentary and EEG windows against their `.ss` files and a recording window | |
+| `test_views.py` | 1 + 112 | Watching changes nothing: goldens with every window attached give the golden traces, and every window was drawn into. Fast: one short golden. Slow: all 109, the crash run, and eight scenes drawn on Tk (`render_views.py`) | slow: xvfb |
+| `test_gui.py` | 20 + 1 | The control panel: `gui-battery.scm` (parser, Step/Go/Reset decisions, speed settings, titles, demos, clamp patterns), structure, and that a headless run loads no tkinter or `metacat.gui` module. Slow: `drive_gui.py` drives the GUI, and each run's trace must equal its golden | slow: xvfb |
+| `test_install.py` | 5 + 4 | Packaging. Fast: the declared commands, packages and help text. Slow: a clean copy of `python/`, `pip install -e` and a regular install into fresh venvs, each running Run 7 (stdout equal to the live oracle's, trace equal to the golden) and opening the GUI | slow: Chez, xvfb |
+| `test_engine_modules.py` | 3 | Each engine module imports alone in a fresh interpreter (no load, no random draw). Cross-module `from`-imports are limited to the allowed ones | |
+| `test_quirk_sites.py` | 2 | The list of `# chez:` and `# 1.2:` sites in `docs/python-translation-plan.md` equals the code's | |
+
+Totals: 1412 tests, 990 fast and 422 slow.
+
+## Helpers
+
+| File | What it is |
+|---|---|
+| `conftest.py` | Puts `tests/` and `oracle/` on `sys.path` |
+| `chez_fixtures.py` | `chez(battery, test)`: what Chez printed for that test. Also `manifest`, `values` |
+| `scheme_canon.py` | `helpers.scm`'s `b:canon` and `b:num` for Python values, so a Python result can be compared with a fixture's text |
+| `scheme_reader.py` | A small Scheme reader for quoted data in batteries and `sgl-fixture.scm` |
+| `scheme_forms.py` | A minimal datum scanner. It counts a battery's `(test ...)` forms independently of Chez |
+| `engine_stubs.py` | `engine_module(name, **attrs)`: stand-ins for globals of engine modules that weren't translated yet when a battery was. Everything is restored afterwards |
+| `codelet_harness.py` | `tests/diff/codelet-harness.scm` in Python: a run-mcat loop restricted to some codelet types, the `b:compact` trace printer, and the bridges and rules settings |
+| `golden_harness.py` | Reads `tests/problems.txt` as `make-golden.ss` does, and runs problems in parallel, each in a fresh fork of a fresh process where `headless.prepare()` has run. `oracle/bench_runs.py` uses it too |
+| `run_scenarios.py` | The break/go scenarios of `test_run.py`. `python3 run_scenarios.py NAME` prints a result as JSON |
+| `name_mapping.py` | Every name the original defines, for `test_name_mapping.py` |
+| `object_prototypes.py` | Item 01's four object representations (six variants) and the micro-benchmark |
+| `quirk_sites.py` | Lists the `# chez:`/`# 1.2:` sites. `--write` rewrites the list in the plan |
+| `render_sgl_fixture.py` | `xvfb-run -a python3 python/tests/render_sgl_fixture.py OUT.png [--check]`: draws the SGL fixture on a 640×480 Canvas, grabs it from the X server, and checks pixels |
+| `render_views.py` | `xvfb-run -a -s "-screen 0 3000x2000x24" python3 python/tests/render_views.py OUTDIR [SCENE ...]`: draws the windows at points of golden runs on Tk and grabs each one as `WINDOW-SCENE.png` |
+| `drive_gui.py` | `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 2560x1600x24" python3 python/tests/drive_gui.py OUTDIR`: builds the GUI as `python3 -m metacat.gui` does and drives it from a second thread. It covers a full run, step mode, Stop and Go, a demo, a breakpoint, a click on the Workspace, Reset, the menus and dialogs (clamps included), saving the commentary and a resize, and grabs the screen. A watchdog ends it after 10 minutes |
+
+## How a battery test works
+
+Take `test_utilities.py`. `CASES` maps each test name of `utilities-battery.scm` to a
+Python function. The function rebuilds the battery's expression in Python, with the same
+order of random draws and side effects. Its value goes through `scheme_canon.canon` and
+must equal `chez("utilities", NAME)`. A separate test checks that `CASES` has exactly the
+battery's names. Batteries whose forms share state (coderack, slipnet, workspace, panels)
+run their cases in battery order, in one engine. The battery's top-level forms between
+tests run first. The codelet-level batteries (codelet, bridge, rule) run their cases in a
+pool of processes forked after the engine and harness are set up. On a failure, they name
+the first differing trace line (problem, seed, codelet).
+
+## `snapshots/`
+
+Renderings kept for inspection, not compared by any test. Tests that draw write their
+pictures to temporary directories. These were made by the scripts above under Xvfb:
+
+| File | Made by |
+|---|---|
+| `sgl-fixture.png` | `render_sgl_fixture.py`, to set next to `racket/tests/snapshots/sgl-fixture.png` |
+| `views/WINDOW-SCENE.png` | `render_views.py`: 56 pictures of the windows (workspace, slipnet, coderack, temperature, top/bottom/vertical themes, trace, memory, commentary, EEG) in the scenes `run7-300`, `run7-800`, `run7-answer`, `run7-answer-description`, `run7-snag-event`, `run7-clamp-click` (Run 7 = `abc abd xyz`, seed 3852097033), `xyd-justify` (a justify run) and `glz-compare` (two answers compared in the Memory) |
+| `gui-run7.png`, `gui-final.png` | `drive_gui.py`: the whole screen at Run 7's answer, and at the end of the drive (`abc abd ijk`, seed 1, after a manual clamp) |
+
+<p>
+<img src="snapshots/views/workspace-glz-compare.png" width="62%"
+     alt="The Workspace showing the description of the answer dlz to abc → abd; glz → ?">
+<img src="snapshots/views/memory-glz-compare.png" width="24%"
+     alt="The Memory with the answer dlz selected">
+</p>
+
+*The `glz-compare` scene: in the Memory (right), a snag and three answers to
+`abc → abd; glz → ?`, with `dlz` selected, and the Workspace drawing that answer's
+description (left).*
+
+Known flaw: in these Xvfb renderings, the Coderack's tiny labels drop letters
+("Bond bu ders"). This hasn't been checked on a real screen yet. Curated copies of some
+pictures are in [`docs/screenshots/`](../../docs/screenshots/).
