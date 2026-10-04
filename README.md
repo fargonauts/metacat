@@ -31,6 +31,22 @@ The original Metacat 1.2 (released 2020) is written in Chez Scheme, with a GUI b
 Scheme Widget Library (SWL), which is no longer maintained. Today the only easy way to run
 the original is a VirtualBox image. This port runs on a current Racket.
 
+## Also in Python
+
+[`python/`](python/README.md) holds a second port, to **Python 3.12** with the standard
+library only and a tkinter GUI. Like the Racket port, it reproduces the original's seeded
+runs event for event (the 109 golden traces and 720 more runs), and it was checked
+against the same Chez oracle:
+
+```bash
+cd python
+python3 -m metacat abc abd xyz --seed 7   # headless, the same output as the original's
+python3 -m metacat.gui                    # the windows and control panel
+pip install -e .                          # installs the commands metacat and metacat-gui
+```
+
+![The Python port's windows after Run 7's answer wyz](docs/screenshots/python-run7-wyz.png)
+
 ## Credits and license
 
 Metacat is © 1999, 2003 **James B. Marshall**. It is based on **Copycat**, originally
@@ -147,6 +163,9 @@ The GUI tests need `xvfb-run` (Xvfb), `xwininfo` (x11-utils) and, optionally, `b
 ```
 chez_scheme/original/   Metacat 1.2 by James B. Marshall, as distributed (read-only)
 chez_scheme/oracle/     the headless harness that runs the original under Chez Scheme 10
+python/                 the Python port (python/README.md): metacat/ (the model, one
+                        module per original file; gui/ the tkinter windows), its
+                        Chez fixtures, oracle capture scripts and tests
 racket/                 the port: compat.rkt (Chez-isms), engine.rkt + engine/*.rktl
                         (the model, one file per original file), headless.rkt, cli.rkt,
                         main.rkt and metacat.rkt (entry points), gui/ (the windows)
@@ -159,8 +178,9 @@ make-dist.sh            builds the standalone program
 
 ## How it was made
 
-The port was built by a "Ralph loop" (`ralph_loops/loop0001/loop.py`), which runs one fresh
+The Racket port was built by a "Ralph loop" (`ralph_loops/loop0001/loop.py`), which runs one fresh
 Claude Code session per work item in [`iterations.md`](ralph_loops/loop0001/iterations.md).
 After each session it runs the gate, then commits and pushes. Each session's work is logged
 in [`PROGRESS.md`](ralph_loops/loop0001/PROGRESS.md), and
-[`ralph_loops/ralph_loop_guide.md`](ralph_loops/ralph_loop_guide.md) describes the method.
+[`ralph_loops/ralph_loop_guide.md`](ralph_loops/ralph_loop_guide.md) describes the method. A second loop, `ralph_loops/loop0002/`, made the
+Python port the same way.

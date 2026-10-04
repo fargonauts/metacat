@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 16/18 SOLVED
+- **Current**: 17/18 SOLVED
 
 ---
 
@@ -1837,3 +1837,79 @@ Item 16, packaging and docs: `pip install -e python` with a `metacat` command
 (`metacat.__main__`), and a GUI entry (`metacat.gui.app:main`). Ship help.txt with the
 package, or find it from the checkout. Use `python/tests/snapshots/gui-run7.png` for the
 README screenshots.
+
+---
+
+## Iteration 17 — 2026-10-04 02:58
+
+### Completed
+Item 16, packaging and docs: **SOLVED**.
+- **Tests first.** I wrote `python/tests/test_install.py` before changing the package and
+  ran it: **8 failed, 1 passed**. The one that passed was the GUI opening from a clean
+  copy, which doesn't touch help.txt. The failures were:
+  - no `[project.scripts]`;
+  - `app.main` needing an argument;
+  - `packages = ["metacat"]` only, so **a regular install left out `metacat/gui`**
+    (`site-packages/metacat/gui/app.py` missing), a real packaging bug;
+  - help.txt read from `chez_scheme/original/` through `parents[3]`;
+  - the editable venv had no `metacat` command;
+  - the clean-checkout trace differed from the golden at byte 99. That one was my test's
+    mistake: the golden was recorded with `--max-codelets 10000`, and the test now passes
+    that too.
+
+  The tests:
+  - fast: the two commands are declared, both `main`s take no required argument, the
+    packages and package data are declared, the shipped help.txt equals the original's
+    byte for byte, and no package file reads outside the package;
+  - slow, each in a tmpdir:
+    - a clean copy of `python/` (`git ls-files -co --exclude-standard`, without fixtures and
+      tests, no `chez_scheme/` beside it) runs `python3 -m metacat abc abd xyz --seed
+      3852097033 --max-codelets 10000 --trace` with no PYTHONPATH. Its stdout must equal
+      the live oracle's, and its trace must equal the golden byte for byte.
+      `python3 -m metacat.gui` there must print "Initializing windows...done" under
+      xvfb-run; the test then kills it.
+    - `pip install -e` of that copy into a fresh venv. `metacat` is run from another
+      directory, `metacat` must import from the copy, and the stdout and trace are
+      checked as above.
+    - a regular install into a fresh venv: the same checks, plus `gui/` and `help.txt` in
+      site-packages, and `metacat-gui` opens.
+
+  The venvs use `--system-site-packages` only so that pip finds setuptools offline
+  (`--no-build-isolation --no-index --no-deps`). New anomalies entry. I also checked by
+  hand the literal `pip install -e python` on the checkout in a venv (`metacat abc abd
+  xyz --seed 7` → wyz), then removed the egg-info and the venv.
+- **Code.**
+  - `pyproject.toml`: packages `metacat` and `metacat.gui`, package data `help.txt`, and
+    the scripts `metacat` (`metacat.__main__:main`) and `metacat-gui`
+    (`metacat.gui.app:main`).
+  - `metacat/gui/help.txt` is a copy of the original's. gui.py reads it beside itself
+    (`port:` comment).
+  - `app.main(argv=None)` reads `sys.argv`.
+  - The CLI's `main` raises the recursion limit itself, because the console script skips
+    the `__main__` block.
+- **Docs.**
+  - `python/README.md` now opens for users. It has the port's claim, a screenshot of the
+    whole GUI at Run 7's answer, and how to run it from a checkout or installed. It covers
+    the CLI's arguments and exit codes, the GUI's command line, buttons and menus, two
+    Workspace pictures (Run 7, and the glz answer description) and how the port was made.
+    The developer sections follow, plus a packaging section.
+  - The screenshot is `docs/screenshots/python-run7-wyz.png`, cropped from
+    `python/tests/snapshots/gui-run7.png` (item 15's Xvfb grab) to the windows. I used
+    Anaconda's PIL once for the crop; nothing in the package or tests needs it. I
+    inspected it: control panel, Temperature 15, Workspace with wyz and both rules,
+    Coderack, Commentary, Slipnet, themes, Trace, Memory.
+  - Top-level `README.md`: a new section, "Also in Python", with commands and the
+    screenshot. The layout lists `python/`. "How it was made" mentions loop0002.
+  - `docs/python-translation-plan.md`: "As built (item 16)".
+  - `docs/anomalies_and_quirks.md`: "Python: a fresh venv has no setuptools ...".
+  - `python/run-tests.sh`: the tier comment.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1406 tests, 7 min 12 s).
+
+### Blockers
+None.
+
+### Next
+Item 17, the final audit. Rerun `python3 python/oracle/bench_runs.py
+docs/python-run-times.md` on an idle machine (item 12's note: it rewrites the file, so
+append the Speed-ups section again). The README's run figures (109 goldens, 720 extra
+seeds) should be confirmed then.

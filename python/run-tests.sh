@@ -10,7 +10,8 @@
 #                                     # view attached, the panels drawn on Tk and
 #                                     # the SGL fixture drawn on Tk, the GUI
 #                                     # driven through its widgets (drive_gui.py)
-#                                     # under xvfb-run, never on the real screen);
+#                                     # under xvfb-run, never on the real screen;
+#                                     # the package installed into fresh venvs);
 #                                     # about 7 min on 32 idle cores
 #   bash python/run-tests.sh --fast   # fast tier: skips tests marked slow (about
 #                                     # 10 s); for iterating on the code

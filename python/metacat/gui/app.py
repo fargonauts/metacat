@@ -236,9 +236,11 @@ def enable_resizing():
     general_graphics.start_resize_listener()
 
 
-def main(argv):
-    """port: python3 -m metacat.gui [SCALE]: setup, then Tk's main loop, as typing
-    (setup) after loading metacat.ss did"""
+def main(argv=None):
+    """port: python3 -m metacat.gui [SCALE] (or metacat-gui [SCALE] once installed):
+    setup, then Tk's main loop, as typing (setup) after loading metacat.ss did"""
+    if argv is None:
+        argv = sys.argv[1:]
     scale = 1
     if argv:
         n = chez.string_to_number(argv[0])

@@ -120,7 +120,7 @@
     `xvfb-run`: drive the GUI through a full run, step mode, stop/restart and a demo;
     screenshot the whole screen and inspect it; the GUI run's trace equals the golden.
 
-- [ ] **16 Packaging and docs.** `python3 -m metacat` (CLI) and `python3 -m metacat.gui`
+- [x] **16 Packaging and docs.** `python3 -m metacat` (CLI) and `python3 -m metacat.gui`
     work from a clean checkout, and `pip install -e python` installs a `metacat`
     command. Write `python/README.md` (with screenshots) and add the Python port to the
     top-level README.md. Tests: install into a fresh venv and run `abc abd xyz` there.

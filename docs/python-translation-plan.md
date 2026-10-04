@@ -855,6 +855,21 @@ from symbols").
   the speed slider, the figure titles, the demos and the clamp patterns. The driver works
   the widgets under xvfb-run, and each GUI run's trace equals its golden.
 
+### As built (item 16)
+
+- `python/pyproject.toml` declares the packages `metacat` and `metacat.gui` (only
+  `metacat` before, so a regular install left out the GUI), `metacat/gui/help.txt` as
+  package data, and the commands `metacat` → `metacat.__main__:main` and `metacat-gui` →
+  `metacat.gui.app:main`. Both `main`s read `sys.argv` when called with no arguments;
+  the CLI's `main` raises the recursion limit itself, since a console script never runs
+  the `__main__` block.
+- help.txt is a byte-for-byte copy of `chez_scheme/original/help.txt` inside the package
+  (gui.py read it from the checkout before); a test keeps them equal. Nothing in the
+  package reads files outside it.
+- Tests: `tests/test_install.py` (a clean copy of `python/`, `pip install -e` and a regular
+  install into fresh venvs; the CLI's stdout against the live oracle, its trace against
+  the golden, the GUI opening under xvfb-run).
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

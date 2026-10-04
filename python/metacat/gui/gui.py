@@ -454,10 +454,10 @@ def reset_button_action(ignore):
 # ------------------------------------------------------------------
 # help viewer
 
-# port: help.txt is read from the original's directory (the original read it
-# from the current directory, Metacat's)
-HELP_FILE = __import__("pathlib").Path(__file__).resolve().parents[3] / \
-    "chez_scheme" / "original" / "help.txt"
+# port: help.txt ships with the package, a copy of the original's
+# (tests/test_install.py checks that it is unchanged); the original read it from
+# the current directory, Metacat's
+HELP_FILE = __import__("pathlib").Path(__file__).resolve().parent / "help.txt"
 
 
 def read_file(filename, text_widget):

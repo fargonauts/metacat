@@ -95,6 +95,8 @@ def condition_text(e):
 
 
 def main(argv=None):
+    """python3 -m metacat, and the installed `metacat` command (pyproject.toml)"""
+    sys.setrecursionlimit(max(sys.getrecursionlimit(), 10000))
     args = sys.argv[1:] if argv is None else argv
     strings, seed, max_codelets, keep_going, trace_file, verbose = parse_args(args)
     from metacat import headless, sugar, utilities
@@ -122,5 +124,4 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    sys.setrecursionlimit(max(sys.getrecursionlimit(), 10000))
     sys.exit(main())

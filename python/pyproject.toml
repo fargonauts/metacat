@@ -14,8 +14,15 @@ dependencies = []                  # the standard library only (tkinter for the 
 [project.optional-dependencies]
 test = ["pytest>=7.4"]
 
+[project.scripts]
+metacat = "metacat.__main__:main"         # the CLI: python3 -m metacat
+metacat-gui = "metacat.gui.app:main"      # the GUI: python3 -m metacat.gui
+
 [tool.setuptools]
-packages = ["metacat"]
+packages = ["metacat", "metacat.gui"]
+
+[tool.setuptools.package-data]
+"metacat.gui" = ["help.txt"]               # chez_scheme/original/help.txt, unchanged
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

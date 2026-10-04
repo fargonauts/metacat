@@ -824,6 +824,18 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** test-side. The driver gives the field the focus first (`focus_force`), as a
   user's click would.
 
+### Python: a fresh venv has no setuptools, so an offline `pip install` can't build
+- **Seen:** loop0002 iteration 17 (item 16), writing python/tests/test_install.py.
+- **What:** since Python 3.12, `python3 -m venv` puts only pip in a new venv. `pip install
+  -e python` then builds in an isolated environment and downloads setuptools, which
+  fails without a network. The editable install also writes `metacat.egg-info/` into the
+  source directory it installs.
+- **Evidence:** `python3 -m venv /tmp/v && /tmp/v/bin/pip list` lists only pip.
+- **Status:** worked around in the tests: the venvs are made with
+  `--system-site-packages` (Anaconda's setuptools 75.1) and pip runs with
+  `--no-build-isolation --no-index --no-deps`, on a clean copy of `python/` in a temporary
+  directory, so the checkout gets no egg-info. A user with a network needs none of this.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

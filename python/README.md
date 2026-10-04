@@ -1,9 +1,88 @@
 # Metacat 1.2 in Python
 
-A test-driven translation of James B. Marshall's Metacat 1.2 (Chez Scheme) to Python,
-standard library only, with a tkinter GUI. GPL v2 or later, like Metacat itself. The
-goal and rules are in `ralph_loops/loop0002/TASK.md`; the work items are in
-`ralph_loops/loop0002/iterations.md`.
+A test-driven translation of James B. Marshall's **Metacat 1.2** (Chez Scheme) to Python,
+standard library only, with a tkinter GUI. GPL v2 or later, like Metacat itself.
+Metacat is © 1999, 2003 James B. Marshall, and is based on Copycat by Melanie Mitchell.
+What Metacat is, and how the ports are checked against the original, is in the
+[top-level README](../README.md).
+
+Given the same seed, this port makes the same run as the original, event for event: all
+109 golden traces of `tests/golden/` match the Chez original byte for byte (also with
+every window attached), and so do 720 more seeded runs.
+
+![The Python GUI after answering wyz to "abc → abd; xyz → ?" (Run 7 of Marshall's
+dissertation)](../docs/screenshots/python-run7-wyz.png)
+
+*Run 7 (seed 3852097033) in the Python GUI, under Xvfb: the control panel, Temperature,
+Workspace (the answer `wyz`, both rules and the crossed bridges), Coderack, Commentary,
+Slipnet, the Top, Bottom and Vertical Themes, the Temporal Trace and the Episodic Memory.*
+
+## Running it
+
+Requirements: Python 3.12 or later with tkinter (Tk 8.6) for the GUI. Nothing else.
+
+From a checkout, without installing anything:
+
+```bash
+cd python
+python3 -m metacat abc abd xyz --seed 7   # headless: the commentary and the answers
+python3 -m metacat.gui                    # the control panel and the windows
+python3 -m metacat.gui 1.5                # the same, with the windows scaled
+```
+
+Or install it, which gives two commands:
+
+```bash
+pip install -e python                     # or: pip install python  (a regular install)
+metacat abc abd xyz --seed 7
+metacat-gui
+```
+
+**Headless** (`python3 -m metacat` or `metacat`) takes the same arguments as the
+original's headless run (`chez_scheme/oracle/run.ss`) and prints exactly what it prints:
+
+```
+metacat INITIAL MODIFIED TARGET [ANSWER] [--seed N] [--max-codelets K] [--keep-going]
+        [--trace FILE] [--verbose]
+```
+
+A run stops at its first answer unless `--keep-going` is given; `--max-codelets K` stops
+it after K codelets. With an ANSWER, Metacat tries to justify that answer. Without
+`--seed` the seed comes from the clock and is printed, so the run can be replayed.
+`--trace FILE` writes the JSON-lines trace of `docs/trace-format.md`, the format of the
+golden traces; `--verbose` prints the model's own running commentary. The exit code is
+0, 2 for bad arguments, and 1 when the original itself crashes (it does on a few runs,
+see `docs/anomalies_and_quirks.md`).
+
+**The GUI** (`python3 -m metacat.gui` or `metacat-gui`) is the original's SWL interface
+redone in tkinter. Type a problem in the control panel's command line and press Enter:
+`abc abd xyz` (what does `xyz` change to?), `abc abd xyz 7` (with seed 7), or
+`abc abd xyz wyz` (justify the answer `wyz`). Then **Go** runs, **Step** runs one step
+(the step interval is under Options), **Stop** interrupts and **Reset** starts the
+problem again. When Metacat finds an answer it stops; Go, or a click on the Workspace,
+makes it look further. **Demos** has the runs of Marshall's dissertation, **Windows**
+hides and shows the windows, and **Help** shows the original's help text (shipped as
+`metacat/gui/help.txt`).
+
+<p>
+<img src="tests/snapshots/views/workspace-run7-answer.png" width="49%"
+     alt="The Workspace of Run 7 with the answer wyz">
+<img src="tests/snapshots/views/workspace-glz-compare.png" width="49%"
+     alt="The answer description of abc → abd; glz → dlz">
+</p>
+
+*Left: the Workspace at Run 7's answer. Right: the description of the answer `dlz` to
+`abc → abd; glz → ?`, drawn when two answers are compared in the Memory window.*
+
+## How it was made
+
+The goal and rules are in `ralph_loops/loop0002/TASK.md`; the work items are in
+`ralph_loops/loop0002/iterations.md`, and each session's work is logged in
+`ralph_loops/loop0002/PROGRESS.md`. One Python module per original `.ss` file, one
+function per Scheme definition (`metacat/names.py` has the name mapping), each
+docstring naming its origin. Every expected value in the tests comes from Chez.
+`docs/python-translation-plan.md` records how Chez's semantics (its random generator,
+exact arithmetic, evaluation order, `map` and `sort` orders, printer) are reproduced.
 
 ## Tests
 
@@ -258,3 +337,16 @@ The control panel and windows (item 15): `python3 -m metacat.gui [SCALE]`.
   Reset, the menus and dialogs, saving the commentary and a resize. Each GUI run's trace
   must equal its golden. It grabs the screen: `tests/snapshots/gui-run7.png` and
   `gui-final.png`.
+
+Packaging (item 16): `pyproject.toml` declares the packages `metacat` and `metacat.gui`,
+the help text as package data, and the commands `metacat` (`metacat.__main__:main`) and
+`metacat-gui` (`metacat.gui.app:main`). The package reads nothing outside itself.
+
+  Tests: `tests/test_install.py`. Fast: the declarations, the help text equal to
+  `chez_scheme/original/help.txt`, no reads outside the package. Slow, each in a
+  temporary directory: a clean copy of `python/` (git's files, without fixtures and tests)
+  runs `python3 -m metacat abc abd xyz --seed 3852097033 --max-codelets 10000 --trace`
+  with the live oracle's stdout and the golden trace, and `python3 -m metacat.gui` opens
+  under xvfb-run; then the same through `pip install -e` and a regular install into fresh
+  venvs (`--system-site-packages` only so that pip finds setuptools offline), run from
+  another directory, with `metacat-gui` opening too.
