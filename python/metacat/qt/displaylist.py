@@ -85,9 +85,19 @@ def _color_table():
     return _colors
 
 
+_rgb_cache = {}
+
+
 def color_rgb(name):
     """port: Tk_GetColor: a colour word as 8-bit (r, g, b); TclError if unknown"""
     name = str(name)
+    rgb = _rgb_cache.get(name)
+    if rgb is None:
+        rgb = _rgb_cache[name] = _color_rgb(name)
+    return rgb
+
+
+def _color_rgb(name):
     if name.startswith("#"):
         digits = name[1:]
         n = len(digits) // 3

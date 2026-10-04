@@ -38,12 +38,12 @@ import threading
 from fractions import Fraction
 
 from PySide6.QtCore import QCoreApplication, QObject, QRectF, Qt, QThread, QTimer
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QFrame, QGraphicsView, QStyle, QWidget
 
 from metacat.gui import hosts as ghosts
 from metacat.gui import swl
-from metacat.qt.canvas import QtCanvas, _qcolor
+from metacat.qt.canvas import PAINT_GATE, QtCanvas, _qcolor
 
 
 def on_gui_thread():
@@ -60,6 +60,17 @@ class PaneView(QGraphicsView):
         self.setFrameShape(QFrame.NoFrame)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setFocusPolicy(Qt.NoFocus)
+        self.paints = 0
+
+    def paintEvent(self, event):
+        # Entered from Qt, this is one Python call that waits for the GIL; the
+        # items' paint calls inside it then find the GIL held.  Without it,
+        # each item's paint would wait for the engine thread to let go of the
+        # GIL (anomalies: "Qt paints the panes slowly while the engine runs in
+        # another thread").
+        self.paints += 1
+        with PAINT_GATE:
+            super().paintEvent(event)
 
 
 class Pane(QWidget):
@@ -71,16 +82,23 @@ class Pane(QWidget):
         self.host = host
         self.v_align = "center"      # "top" for the Temperature (docs/qt-gui-plan.md 2.4)
         self.view = PaneView(self, host.canvas.scene)
+        self.setAutoFillBackground(True)
+        self.background = None
+        self.set_background()
+
+    def set_background(self):
+        """the letterbox margins, in the panel's background colour (painted by
+        Qt itself: no Python paintEvent)"""
+        background = swl.tcl_word(self.host.canvas.background)
+        if background != self.background:
+            self.background = background
+            palette = self.palette()
+            palette.setColor(QPalette.Window, _qcolor(background))
+            self.setPalette(palette)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.host.pane_resized()
-
-    def paintEvent(self, event):
-        # the letterbox margins, in the panel's background colour
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), _qcolor(swl.tcl_word(self.host.canvas.background)))
-        painter.end()
 
 
 class QtHost(ghosts.OffscreenHost):
@@ -212,6 +230,7 @@ class QtHost(ghosts.OffscreenHost):
     def sync(self):
         """bring the scene and the view up to date (GUI thread only)"""
         self.canvas.sync()
+        self.pane.set_background()
         with self._lock:
             region, self._scroll_region = self._scroll_region, None
             vview, self._vertical_view = self._vertical_view, None

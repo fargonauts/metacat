@@ -484,6 +484,35 @@ in the engine thread. A flash shorter than the 50 ms refresh may not show, as in
 port. When the engine parks (an answer, Stop, a breakpoint), the bridge flushes at once,
 so the final picture is always complete.
 
+**As built (item 05).** `metacat/qt/engine_bridge.py` and `controls.py`:
+
+- `GuiInvoker.post(fn)` runs fn on the GUI thread (a queued signal; at once when already
+  there); `call(fn, timeout)` waits for its value (drivers and tests only; the GUI thread
+  runs it directly, so it never waits on itself). `EngineBridge` makes the
+  `EngineThread`, sets `setup.g_repl_thread` and the Workspace's thread-break handler;
+- `QtControlPanel` is gui.ss's control panel object, with the widgets in a fixed tool bar
+  above the splitter tree (the central widget stays the tree). Every widget change goes
+  through `post`. Enter, Step, Go, Stop, Reset and the speed slider call gui.py's own
+  actions; the Options menu has Set breakpoint, Clear breakpoint and Step mode interval
+  with gui.ss's input dialog (item 06 adds the rest). When the engine parks
+  (`switch-to-input-mode`), the main window syncs at once;
+- no journal and no blocking canvas queries: the display list answers in the calling
+  thread (2.6), so the engine never waits for the GUI thread;
+- what the plan did not foresee is the GIL. Qt's C++ calling Python while the GUI thread
+  doesn't hold the GIL waits up to 5 ms per call while the engine runs. So nothing in the
+  scene is a Python callback outside a paint pass entered from Python
+  (`PaneView.paintEvent`), the items record their painter calls once and replay them,
+  and the *paint gate* holds the engine's canvas commands while the GUI thread syncs or
+  paints (anomalies: "Qt paints the panes slowly while the engine runs in another
+  thread");
+- measured with `drive_qt_gui.py` and `drive_gui.py`'s `timing` (run 7 from Go to its
+  answer, speed slider at Fast, 2026-10-04, 32 cores at a load average of about 22):
+  tkinter GUI 6.15, 6.56 and 6.34 s; Qt GUI 6.46, 7.14 and 7.01 s. The Workspace
+  pane repaints about 17 times a second during the run (113–130 paints in a profiled run), and the GUI thread
+  answers within 0.1 s (the tkinter GUI's test allows 0.5 s). Before the paint gate the
+  Qt run took 5.3–5.7 s, but the GUI thread took up to 0.4 s to answer and the
+  Workspace repainted 4 times a second.
+
 ### 2.6 The canvas backend
 
 `qt/canvas.py` has `QtCanvas`, an object with the panel canvas interface: `tcl(*args)`,

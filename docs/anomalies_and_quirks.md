@@ -295,6 +295,34 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   while each still passes all 109 goldens. The square-for-cube mutant passes the 720 too,
   so a partly active theme's spread still shows only in trace-extra-battery.scm.
 
+### A Stop pressed just after Go can be lost (original)
+- **Seen:** 2026-10-04, loop0003 item 05, `drive_qt_gui.py`'s 50 Go/Stop toggles: run 7
+  went on to its answer during the toggling.
+- **What:** run.ss's `go` first sends `switch-to-run-mode` to the control panel (which
+  enables Stop), then does `(set! *interrupt?* #f)`. `stop-button-action` only does
+  `(set! *interrupt?* #t)`. A Stop pressed after Stop is enabled but before `go` clears the
+  flag is undone, and the run goes on. In the original the window is the time SWL took to
+  run the control panel's widget calls; in the tkinter GUI it is the time `ThreadSafeTk`
+  takes to hand the call back; in the Qt GUI `switch-to-run-mode` is posted and returns
+  at once, so the window is a few bytecodes of the engine thread. A second Go queued
+  before the first one shows also resumes the run again, past an answer if it is reached
+  meanwhile.
+- **Evidence:** `chez_scheme/original/run.ss` lines 124–133 and gui.ss's
+  `stop-button-action`; `python/tests/drive_qt_gui.py`'s `toggles`.
+- **Status:** won't fix (the original's behaviour, and the trace is unaffected: the flag
+  draws no random number). The toggles test presses Go only in input mode, Stop once the
+  run shows, and stops toggling at the answer.
+
+### Qt's offscreen platform warns when a dialog is shown
+- **Seen:** 2026-10-04, loop0003 item 05, the breakpoint and step interval dialogs under
+  `QT_QPA_PLATFORM=offscreen`.
+- **What:** each dialog prints `This plugin does not support propagateSizeHints()` on
+  stderr. It's Qt's offscreen plugin saying it has no window manager to tell a size hint
+  to; the dialog works.
+- **Evidence:** `QT_QPA_PLATFORM=offscreen python3 python/tests/drive_qt_gui.py /tmp/dq
+  step_mode`.
+- **Status:** harmless; ignored.
+
 ## ⚙️ Chez / Racket quirks
 
 ### Chez doesn't evaluate arguments left to right
@@ -1016,6 +1044,37 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   thread and resizes at the run's `update-everything`, so the test doesn't depend on it.
   Item 05 has to keep the GUI thread's Python work per refresh small (fewer Python calls
   per painted item, or painting cached pictures) and measure it.
+- **Update (loop0003 item 05): fixed.** What costs is a Python function that Qt calls from
+  C++ while the GUI thread doesn't hold the GIL: each call waits for the engine thread to
+  let go. Calls the GUI thread makes from Python keep the GIL, and so do the C++ calls
+  they lead to. Measured in isolation: 500 Python-subclassed items repainted from
+  `QApplication.exec()` while another thread ran a Python loop gave 1 frame in 3 s; with
+  the view's `paintEvent` overridden in Python (one wait, then every item's `paint`
+  finds the GIL held) it gave 64. Three changes:
+  - `TkItem` is a `QGraphicsRectItem` with no Python `boundingRect` (Qt asks it of every
+    changed item from C++); its rect is the bounding box;
+  - `PaneView.paintEvent` enters the paint pass from Python, and the panes' letterbox
+    margins are painted by Qt (`autoFillBackground`), not by a Python `paintEvent`;
+  - a *paint gate* (`canvas.PAINT_GATE`): the GUI thread holds it while it syncs the
+    scenes and while a view paints, and every canvas command waits for it. The engine,
+    which draws constantly, then waits on a lock without the GIL, and the GUI thread's
+    Python runs at full speed instead of in 5 ms turns.
+
+  Then a second finding: **PySide6's constructors release the GIL.** `QColor(1, 2, 3)`
+  300 times took 0.1 ms alone and 162 ms with a busy Python thread (QPen 471 ms, QPointF
+  172 ms, QRectF 162 ms); method calls such as `setPen` or `pen.setWidth` don't release
+  it. So the items record their painter calls (with their `QColor`s, `QPen`s and
+  `QPolygonF`s) once, at their first paint after a change, under the gate, and replay
+  them afterwards: a Workspace paint at run 7's answer went from 22 ms to 6 ms.
+  Driven run 7 (`drive_qt_gui.py`): the GUI thread answers within 0.05–0.09 s (0.41 s
+  before the gate), and the panes repaint about 150 times in the measured part of the
+  run. Tests: `test_qt_engine.py::test_scene_items_have_no_python_bounding_rect` and
+  `::test_the_panes_repaint_while_another_thread_runs_python`, which runs
+  `python/tests/qt_paint_probe.py` (38–42 timer ticks and paints in 2 s; 2 ticks with
+  `--without-fix`). Two more findings from the probe: a Python event filter on the
+  viewport is enough by itself to cure the stall (Qt enters Python once per paint
+  event), and the gate helps only a thread that draws: a thread spinning in pure Python
+  still slows the GUI to 8 ticks in 2 s. The engine draws constantly.
 
 ### A pane that comes back to its size kept a clamped scroll position (port bug, fixed)
 - **Seen:** 2026-10-04, loop0003 item 04, the run7 picture after 14 window resizes.

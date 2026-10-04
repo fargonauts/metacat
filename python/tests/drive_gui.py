@@ -581,15 +581,35 @@ def write_rgb_png(path, w, h, rgb, r):
                      + chunk(b"IEND", b""))
 
 
+def timing():
+    """run 7 from Go to its answer (the speed slider as invalid_input leaves it:
+    Fast), for the Qt GUI's comparison (drive_qt_gui.py's timing; loop0003
+    item 05).  Only when named on the command line."""
+    clear_memory()
+    golden = "abc-abd-xyz_3852097033.jsonl"
+    with Traced(golden, ["abc", "abd", "xyz"], 3852097033):
+        enter("abc abd xyz 3852097033")
+        wait_idle()
+        t0 = time.time()
+        click("go-button")
+        wait_idle()
+        elapsed = time.time() - t0
+    check(state() == golden_end(golden), "the golden's end: %r" % (state(),))
+    print("ok timing run7 %.2f s" % elapsed, flush=True)
+
+
 SCENARIOS = [windows, invalid_input, full_run, step_mode, demo_stop_go, breakpoint_click,
              reset, menus, save_commentary, resize, screenshot]
+ON_REQUEST = [timing]
 
 
 def driver():
     try:
         time.sleep(0.5)
-        for scenario in SCENARIOS:
+        for scenario in SCENARIOS + ON_REQUEST:
             if len(sys.argv) > 2 and scenario.__name__ not in sys.argv[2:]:
+                continue
+            if len(sys.argv) <= 2 and scenario in ON_REQUEST:
                 continue
             scenario()
         STATUS[0] = 0

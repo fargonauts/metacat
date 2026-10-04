@@ -76,7 +76,7 @@
       compare each pane with the tkinter panel snapshots in
       `python/tests/snapshots/views/`.
 
-- [ ] **05 Engine thread and run control.** `qt/engine_bridge.py`:
+- [x] **05 Engine thread and run control.** `qt/engine_bridge.py`:
     - the engine in a worker thread;
     - canvas commands batched onto the GUI thread;
     - blocking queries (`bbox`, measurement) without deadlock;

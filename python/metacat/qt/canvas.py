@@ -28,12 +28,23 @@ import threading
 
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene
+from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsScene
 
 from metacat.gui import swl
 from metacat.qt import fonts
 from metacat.qt.displaylist import (DisplayList, TclError, bezier_points, color_rgb,  # noqa: F401
                                     dash_lengths)
+
+
+# The paint gate.  The GUI thread holds it while it brings the scenes up to
+# date (MainWindow.sync) and while a view paints (PaneView.paintEvent); a
+# canvas command waits for it.  So the engine thread, which draws all the
+# time, stops drawing for those moments: it waits on a lock, without the GIL,
+# and the GUI thread's Python runs at full speed instead of sharing the GIL
+# in 5 ms turns; and no item changes while it is painted.  The GUI thread
+# waits at most for one canvas command, which never waits for the GUI thread
+# (docs/qt-gui-plan.md 2.5, deadlock rules).
+PAINT_GATE = threading.RLock()
 
 
 class QtCanvas:
@@ -52,7 +63,10 @@ class QtCanvas:
 
     def tcl(self, *args):
         """port: the canvas's widget command, answering as swl.TkCanvas does"""
-        return swl._from_tcl(self.display_list.tcl(*[swl.tcl_word(a) for a in args]))
+        words = [swl.tcl_word(a) for a in args]
+        with PAINT_GATE:
+            answer = self.display_list.tcl(*words)
+        return swl._from_tcl(answer)
 
     def get_background_color(self):
         """port: SWL <canvas> get-background-color"""
@@ -137,11 +151,36 @@ def _px(v):
     return int(v + 0.5) if v > 0 else int(v - 0.5)
 
 
-class TkItem(QGraphicsItem):
-    """One canvas item in the scene, painted as Tk paints it on X11."""
+class _Recorder:
+    """a stand-in for a QPainter that records the calls made on it, to be
+    replayed on a real one: (QPainter's method, its arguments)"""
+
+    def __init__(self):
+        self.ops = []
+
+    def __getattr__(self, name):
+        method = getattr(QPainter, name)
+
+        def record(*args):
+            self.ops.append((method, args))
+        return record
+
+
+class TkItem(QGraphicsRectItem):
+    """One canvas item in the scene, painted as Tk paints it on X11.
+
+    Its bounding rectangle is a QGraphicsRectItem's rect (with no pen), so
+    that Qt's own boundingRect answers it: the scene asks every changed
+    item's from C++, and a Python override would wait for the GIL each time,
+    up to 5 ms while the engine thread runs (anomalies: "Qt paints the panes
+    slowly while the engine runs in another thread").  paint is Python, but
+    the views call it inside their paint pass, which PaneView.paintEvent
+    enters from Python with the GIL held, and it replays the painter calls
+    recorded at its first paint."""
 
     def __init__(self, item, measure):
         super().__init__()
+        self.setPen(Qt.NoPen)
         self.set_item(item, measure)
 
     def set_item(self, item, measure):
@@ -153,12 +192,11 @@ class TkItem(QGraphicsItem):
             self.layout = item.text_layout(measure)
         box = item.bbox(measure, ignore_state=True) or [0, 0, 0, 0]
         self._rect = QRectF(box[0] - 2, box[1] - 2, box[2] - box[0] + 4, box[3] - box[1] + 4)
+        self.setRect(self._rect)
         self.setZValue(item.z)
         self.setVisible(item.state != "hidden")
+        self.ops = None               # recorded at the first paint
         self.update()
-
-    def boundingRect(self):
-        return self._rect
 
     # --- pens
 
@@ -176,6 +214,17 @@ class TkItem(QGraphicsItem):
         return pen
 
     def paint(self, painter, option, widget=None):
+        # the painter calls are made once, at the first paint after a change
+        # (most items are deleted before they are ever painted), and replayed
+        ops = self.ops
+        if ops is None:
+            recorder = _Recorder()
+            self._paint_item(recorder)
+            ops = self.ops = recorder.ops
+        for method, args in ops:
+            method(painter, *args)
+
+    def _paint_item(self, painter):
         painter.setRenderHint(QPainter.Antialiasing, False)
         getattr(self, "_paint_" + self.item.kind)(painter)
 

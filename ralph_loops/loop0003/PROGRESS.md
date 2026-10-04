@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 4/12 SOLVED
+- **Current**: 5/12 SOLVED
 
 ---
 
@@ -349,3 +349,108 @@ Item **04 Panels in panes**: SOLVED.
     deferred scroll and visibility changes;
   - mouse presses aren't wired to `viewport.mouse_press` yet (item 07).
 
+
+---
+
+## Iteration 6 — 2026-10-04 19:03:59
+Item **05 Engine thread and run control**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** I wrote `python/tests/test_qt_engine.py` and the
+  driver `python/tests/drive_qt_gui.py` before any code. First run of the fast tier:
+  `7 failed, 9 errors` (no `metacat.qt.engine_bridge`, no `metacat.qt.controls`, no
+  `PaneView.paints`; the scene items still had a Python `boundingRect`). The first version
+  of the test run also hung at exit; I fixed two test bugs that caused it (the busy thread
+  wasn't a daemon; the driver didn't `os._exit` when building the GUI failed, so the
+  resize listener kept the process up). Three more changes came from what the tests found,
+  each failing before its fix:
+  - the 50 toggles: run 7 went on to its answer during the toggling. A Stop can be
+    lost: `go` switches to run mode before it clears `*interrupt?*` (also true of the
+    original). The scenario now presses Go only in input mode, Stop once the run shows,
+    and stops toggling at the answer;
+  - responsiveness: the GUI thread took up to 0.41 s to answer during a run (limit 0.5 s),
+    because the Workspace's paints (130 ms each at half the GIL) filled it. That led to
+    the paint gate and the recorded painter calls (below);
+  - the repaint test was flaky in the full suite (13 and then 7 ticks, where earlier tests'
+    windows and timers share the process), so it now runs `qt_paint_probe.py` in a fresh
+    process.
+- **`python/metacat/qt/engine_bridge.py`**: `GuiInvoker.post` (a queued signal; at once on
+  the GUI thread) and `call(fn, timeout)` (waits for the GUI thread's value; directly on
+  the GUI thread, and `TimeoutError` instead of a hang). `EngineBridge` reuses
+  `metacat.gui.app.EngineThread` as the REPL thread and sets `setup.g_repl_thread` and the
+  Workspace's thread-break handler.
+- **`python/metacat/qt/controls.py`**: `QtControlPanel` is gui.ss's control panel object,
+  with the same messages and model effects as gui.py's: init/run/resume/reset problem,
+  the run, input and disabled modes (`_enable_all`'s table), breakpoint messages, display
+  and display-error (700 ms), engine-error, verbose mode, plus `run-demo` (the demo menu
+  item's action). Its widgets are a strip at the top of the window: info label, command
+  line (Enter), the speed slider, Step, Go, Stop, Reset, the breakpoint label and the
+  self-watching warning. Enter, the buttons and the slider run gui.py's own actions. An
+  Options menu has Set breakpoint, Clear breakpoint and Step mode interval, with gui.ss's
+  input dialog in Qt. A widget change from another thread is posted to the GUI thread.
+  When the engine parks, the window syncs at once.
+- **`app.setup`** now loads the engine with `engine.load()` (not `headless.prepare()`,
+  which replaced `break`), makes the bridge and the control panel, and places the strip in
+  a fixed tool bar (`MainWindow.place_control_panel`). At quit with a run going,
+  `main` leaves with `os._exit`.
+- **Painting while the engine runs (the GIL stall that item 04 found), fixed:**
+  - `TkItem` is a `QGraphicsRectItem` with no Python `boundingRect`;
+  - `PaneView.paintEvent` enters the paint pass from Python, and the panes' margins
+    are painted by Qt (`autoFillBackground`);
+  - `canvas.PAINT_GATE`: the GUI thread holds it while it syncs and paints, and canvas
+    commands wait for it;
+  - PySide6's constructors release the GIL (a `QColor` costs 0.5 ms while another
+    thread runs Python), so each item records its painter calls at its first paint after
+    a change and replays them. A Workspace paint went from 22 ms to 6 ms; most items are
+    deleted before they're ever painted;
+  - colour words are cached in `displaylist.color_rgb`.
+
+  `qt_paint_probe.py`: 38–42 ticks and paints in 2 s; with `--without-fix`, 2 ticks.
+- **Results** (`drive_qt_gui.py`, offscreen, about 28 s): each of these scenarios gives
+  exactly its golden trace:
+  - start (invalid input, the slider at Fast);
+  - a full run (`abc abd ijk 1`, Enter, Go);
+  - step mode (interval 40 through the dialog: steps at 40, 80, 120, then Go);
+  - a demo (Run 7 via `run-demo`) stopped mid-run and restarted;
+  - a breakpoint at 100, then Go;
+  - Reset with an empty line;
+  - a justify run (`abc abd ijk abd 1`);
+  - 50 rapid Go/Stop toggles, then the run to its answer (no deadlock; worst toggle
+    0.16–0.22 s).
+
+  While run 7 runs, the GUI thread answers within 0.045–0.094 s and the panes paint
+  about 150 times in the measured second or two. I grabbed the window at run 7's answer
+  and looked at it: every panel is animated in its pane, and the strip is on top.
+- **Timing, run 7 from Go to its answer, slider at Fast** (interleaved, 32 cores at a
+  load average of about 22): **tkinter GUI 6.15 / 6.56 / 6.34 s** (`drive_gui.py
+  invalid_input timing` under xvfb-run); **Qt GUI 6.46 / 7.14 / 7.01 s**. Before the paint
+  gate the Qt run took 5.3–5.7 s, but the GUI then answered in up to 0.41 s and the
+  Workspace repainted 4 times a second (now about 17). Recorded in
+  `docs/qt-gui-plan.md` 2.5.
+- `drive_gui.py` gained a `timing` scenario that runs only when named (the default run
+  and `test_gui.py` are unchanged).
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: the GIL entry is updated to fixed, with the
+    constructor finding and the probe's numbers; new entries for the lost Stop
+    (original) and Qt offscreen's `propagateSizeHints()` warning;
+  - `docs/divergences.md`: a new section, Python Qt GUI: the engine thread and the run
+    controls;
+  - `docs/qt-gui-plan.md` 2.5: "As built (item 05)";
+  - `python/tests/README.md`: rows for `test_qt_engine.py`, `drive_qt_gui.py` and
+    `qt_paint_probe.py`, and new totals (1564: 1128 fast, 436 slow).
+- Gate: `python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1564 passed in 8:53; racket/ unchanged).
+
+### Blockers
+- None for item 05. Item 00 is still `[!]` from session 1 (its deliverables exist and
+  their tests pass; see iteration 2).
+
+### Next
+- Item 06 (control strip and menus):
+  - add Demos (with highlighting, via `run-demo`), View, the rest of Options, Memory,
+    Help and Save commentary to the menu bar;
+  - add the Clear Memory and theme-edit dialogs (`ready-to-edit?` answers #f until
+    then);
+  - extend `QtControlPanel.menus` so that run mode disables them all;
+  - the input dialog in `controls.py` can be reused.
+- Mouse presses on panes aren't wired yet (item 07). The breakpoint scenario resumes
+  with Go, not with a click on the Workspace.

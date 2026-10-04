@@ -158,3 +158,30 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
 - **Tests:** `python/tests/test_qt_panes.py`: the layout, letterboxing, scroll bars,
   feeding, and golden runs (run7 at 300 and 800 codelets and at the answer, `a b z`
   seed 1, and run7 with 14 window resizes) giving their golden traces in the panes.
+
+## Python Qt GUI: the engine thread and the run controls (loop0003 item 05)
+- **What:** the Qt GUI runs the engine in `metacat.gui.app.EngineThread`, as the tkinter
+  GUI does, with the control panel as a strip above the panes
+  (`python/metacat/qt/controls.py`, `engine_bridge.py`). It answers gui.ss's messages
+  and runs gui.py's own button and slider actions. Differences in how it does so:
+  - the messages the engine sends from its thread that change widgets
+    (`switch-to-run-mode`, `switch-to-input-mode`, the breakpoint messages,
+    `engine-error`) are posted to the GUI thread and return at once. SWL and
+    `ThreadSafeTk` made the engine wait until the widget had changed. No caller uses
+    their value;
+  - the panes show the canvases as of the last 50 ms refresh (and at once when the engine
+    parks), so a flash shorter than 50 ms may not show, as in the Racket port;
+  - the paint gate (`canvas.PAINT_GATE`): while the GUI thread brings the scenes up to
+    date or paints a pane, the engine thread waits at its next canvas command. This
+    changes timing, never a run (anomalies: "Qt paints the panes slowly while the engine
+    runs in another thread");
+  - a demo starts through the panel's `run-demo` message (a port addition: gui.ss's
+    demo menu item action, `init-new-problem` with step mode off);
+  - the input dialog is a Qt dialog titled "Input": Enter reads the field as gui.ss's
+    `input-dialog` does; Escape also closes it.
+- **Why:** Qt's widgets belong to the GUI thread; the engine must never wait for it while
+  it paints (docs/qt-gui-plan.md 2.5, deadlock rules).
+- **Tests:** `python/tests/test_qt_engine.py`: the bridge, the panel's modes and actions,
+  the dialogs, painting while another thread runs, and `drive_qt_gui.py` (a full run,
+  step mode, a demo stopped and restarted, a breakpoint, Reset, a justify run, 50 Go/Stop
+  toggles, each trace equal to its golden).

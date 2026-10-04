@@ -19,7 +19,7 @@ scene up to date with its canvas (`sync`).
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMainWindow, QSplitter
+from PySide6.QtWidgets import QMainWindow, QSplitter, QToolBar
 
 TITLE = "Metacat"
 DEFAULT_SIZE = (1920, 1010)     # a maximised window on a 1920x1080 screen (the minimum)
@@ -107,6 +107,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.splitters["rows"])
         self.panes = {}
         self.hosts = {}
+        self.control_panel = None
+        self.bridge = None
         self.default_layout = True    # until the user drags a handle
         self.sync_timer = QTimer(self)
         self.sync_timer.setInterval(SYNC_INTERVAL)
@@ -143,6 +145,23 @@ class MainWindow(QMainWindow):
                 pane.show()
         self.apply_default_layout()
 
+    def place_control_panel(self, control_panel, bridge):
+        """the control panel's strip above the panes (a fixed tool bar, so the
+        central widget stays the splitter tree), its menus in the menu bar;
+        when the engine parks, every pane is brought up to date at once"""
+        from metacat.objects import tell
+        self.control_panel, self.bridge = control_panel, bridge
+        widgets = tell(control_panel, "get-widgets")
+        bar = QToolBar("Control panel")
+        bar.setObjectName("control-strip-bar")
+        bar.setMovable(False)
+        bar.setFloatable(False)
+        bar.toggleViewAction().setEnabled(False)
+        bar.addWidget(widgets["frame"])
+        self.addToolBar(Qt.TopToolBarArea, bar)
+        self.menuBar().addMenu(widgets["options-menu"])
+        control_panel.parked_hook = self.sync
+
     def apply_default_layout(self):
         c = self.centralWidget()
         sizes = default_sizes(c.width(), c.height(), HANDLE)
@@ -161,6 +180,9 @@ class MainWindow(QMainWindow):
         return {name: sp.sizes() for name, sp in self.splitters.items()}
 
     def sync(self):
-        """every pane's scene and view up to date with its canvas (GUI thread)"""
-        for host in self.hosts.values():
-            host.sync()
+        """every pane's scene and view up to date with its canvas (GUI thread),
+        the canvas commands held at the paint gate meanwhile"""
+        from metacat.qt.canvas import PAINT_GATE
+        with PAINT_GATE:
+            for host in self.hosts.values():
+                host.sync()
