@@ -478,6 +478,31 @@ so the final picture is always complete.
    (`-state hidden`) are `setVisible(False)`. Colours come through `colors.py`'s
    `#rrggbb` words, and fonts through the mapping of item 03.
 
+**The inventory (item 01).** `python/tests/data/tk-canvas-commands.json`, made by
+`python/tests/tk_canvas_inventory.py` from the code (every `tcl_eval`, `swl_tcl_eval` and
+`.tcl` call, read with `ast`), the `sgl-tcl` fixtures and recording canvases in run7 and a
+justify run, and checked by `test_tk_canvas_inventory.py`. The whole list:
+
+| Command | Options | Sent by |
+|---|---|---|
+| `create rectangle` | `-outline -fill -width -dash -state -tags` | code, fixtures, runs |
+| `create line` | `-fill -width -dash -tags` | code, fixtures, runs |
+| `create oval` | `-outline -fill -width -dash -tags` | code, fixtures, runs |
+| `create arc` | `-style -outline -fill -width -dash -start -extent -tags` | code, fixtures, runs |
+| `create polygon` | `-outline -fill -width -dash -tags` | code, fixtures, runs |
+| `create text` | `-text -anchor -font -fill -tags` | code, fixtures, runs |
+| `delete`, `move`, `itemconfigure` (`-state`, `-tags`), `bbox` | | code, fixtures, runs |
+| `raise` (`raise TAG all`), `scale` (`scale TAG 0 0 XF YF`) | | code, fixtures (no panel in a run) |
+| `canvasx`, `canvasy` | | code (the mouse handlers) |
+
+Values: `-anchor` is `s` (drawn text) or `nw` (measured text); `-style` is `arc` or
+`pieslice`; `-state` is `hidden` or `normal`; `-dash` is `""`, `"- "` or `". "`. Tags are
+always one word (never a list). `bbox` targets an id, `delete` `all` or a tag,
+`itemconfigure` and `move` `all` or a tag. Besides `tcl`, panels call only
+`get_background_color` and `set_background_color_bang`. Not in the list, so the Qt canvas
+needs none of them: `-arrow`, `-smooth`, `-justify`, `lower`, `coords`, `find`, `gettags`,
+`addtag`, window items.
+
 **The pane** (`qt/hosts.py`): a `QtHost` stands for `hosts.TkHost`, with the same methods
 (`make_canvas`, `set_scroll_region_bang`, `get_scrollbar`, `set_vertical_view`,
 `show_window`/`hide_window`, `set_title_bang`, …). Its widget is a `QGraphicsView` over

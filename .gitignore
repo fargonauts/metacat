@@ -9,3 +9,4 @@ ralph_loops/*/nohup.out
 build/
 .pytest_cache/
 *.egg-info/
+python/tests/screenshots-qt/

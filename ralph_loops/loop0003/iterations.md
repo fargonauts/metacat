@@ -26,7 +26,7 @@
     Tests: the inventory script runs and its JSON lists every window and menu item that
     `gui.py` defines. This is a check of the inventory itself.
 
-- [ ] **01 Skeleton and test harness.** Create `python/metacat/qt/`:
+- [x] **01 Skeleton and test harness.** Create `python/metacat/qt/`:
     - `python3 -m metacat.qt` opens an empty `QMainWindow` titled Metacat;
     - add a `qt` extra in `pyproject.toml`;
     - make `python/tests/test_qt_*.py` skip when PySide6 is missing;

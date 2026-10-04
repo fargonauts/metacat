@@ -885,6 +885,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** open. Documented in `python/tests/README.md`. A fix would skip these two
   tests, or read the version from the fixtures, when Chez is missing.
 
+### pytest-qt stops the whole pytest run when no Qt binding imports
+- **Seen:** loop0003 iteration 2 (item 01), writing `test_qt_tests_skip_without_pyside6`
+  in python/tests/test_qt_skeleton.py.
+- **What:** this machine has the pytest-qt plugin (4.5.0) installed. With PySide6 made
+  unimportable, its `pytest_configure` fails before any test is collected
+  (`INTERNALERROR> ... pytestqt/qt_compat.py ... _guess_qt_api`), so every test of the
+  suite errors, not just the Qt ones. Blocking it needs its entry-point name,
+  `-p no:pytest-qt`; `-p no:pytestqt` (the module name) is silently accepted and does
+  nothing.
+- **Evidence:** from python/, `python3 -m pytest -o addopts= tests/test_qt_skeleton.py`
+  with `PYTHONPATH` set to a folder holding a `PySide6/__init__.py` that raises
+  `ImportError`; the test above runs pytest that way, with the project's `addopts`.
+- **Status:** worked around: python/pyproject.toml's pytest `addopts` has
+  `-p no:pytest-qt`. The Qt tests use conftest.py's own `qapp` fixture, so they need no
+  plugin, and they skip cleanly without PySide6.
+
+### An offscreen QApplication makes later forks warn
+- **Seen:** loop0003 iteration 2 (item 01), the first gate run with the Qt tests.
+- **What:** `QApplication` with `QT_QPA_PLATFORM=offscreen` starts one OS thread of its own
+  (`/proc/self/task` goes from 1 to 2). The session's `qapp` fixture keeps it alive, and
+  `test_rules.py`, which runs after `test_qt_skeleton.py` in file order, forks
+  (`golden_harness`): Python 3.12 printed 32 times "This process is multi-threaded, use
+  of fork() may lead to deadlocks in the child". Nothing deadlocked, but a fork can copy
+  a lock the other thread holds.
+- **Evidence:** the gate log of that run (`1438 passed, 32 warnings`); without the Qt
+  tests, `python3 -m pytest tests/test_rules.py` gives no warnings.
+- **Status:** worked around: python/tests/conftest.py runs every `test_qt_*.py` file after
+  all the others (`test_qt_tests_run_after_the_others` checks it).
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

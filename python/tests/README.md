@@ -11,8 +11,9 @@ Each test file was written before the code it checks, and failed first; that is 
 ## Running
 
 ```bash
-bash python/run-tests.sh            # full tier: all 1412 tests, about 7 min on 32 idle cores
-bash python/run-tests.sh --fast     # fast tier: 990 tests, about 10 s; no display
+bash python/run-tests.sh            # full tier: all 1439 tests, about 7 min on 32 idle cores
+bash python/run-tests.sh --fast     # fast tier: 1014 tests, about 10 s; no display
+bash python/run-tests.sh --qt       # the Qt GUI's tests alone (test_qt_*.py)
 bash python/run-tests.sh -k golden  # extra arguments go to pytest
 cd python && python3 -m pytest tests/test_chez.py -q   # one file
 ```
@@ -32,7 +33,9 @@ Requirements:
   and the re-captures), `xvfb-run` (every test that opens Tk windows), and many cores. The
   golden and extra-seed runs fork one process per run, in parallel.
 
-GUI tests never open windows on the real screen. They run their scripts under
+GUI tests never open windows on the real screen. The Qt tests (`test_qt_*.py`, loop0003)
+need PySide6 and skip without it; each starts with `pytest.importorskip("PySide6...")`, and
+`run-tests.sh` exports `QT_QPA_PLATFORM=offscreen`, so they need no X server. The tkinter tests run their scripts under
 `xvfb-run -a`, with `WAYLAND_DISPLAY` unset, and every script exits by itself.
 
 ## Test files
@@ -64,17 +67,19 @@ The counts are the tests pytest collects (fast + slow).
 | `test_views.py` | 1 + 112 | Watching changes nothing: goldens with every window attached give the golden traces, and every window was drawn into. Fast: one short golden. Slow: all 109, the crash run, and eight scenes drawn on Tk (`render_views.py`) | slow: xvfb |
 | `test_gui.py` | 20 + 1 | The control panel: `gui-battery.scm` (parser, Step/Go/Reset decisions, speed settings, titles, demos, clamp patterns), structure, and that a headless run loads no tkinter or `metacat.gui` module. Slow: `drive_gui.py` drives the GUI, and each run's trace must equal its golden | slow: xvfb |
 | `test_tk_gui_inventory.py` | 5 + 1 | The inventory of the tkinter GUI (`data/tk-gui-inventory.json`, loop0003 item 00) lists every window, its mouse handlers, every menu item `gui.py` defines (read from its source), the run states, the dialogs and the bindings. Slow: `tk_gui_inventory.py` regenerates it under Xvfb, and it must equal the committed one (font keys aside) | slow: xvfb |
+| `test_tk_canvas_inventory.py` | 8 + 2 | The Tk canvas commands the panels send (`data/tk-canvas-commands.json`, loop0003 item 01, made by `tk_canvas_inventory.py`): every command, item kind, option, enumerated value, target form, tag and canvas method, from the code (read with `ast`; a computed command outside the known forwarders fails), the `sgl-tcl` fixtures and, slow, recording canvases in run7 and a justify run with every view attached. A command a module sends that the list lacks fails | |
+| `test_qt_skeleton.py` | 11 | The Qt GUI's harness (loop0003 item 01): `MainWindow` opens and closes offscreen, `python3 -m metacat.qt --quit-after` exits by itself, `metacat.qt.grab.grab_png` writes a PNG of the widget's size, every `test_qt_*.py` skips cleanly in a fresh pytest with PySide6 hidden and runs after every other test file (conftest.py; the `QApplication` starts a thread, and other tests fork), the `qt` extra, and no PySide6 in the engine or the tkinter GUI | PySide6 (skips without) |
 | `test_install.py` | 5 + 4 | Packaging. Fast: the declared commands, packages and help text. Slow: a clean copy of `python/`, `pip install -e` and a regular install into fresh venvs, each running Run 7 (stdout equal to the live oracle's, trace equal to the golden) and opening the GUI | slow: Chez, xvfb |
 | `test_engine_modules.py` | 3 | Each engine module imports alone in a fresh interpreter (no load, no random draw). Cross-module `from`-imports are limited to the allowed ones | |
 | `test_quirk_sites.py` | 2 | The list of `# chez:` and `# 1.2:` sites in `docs/python-translation-plan.md` equals the code's | |
 
-Totals: 1412 tests, 990 fast and 422 slow.
+Totals: 1439 tests, 1014 fast and 425 slow.
 
 ## Helpers
 
 | File | What it is |
 |---|---|
-| `conftest.py` | Puts `tests/` and `oracle/` on `sys.path` |
+| `conftest.py` | Puts `tests/` and `oracle/` on `sys.path`. Qt fixtures (loop0003): `qapp`, the session's `QApplication`, always offscreen, quit at the end; `grab(widget, name)`, a PNG in `tests/screenshots-qt/<test>/` (not committed) for inspection |
 | `chez_fixtures.py` | `chez(battery, test)`: what Chez printed for that test. Also `manifest`, `values` |
 | `scheme_canon.py` | `helpers.scm`'s `b:canon` and `b:num` for Python values, so a Python result can be compared with a fixture's text |
 | `scheme_reader.py` | A small Scheme reader for quoted data in batteries and `sgl-fixture.scm` |
@@ -90,6 +95,7 @@ Totals: 1412 tests, 990 fast and 422 slow.
 | `render_views.py` | `xvfb-run -a -s "-screen 0 3000x2000x24" python3 python/tests/render_views.py OUTDIR [SCENE ...]`: draws the windows at points of golden runs on Tk and grabs each one as `WINDOW-SCENE.png` |
 | `drive_gui.py` | `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 2560x1600x24" python3 python/tests/drive_gui.py OUTDIR`: builds the GUI as `python3 -m metacat.gui` does and drives it from a second thread. It covers a full run, step mode, Stop and Go, a demo, a breakpoint, a click on the Workspace, Reset, the menus and dialogs (clamps included), saving the commentary and a resize, and grabs the screen. A watchdog ends it after 10 minutes |
 | `tk_gui_inventory.py` | `env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 1920x1200x24" python3 python/tests/tk_gui_inventory.py python/tests/data/tk-gui-inventory.json`: builds the GUI as `python3 -m metacat.gui` does and walks it: windows, control-panel widgets and their states in each run mode, menus, dialogs (opened and closed), bindings and the speed table. Writes the JSON that `docs/qt-gui-plan.md` summarises |
+| `tk_canvas_inventory.py` | `python3 python/tests/tk_canvas_inventory.py python/tests/data/tk-canvas-commands.json`: the Tk canvas commands the panels send, from the code, the `sgl-tcl` fixtures and recorded runs (about 4 s, no display). `--record OUT problem... seed` records one run |
 
 ## How a battery test works
 

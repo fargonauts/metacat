@@ -7,3 +7,9 @@
 [2026-10-04 15:29:35] session it01: error (exit 1, 40 tool calls)
 [2026-10-04 15:29:35] item not marked by the agent (error); marking - [!] so the loop advances
 [2026-10-04 15:37:23] tests passed: GATE PASSED
+[2026-10-04 15:37:23] committed 6ce8de2: 00 Inventory and design. Write `docs/qt-gui-plan.md`.
+[2026-10-04 15:37:26] pushed 6ce8de2 to origin
+[2026-10-04 15:37:26] === iteration 2: 01 Skeleton and test harness. Create `python/metacat/qt/`:
+[2026-10-04 15:37:26] claude session it02 (cap 3.00 h) -> session_it02.log
+[2026-10-04 16:02:31] session it02: ok (exit 0, 62 tool calls)
+[2026-10-04 16:09:54] tests passed: GATE PASSED

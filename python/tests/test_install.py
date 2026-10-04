@@ -59,7 +59,7 @@ def test_entry_points_take_no_arguments():
 
 def test_packages_and_data_declared():
     data = pyproject()["tool"]["setuptools"]
-    assert set(data["packages"]) == {"metacat", "metacat.gui"}
+    assert set(data["packages"]) == {"metacat", "metacat.gui", "metacat.qt"}
     assert "help.txt" in data["package-data"]["metacat.gui"]
 
 
