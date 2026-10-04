@@ -536,6 +536,26 @@ at Tk's fixed 96 dpi, so it becomes pixel size `round(size·96/72)`, independent
 screen. `bold` maps to `QFont.Bold`, `italic` to italic, and `underline` and `overstrike`
 map too. Measurement and drawing use the same `QFont`.
 
+*As built (item 03).* `qt/fontspec.py` (no Qt) reads a font word as Tk 8.6's
+ParseFontNameObj does: the list form with any number of style words or style lists (later
+weight or slant words win, case-sensitive), the `-family -size -weight -slant -underline
+-overstrike` form, `TkDefaultFont` (and the other Tk named fonts) as Helvetica −12, size 0
+as Tk's default, and Tk's error messages; the canvas checks `-font` with it. Points become
+`(int)(points·96/72 + 0.5)` pixels. `qt/fonts.py` measures widths with
+`QFontMetrics.horizontalAdvance` (97% of the reference samples equal Tk's `font measure`)
+and takes ascent and descent from the ink of the font's printable Latin-1 glyphs
+(`QRawFont.boundingRect`, rounded up), because the tkinter GUI's Tk draws with X core
+fonts, whose ascent and descent are such ink extents; Qt's own `ascent()` follows the OS/2
+win ascent and is up to 7 pixels taller. `families()` lists Qt's families lower-cased,
+without Qt's ` [foundry]` suffix, plus the faces of fonts.ss's preference lists that
+fontconfig maps onto a real face rather than its generic fallback. So on this machine
+`serif` is `times new roman` (Liberation Serif), `sans-serif` `helvetica` (Nimbus Sans) and
+`fancy` `palatino linotype` (P052). `install()` makes `metacat/gui/fonts.py` choose its
+faces from that list and measure on a `HiddenCanvas` (a `QtCanvas` that drops its change
+records at each `delete`). Colours need nothing new: `displaylist.color_rgb` reads all 752
+names of `colors.py` exactly as Tk does (`python/tests/test_qt_fonts.py`, reference
+`python/tests/data/tk-fonts-colors.json`).
+
 ### 2.7 The control strip and menus (item 06)
 
 - **Control strip**, left to right:

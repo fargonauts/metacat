@@ -955,8 +955,40 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `test_display_list_with_qt_fonts` (tolerance 6 pixels on text extents
   only); `QFontMetrics(QFont("helvetica")).ascent()` with `setPixelSize(11)` is 12, while
   Tk's `font metrics {helvetica -11}` gives `-ascent 10 -descent 2`.
-- **Status:** open, for loop0003 item 03 (fonts). Only the pictures depend on it: the
-  engine never measures text.
+- **Status:** explained and worked around (loop0003 item 03). The Tk here is Anaconda's,
+  built without Xft: it draws X core fonts (the X server's Type 1 rasteriser, reading
+  `/usr/share/fonts/X11/Type1`), and a core font's ascent and descent are the extents of
+  its glyphs' ink, not the face's line metrics. Qt's `ascent()` is the OS/2 table's win
+  ascent (1.075 em for Nimbus Sans). `metacat/qt/fonts.py` now takes the ascent and descent
+  from the ink of the font's printable Latin-1 glyphs: over 252 fonts
+  (`python/tests/data/tk-fonts-colors.json`) the linespace is within 3 pixels of Tk's, and
+  within 1 for 79% of them, and the ascent within 1 for all
+  (`test_qt_fonts.py::test_heights_are_close_to_tks`). The text
+  items of the canvas streams are now within 2 pixels of Tk's. Only the pictures depend
+  on it: the engine never measures text.
+
+### Tk's font measure and Qt's horizontalAdvance part at 22-pixel bold Helvetica
+- **Seen:** loop0003 iteration 4 (item 03), the widths of the reference samples.
+- **What:** 97% of the 2,016 sample widths are identical in Tk and Qt, and 98% within a
+  pixel. The rest are bold Helvetica at 22 pixels ("Bond builders": Tk 151, Qt 145) and
+  24-point Times (2 or 3 pixels).
+- **Evidence:** `python/tests/test_qt_fonts.py::test_widths_are_tks`.
+- **Status:** explained: two hinters. The X server hints the Type 1 `.pfb` files, FreeType
+  (in Qt) the OpenType `.otf` files of the same URW designs, and their rounded advances
+  differ at a few sizes. Only pictures depend on widths.
+
+### Qt names fontconfig families with a foundry, and resolves aliases its own way
+- **Seen:** loop0003 iteration 4 (item 03), `QFontDatabase.families()`.
+- **What:** Qt lists "Nimbus Sans [UKWN]", "Nimbus Sans [URW ]" and "Nimbus Sans [URW]"
+  for one family, with fontconfig's foundry in brackets. The alias names fonts.ss prefers
+  are not listed at all, yet `QFont("palatino")` gives P052 and `QFont("times new roman")`
+  Liberation Serif, while an unknown name gives Noto Sans. Anaconda's `fc-match` (first on
+  the PATH) answers KaTeX_AMS for everything; it doesn't read the system's configuration,
+  which Qt and the system fontconfig do.
+- **Evidence:** `python/tests/test_qt_fonts.py::test_families_are_fontconfigs`.
+- **Status:** worked around: `qt/fonts.families()` strips the bracket, lower-cases, and
+  adds a preferred face when fontconfig maps it onto something other than its generic
+  fallback (docs/divergences.md, Python Qt GUI).
 
 ### X11 draws a wide diagonal line with a jog
 - **Seen:** loop0003 iteration 3 (item 02), comparing the SGL fixture drawn by Qt with
@@ -1317,8 +1349,17 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** `docs/screenshots/panels/coderack-run7-answer.png`,
   `docs/screenshots/python-run7-wyz.png` and `python-ijk-clamp.png`, against
   `docs/screenshots/run7-wyz.png` (Racket).
-- **Status:** open. Not yet checked on a real screen. A guess, not verified: at a few pixels
-  per glyph, Tk's font rendering in this Xvfb setup (no antialiasing, or a fallback face)
-  gives the narrow glyphs `i` and `l` no pixels at all. If it also happens on a real
-  screen, the port could set a minimum pixel size for this font, which would be a
-  divergence to record in `docs/divergences.md`.
+- **Status:** explained (loop0003 item 03). The default Coderack window is 598 pixels high,
+  so the labels are `round(14/1000 × 598)` = 8 pixels. The Tk that tkinter loads here
+  (Anaconda's `libtk8.6.so`) is built without Xft: `ldd` shows libX11 but no libXft or
+  fontconfig, `font actual {helvetica -11}` names the core font family `nimbus sans l`, and
+  the X server rasterises the Type 1 files in `/usr/share/fonts/X11/Type1` as 1-bit
+  bitmaps. At 8, 9 and 10 pixels it gives the one-pixel stems of `i` and `l` no pixels
+  ("illil" shows three strokes at 10 pixels); at 7 and 11 they survive. So it is the font
+  path, not Xvfb as such: a real X screen with the same Tk would do the same, and a Tk
+  built with Xft would not. The Racket port (Cairo/Pango) and the Qt GUI (FreeType,
+  antialiased) draw every letter:
+  `docs/screenshots/panels/small-text-tk.png` against `small-text-qt.png`
+  (`python/tests/render_small_text.py`), and
+  `python/tests/test_qt_fonts.py::test_tiny_coderack_labels_keep_their_thin_letters`
+  (5 to 11 pixels). The tkinter GUI is left as it is.

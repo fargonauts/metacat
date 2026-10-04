@@ -19,3 +19,9 @@
 [2026-10-04 16:09:57] claude session it03 (cap 3.00 h) -> session_it03.log
 [2026-10-04 16:42:24] session it03: ok (exit 0, 61 tool calls)
 [2026-10-04 16:49:53] tests passed: GATE PASSED
+[2026-10-04 16:49:53] committed 5ab5e6f: 02 The Qt canvas. `qt/canvas.py`: an object with the panel canvas inte
+[2026-10-04 16:49:57] pushed 5ab5e6f to origin
+[2026-10-04 16:49:57] === iteration 4: 03 Fonts and colours. Map Tk font specs (family lists, negative pixel sizes,
+[2026-10-04 16:49:57] claude session it04 (cap 3.00 h) -> session_it04.log
+[2026-10-04 17:09:09] session it04: ok (exit 0, 77 tool calls)
+[2026-10-04 17:16:47] tests passed: GATE PASSED

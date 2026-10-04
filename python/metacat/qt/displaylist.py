@@ -672,6 +672,8 @@ def _convert(option, value):
             raise TclError('bad smooth value "%s"' % value)
         return value
     if option == "-font":
+        from metacat.qt.fontspec import parse_font
+        parse_font(value)       # Tk's errors
         return tuple(value) if isinstance(value, (list, tuple)) else str(value)
     if option == "-text":
         return str(value)

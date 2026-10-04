@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 2/12 SOLVED
+- **Current**: 3/12 SOLVED
 
 ---
 
@@ -175,3 +175,79 @@ Item **02 The Qt canvas**: SOLVED.
 - Item 04 will need `QtCanvas.sync()` called on a timer (item 05 batches it) and
   `set_origin` from the view's scroll position.
 
+
+---
+
+## Iteration 4 — 2026-10-04 17:08:35
+Item **03 Fonts and colours**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** `python/tests/test_qt_fonts.py` and its Tk
+  reference were written before any code. First run: `40 failed, 24 passed` (no
+  `metacat.qt.fontspec`, no `families`/`install`/`descent`, Qt's heights too tall, the
+  canvas accepting `-font {helvetica -11 heavy}`). Three of my own expectations were then
+  wrong and were corrected, not loosened silently: `bbox` answers a list; Tk and Qt widths
+  differ by up to 6 pixels for 22-pixel bold Helvetica (now 97% exact, 98% within 1, all
+  within 6); antialiased 1-pixel stems straddle two columns, so the thin-letter test
+  counts local minima.
+- **The reference**: `python/tests/tk_fonts_colors.py` under Xvfb writes
+  `python/tests/data/tk-fonts-colors.json`: Tk's ascent, descent, linespace, actual family
+  and the widths of 8 samples for 252 font words (Helvetica, Times, Courier; −5…−30 pixels
+  and 8…24 points; 4 styles), and `winfo rgb` of all 752 colour names of `colors.py`. Its
+  slow test regenerates it and compares.
+- **Finding: the tkinter GUI's Tk has no Xft.** Anaconda's `libtk8.6.so` links libX11
+  only; Tk draws X core fonts, which the X server rasterises from
+  `/usr/share/fonts/X11/Type1` as 1-bit bitmaps, and their ascent/descent are glyph-ink
+  extents.
+- **`python/metacat/qt/fontspec.py`** (no Qt): Tk 8.6's ParseFontNameObj: list form with
+  any style words or style lists (later weight/slant wins, case-sensitive), the `-family
+  -size -weight -slant -underline -overstrike` form, Tk's named fonts as Helvetica −12,
+  size 0 = default, points → `(int)(pt·96/72+0.5)` pixels, and Tk's error messages. The
+  display list now checks `-font` with it (an item with a bad font isn't created).
+- **`python/metacat/qt/fonts.py`** completed: `qfont` from the spec; `QtMetrics` measures
+  widths with `horizontalAdvance` and takes ascent/descent from the ink of the font's
+  printable Latin-1 glyphs (`QRawFont.boundingRect`, rounded up), as X's core fonts do.
+  Linespace is now within 3 px of Tk's for all 252 fonts (within 1 for 79%), ascent within
+  1 for all; before, Qt's OS/2 win ascent made it up to 7 px taller. `families()` (Qt's
+  families lower-cased, ` [foundry]` stripped, plus fonts.ss's preferred faces that
+  fontconfig maps onto a real face rather than its fallback) and `install()` (fonts.ss
+  picks faces from them and measures on a `HiddenCanvas`, a `QtCanvas` that drops its
+  change records at each `delete`). Here: serif `times new roman` (Liberation Serif),
+  sans-serif `helvetica` (Nimbus Sans), fancy `palatino linotype` (P052).
+- **Measurement consistency** tested: a text item's `bbox` = measured width + Tk's cursor
+  pixel by the linespace; `horizontalAdvance` of the drawing `QFont` equals the
+  measurer's width; the drawn ink lies inside the bbox and fills it but the side
+  bearings; `FixedFont get-pixel-size` after `install()` gives the Qt numbers.
+- **Colours**: all 752 names read as Tk reads them (the 5 TIP 403 names differ from
+  `colors.py`, as logged in item 02), upper case too; every `Rgb` of `colors.py`,
+  `constants.py` and `*color-names*` round-trips through `swl.tcl_word`; the scene paints
+  the exact RGB.
+- **`TEXT_TOLERANCE` in `test_qt_canvas.py` tightened from 6 to 2** (fails at 1).
+- **The UFO answered.** `python/tests/render_small_text.py` draws the Coderack's labels at
+  5–11 px with Tk and with Qt: `docs/screenshots/panels/small-text-tk.png` and
+  `small-text-qt.png` (inspected). The default Coderack is 598 px high, so the labels are
+  8 px; Tk's core fonts drop the `i`s and `l`s at 8, 9 and 10 px (not 7 or 11); Qt draws
+  every letter at the same widths. Test:
+  `test_tiny_coderack_labels_keep_their_thin_letters`. The SGL fixture picture
+  re-rendered and inspected: 97.8% of pixels match the tkinter one (was 97.7%);
+  `docs/screenshots/panels/sgl-fixture-qt.png` updated.
+- **Docs**: `docs/anomalies_and_quirks.md`: the UFO entry explained; "Qt's metrics taller"
+  explained and worked around; new entries for the 22-px width differences (two hinters)
+  and Qt's foundry-suffixed family names and alias resolution (Anaconda's `fc-match`
+  answers KaTeX_AMS for everything). `docs/divergences.md` (Python Qt GUI): ink metrics,
+  antialiased text, and the faces (Liberation Serif for serif where tkinter uses Nimbus
+  Roman). `docs/qt-gui-plan.md` 2.6 "As built (item 03)". `docs/screenshots/README.md`:
+  small-text section. `python/tests/README.md`: rows for the new test, reference script
+  and render script; totals 1518 (1091 fast, 427 slow).
+- Gate: `python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1518 passed in 7:37; racket/
+  unchanged).
+
+### Blockers
+- None for item 03. Item 00 is still `[!]` from session 1 (deliverables exist and pass;
+  see iteration 2).
+
+### Next
+- Item 04 (the Qt host): call `fonts.install()` when the Qt GUI starts (before the
+  panels select their fonts), call `QtCanvas.sync()` on a timer, and set `set_origin`
+  from each view's scroll position. The Logo's scrollbar sizes still need Qt values
+  (`QStyle.PM_ScrollBarExtent`).

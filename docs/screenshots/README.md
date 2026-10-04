@@ -202,6 +202,23 @@ runs the panels' Tk canvas commands:
 
 ![SGL fixture drawn by the Python port's Qt canvas](panels/sgl-fixture-qt.png)
 
-It matches the tkinter picture cell for cell and passes the same pixel checks. Text is a
-pixel lower, because Qt's metrics of the same faces are taller (fonts are loop0003 item
-03). Qt draws the 5-pixel white line in "erase" straight, where X11 puts a jog in it.
+It matches the tkinter picture cell for cell and passes the same pixel checks. Since
+loop0003 item 03, Qt measures a font's ascent and descent from its Latin-1 ink, as X's core
+fonts do, so text sits where Tk puts it, within a pixel or two (97.8% of the pixels agree
+within 24 levels). Qt draws the 5-pixel white line in "erase" straight, where X11 puts a jog
+in it.
+
+### Small text: Tk's core fonts against Qt
+
+The Coderack's codelet-type labels are 14/1000 of its window's height, 8 pixels at the
+default size. `python/tests/render_small_text.py` draws them in Helvetica from 5 to 11
+pixels, once on a tkinter Canvas under Xvfb and once on the Qt canvas:
+
+| tkinter (core X fonts, Xvfb) | Qt canvas |
+| --- | --- |
+| ![Small Helvetica drawn by Tk](panels/small-text-tk.png) | ![Small Helvetica drawn by Qt](panels/small-text-qt.png) |
+
+At 8, 9 and 10 pixels Tk drops `i`s and `l`s ("Bond bu ders", "illil" as three strokes at
+10 pixels). Qt draws every letter, antialiased, at the same widths. See
+`docs/anomalies_and_quirks.md`, "The Python port's Coderack labels lose their `i`s and
+`l`s".

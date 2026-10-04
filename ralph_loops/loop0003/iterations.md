@@ -57,7 +57,7 @@
     - render the SGL fixture with Qt, inspect it, and compare it with
       `docs/screenshots/panels/sgl-fixture-python.png`.
 
-- [ ] **03 Fonts and colours.** Map Tk font specs (family lists, negative pixel sizes,
+- [x] **03 Fonts and colours.** Map Tk font specs (family lists, negative pixel sizes,
     points, weight, slant) and Tk colour names onto Qt. Text measurement for the panels
     must use the same fonts the Qt canvas draws with. Check the tiny Coderack label case:
     do the `i`s and `l`s render in Qt? Update the anomalies entry with the answer.

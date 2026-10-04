@@ -113,8 +113,19 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   - pixels differ from the tkinter GUI's: Qt rasterises wide lines, arcs and dash phases
     a little differently (X11's jog in wide diagonal lines is gone), and text is drawn
     by Qt;
-  - text extents come from Qt's metrics of the same fontconfig faces. The widths agree
-    within a pixel, but the heights are up to 5 pixels taller (item 03 maps the fonts);
+  - text extents come from Qt's metrics of the same fontconfig faces. Widths are Tk's
+    for 97% of the reference samples; ascent and descent are the ink of the font's
+    Latin-1 glyphs, as X's core fonts compute them, so heights are within 3 pixels of
+    Tk's (item 03). All text items' bboxes are within 2 pixels of Tk's;
+  - text is antialiased, where the tkinter GUI's Tk draws X core fonts in bitmaps.
+    Thin letters of small text no longer vanish: the Coderack's 8-pixel labels show
+    their `i`s and `l`s;
+  - the faces: fonts.ss picks from `qt/fonts.families()`, fontconfig's families plus
+    the preferred faces fontconfig maps onto a real face. On this machine that gives
+    `times new roman` (Liberation Serif) for serif and `palatino linotype` (P052) for
+    fancy, where the tkinter GUI, listing X's core font names, picks `times` (Nimbus
+    Roman) and `palatino` (also P052's design). Liberation Serif has Times New Roman's
+    metrics, so serif text is laid out a little differently from the tkinter GUI's;
   - colour words are read as Tk 8.6 reads them (`gray` is `#808080`), but the panels
     only send `#rrggbb`.
 - **Why:** the single-window GUI is Qt; Tk can't draw into it.

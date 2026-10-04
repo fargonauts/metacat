@@ -94,6 +94,18 @@ class QtCanvas:
                         g.setZValue(value)
 
 
+class HiddenCanvas(QtCanvas):
+    """port: fonts.ss's *hidden-canvas*, a canvas never shown that measures text
+    by creating it and asking its bbox.  No scene follows it, so the changes
+    are dropped at each delete instead of piling up for a sync."""
+
+    def tcl(self, *args):
+        answer = super().tcl(*args)
+        if args and str(args[0]) == "delete":
+            self.display_list.take_changes()
+        return answer
+
+
 def _qcolor(word):
     r, g, b = color_rgb(word)
     return QColor(r, g, b)

@@ -9,8 +9,8 @@ The reference is a real tkinter Canvas given the same commands
   Qt canvas gives Tk's display list: ids, stacking order, kinds, coordinates,
   options, tags, hidden state, and every bbox and canvasx answer.  With Tk's own
   text metrics (recorded in the reference) everything is exact; with Qt's fonts,
-  everything but the text items' extents is exact, and those are close (the
-  fonts themselves are item 03);
+  everything but the text items' extents is exact, and those are within
+  TEXT_TOLERANCE (test_qt_fonts.py tests the fonts);
 - the slow tier checks that the reference is what Tk says today;
 - the canvas accepts every command and option of the item-01 inventory, and
   rejects others as Tk does;
@@ -41,10 +41,11 @@ REPO = PY.parent
 SCREENSHOT = REPO / "docs" / "screenshots" / "panels" / "sgl-fixture-python.png"
 QT_SCREENSHOT = REPO / "docs" / "screenshots" / "panels" / "sgl-fixture-qt.png"
 
-# Qt's fonts against Tk's (Xft): the text items' extents may differ by this many
-# pixels on each side.  Measured on 2026-10-04: widths within 1 pixel, heights
-# within 5 (Qt's ascent + descent exceeds Xft's); item 03 maps the fonts.
-TEXT_TOLERANCE = 6
+# Qt's fonts against Tk's (core X fonts): the text items' extents may differ by
+# this many pixels on each side.  Item 02 measured heights within 5 pixels (Qt's
+# line metrics); item 03's ink metrics (metacat/qt/fonts.py) brought them, and
+# the widths, within 2.
+TEXT_TOLERANCE = 2
 
 
 @pytest.fixture(scope="module")
