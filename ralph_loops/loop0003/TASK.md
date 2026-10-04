@@ -5,8 +5,10 @@
   about ten top-level windows across the screen: the control panel, Workspace, Slipnet,
   Coderack, Temperature, the three Themes windows, Temporal Trace, Episodic Memory,
   Commentary and the EEG. The goal is a single main window that shows all of them at once
-  as panes, with every control and menu of today's GUI. It should be pleasant on a laptop
-  screen (1366×768) and use a large one well.
+  as panes, with every control and menu of today's GUI. **1920×1080 is the minimum screen**
+  (the owner's decision): the default layout is designed for 1080p, and larger screens
+  (2560×1440, 4K) use the extra space. Smaller screens aren't a target, so drop the
+  1366×768 layout from `docs/qt-gui-plan.md`.
 - **Same pictures, new frame.** The panels' drawing code already exists and is faithful:
   `python/metacat/gui/*_graphics.py`, through `sgl.py`. Every panel draws by sending the
   original's Tk canvas commands to a canvas object (`tcl(*args)`; see `swl.py`, `hosts.py`).

@@ -115,8 +115,9 @@
     scenario of `drive_gui.py` gives its expected trace.
 
 - [ ] **08 Layout polish.**
-    - the default layouts for 1920×1080 and 1366×768 from item 00, chosen by screen
-      size;
+    - the default layout for 1920×1080 from item 00 (1080p is the minimum screen, the
+      owner's decision; remove the 1366×768 layout from `docs/qt-gui-plan.md`), and how it
+      grows on 2560×1440 and 4K;
     - splitter handles that resize panes, with sensible minimum pane sizes;
     - hiding and showing panes from the View menu, with the splitters closing up the gap;
     - layout saved and restored with `QSettings`, plus a View → Reset layout item;
@@ -126,7 +127,7 @@
       be drawn.
 
     Tests: splitter-size save and restore round-trips; reset layout restores the default; every pane is visible and non-empty at
-    both sizes after a run. Inspect screenshots at both sizes.
+    1920×1080 and 2560×1440 after a run. Inspect screenshots at both sizes.
 
 - [ ] **09 Packaging and docs.**
     - `pip install -e 'python[qt]'` installs a `metacat-qt` command;
