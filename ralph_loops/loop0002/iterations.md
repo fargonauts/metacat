@@ -104,7 +104,7 @@
     - render the fixture to PNG (Tk `postscript` or a screen grab under Xvfb),
       inspect it, and compare with `racket/tests/snapshots/sgl-fixture.png`.
 
-- [ ] **14 The panels.** Translate `general-graphics.ss` and every `*-graphics.ss` (workspace,
+- [x] **14 The panels.** Translate `general-graphics.ss` and every `*-graphics.ss` (workspace,
     bridges, groups, rules, slipnet, coderack, temperature, themes, trace, memory,
     commentary, EEG) as views that subscribe to engine hooks. Tests:
     - `graphics-battery.scm` and `panels-battery.scm` against their fixtures;

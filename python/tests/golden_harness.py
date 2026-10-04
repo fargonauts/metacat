@@ -27,11 +27,14 @@ GOLDEN_DIR = os.path.join(ROOT, "tests", "golden")
 PROBLEMS_FILE = os.path.join(ROOT, "tests", "problems.txt")
 
 
-def prepare():
+def prepare(views=False):
     headless.prepare()
+    if views:
+        from metacat.gui import views as V
+        V.load_views()
 
 
-def run_problem(strings, seed, cap, keep_going, trace=True):
+def run_problem(strings, seed, cap, keep_going, trace=True, views=None):
     """The oracle run.ss's run: returns (reason, trace text, stdout).  An error of
     the run propagates, with the partial trace in its `partial_trace` attribute and
     the output in `stdout`."""
@@ -39,7 +42,8 @@ def run_problem(strings, seed, cap, keep_going, trace=True):
     out = io.StringIO()
     try:
         with redirect_stdout(out):
-            reason, _answers = headless.run_problem(strings, seed, cap, keep_going, port)
+            reason, _answers = headless.run_problem(strings, seed, cap, keep_going, port,
+                                                    views=views)
     except BaseException as e:
         e.partial_trace = port.getvalue() if port is not None else None
         e.stdout = out.getvalue()
@@ -86,6 +90,33 @@ def _run_one(args):
                 getattr(e, "partial_trace", None), getattr(e, "stdout", None))
 
 
+_WINDOWS = {}
+
+
+def _attach_views():
+    from metacat.gui import views as V
+    _WINDOWS.clear()
+    _WINDOWS.update(V.attach_views())
+
+
+def _run_one_views(args):
+    """_run_one with every window attached (metacat.gui.views.attach_views, all
+    graphics on, offscreen); stdout ends with one line per window, "NAME view: N
+    items" (the items created on its canvas), as racket/tests/views-harness.rkt's
+    views-run."""
+    from metacat.gui import views as V
+    strings, seed, cap, keep = args
+    try:
+        reason, text, stdout = run_problem(strings, seed, cap, keep, views=_attach_views)
+        status = "ok"
+    except BaseException as e:   # noqa: BLE001 - reported to the parent
+        status, reason = "error", "%s: %s" % (type(e).__name__, e)
+        text, stdout = getattr(e, "partial_trace", None), getattr(e, "stdout", None) or ""
+    stdout += "".join("%s view: %d items\n" % (name, V.window_items(w))
+                      for name, w in _WINDOWS.items())
+    return (status, reason, text, stdout)
+
+
 def _run_one_digest(args):
     """_run_one for the extra seeds (test_extra_seeds.py): the run as `python3 -m
     metacat ... --trace FILE` gives it, reduced to what the oracle's fixture keeps:
@@ -107,11 +138,13 @@ def _run_one_digest(args):
 def run_in_forks(jobs, processes=None, digest=False):
     """Run each (strings, seed, cap, keep-going?) in a fresh fork of this process
     (after prepare()), in parallel; results in order.  With digest, each result is
-    _run_one_digest's instead of _run_one's."""
-    prepare()
+    _run_one_digest's instead of _run_one's; with digest == "views",
+    _run_one_views's."""
+    prepare(views=digest == "views")
+    worker = {False: _run_one, True: _run_one_digest, "views": _run_one_views}[digest]
     ctx = multiprocessing.get_context("fork")
     with ctx.Pool(processes or min(32, os.cpu_count() or 1), maxtasksperchild=1) as pool:
-        return pool.map(_run_one_digest if digest else _run_one, jobs, chunksize=1)
+        return pool.map(worker, jobs, chunksize=1)
 
 
 def run_in_fresh_process(jobs, processes=None, digest=False):

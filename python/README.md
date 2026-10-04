@@ -226,3 +226,21 @@ The SGL interpreter on tkinter (item 13):
   - Slow tier: the fixture rendered on a real Canvas under `xvfb-run`
     (`tests/render_sgl_fixture.py OUT.png --check`, which grabs the window and checks
     pixels; `tests/snapshots/sgl-fixture.png` is one rendering).
+
+The panels (item 14):
+- Engine side (no tkinter): `metacat/general_graphics.py` (pexp builders, text helpers),
+  `group_graphics.py`, `bridge_graphics.py`, `rule_graphics.py`, `eeg_graphics.py`
+  (the EEG object).
+- `metacat/gui/`: `constants.py`, `general_graphics.py` (graphics and text windows),
+  `slipnet_`, `workspace_`, `temperature_`, `coderack_`, `theme_`, `trace_`, `memory_`,
+  `commentary_` and `eeg_graphics.py`, `hosts.py` (offscreen or Tk window hosts) and
+  `views.py` (`load_views()`, `attach_views()`, `attach_workspace_view()`).
+- `headless.run_problem(strings, seed, cap, views=views.attach_views)` runs a problem
+  with every window attached; the output and trace are the same as without.
+
+  Tests: `tests/test_graphics.py` (graphics-battery.scm), `tests/test_panels.py`
+  (panels-battery.scm), `tests/test_gui_windows.py`, `tests/test_gui_panels_a.py`,
+  `tests/test_views.py` (goldens with views attached; slow: all 109, the crash run, and
+  `tests/render_views.py OUTDIR [SCENE...]` under xvfb-run, which draws eight scenes of
+  run7, a justify run and a Memory comparison on Tk and grabs each window).
+  `tests/snapshots/views/` holds one rendering of every scene.

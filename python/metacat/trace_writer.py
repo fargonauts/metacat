@@ -311,20 +311,7 @@ def install_trace():
 
     m.slipnet.update_slipnet_activations = update_slipnet_activations
 
-    window = setup.g_trace_window
-
-    def trace_window_fn(self, msg, *args):
-        if msg == "add-event" and PORT is not None:
-            event = args[0]
-            emit("event",
-                 ("type", tell(event, "get-type")),
-                 ("number", tell(event, "get-event-number")),
-                 ("name", tell(event, "print-name")),
-                 ("time", tell(event, "get-time")),
-                 ("temperature", tell(event, "get-temperature")))
-        return window(self, msg, *args)
-
-    setup.g_trace_window = Lambda(trace_window_fn)
+    wrap_trace_window()
 
     o_abstract_answer_description = m.memory.abstract_answer_description
 
@@ -343,6 +330,29 @@ def install_trace():
         return _metacat.trace_writer.on_halt(message, obj)
 
     objects.report_error_and_halt = report_error_and_halt
+
+
+
+def wrap_trace_window():
+    """trace.ss: install-trace!'s wrapper of *trace-window* (each add-event is
+    emitted), around whichever Trace window is installed: the headless one at
+    install time, or the views' (headless.run_problem's views).  Returns the
+    wrapper."""
+    window = setup.g_trace_window
+
+    def trace_window_fn(self, msg, *args):
+        if msg == "add-event" and PORT is not None:
+            event = args[0]
+            emit("event",
+                 ("type", tell(event, "get-type")),
+                 ("number", tell(event, "get-event-number")),
+                 ("name", tell(event, "print-name")),
+                 ("time", tell(event, "get-time")),
+                 ("temperature", tell(event, "get-temperature")))
+        return window(self, msg, *args)
+
+    setup.g_trace_window = Lambda(trace_window_fn)
+    return setup.g_trace_window
 
 
 def trace_start(strings, seed, max_codelets, keep_going_p):

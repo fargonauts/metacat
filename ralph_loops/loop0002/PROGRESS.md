@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 14/18 SOLVED
+- **Current**: 15/18 SOLVED
 
 ---
 
@@ -1617,3 +1617,105 @@ Item 14, the panels. general-graphics.ss's `make-graphics-window` should build
 graphics battery's fixtures are in `python/fixtures/graphics/` and
 `python/fixtures/panels/`. `oracle/sgl-tcl.ss`'s `define-class`/`send`/`swl:tcl-eval`
 recipe can capture the Tcl stream of other panels if the batteries aren't enough.
+
+---
+
+## Iteration 15 — 2026-10-04 02:25
+
+### Completed
+Item 14, the panels: **SOLVED**.
+- **Code.** Four subagents translated the files in parallel against a contract I wrote
+  first (`metacat/gui/hosts.py`). I then integrated and reviewed their work.
+  - Engine side (no tkinter, no `metacat.gui`):
+    - `general_graphics.py` now has all of general-graphics.ss except the windows;
+    - `group_graphics.py` is complete;
+    - new `bridge_graphics.py`, `rule_graphics.py` and `eeg_graphics.py` (`%EEG-table%`,
+      `make-EEG`, `*EEG*`). headless.py's stand-in `*EEG*` is gone.
+    - chez.py: complex arithmetic and `magnitude`/`angle`/`make-polar`/`cos`/`sin`/`acos`
+      with Chez's exact results.
+  - Views (`metacat/gui/`): `constants.py`, `general_graphics.py` (`GraphicsWindow`, the
+    scrollable text window, the resize listener), and `slipnet_`, `workspace_`,
+    `temperature_`, `coderack_`, `theme_`, `trace_`, `memory_`, `commentary_` and
+    `eeg_graphics.py`.
+  - `hosts.py`: `OffscreenHost` (counts items and measures text with sgl-tcl.ss's fixed
+    metric, so it needs no display) and `TkHost` (a Toplevel and a Canvas).
+  - `views.py`: `load_views`, `attach_views`, `attach_workspace_view`.
+  - Driver: `headless.run_problem(..., views=...)` attaches the views, then wraps their
+    Commentary and Trace windows (`install_recorders`, and
+    `trace_writer.wrap_trace_window`, split out of `install_trace`). The null EEG window
+    also accepts `plot-current-values`, for runs with only the Workspace window.
+- **Tests first.** Each test file was written and run before its code existed:
+
+  | File | Before the code | Now |
+  |---|---|---|
+  | test_graphics.py (graphics-battery.scm's 48 tests + structure) | 65 failed, 5 passed | 71 passed |
+  | test_panels.py (panels-battery.scm's 36 tests + structure) | 33 failed, 4 passed | 47 passed |
+  | test_gui_windows.py | 6 failed, 8 errors, 3 passed | 17 passed |
+  | test_gui_panels_a.py | 12 failed, 11 errors, 1 passed | 25 passed |
+  | test_views.py | failed (no `metacat.gui.views`) | 113 passed |
+
+  The batteries' header says 50 graphics tests and 38 panels tests, but their MANIFESTs
+  have 48 and 36. The cases cover every MANIFEST entry, and a test checks that.
+- **Watching changes nothing.** test_views.py runs all 109 goldens with every window
+  attached (offscreen, all graphics switches on). Every trace is identical, and every
+  window draws, more than 1000 items each over the goldens. The crash run (abc ccbbaa
+  ijk seed 3) raises the same `caddr` error after the same trace. That takes 38 s on
+  32 cores. The fast tier runs a b z seed 1 with views. A mutant view that draws one
+  random number in the Temperature window's update fails it at trace line 3.
+- **Look at what you draw.** `tests/render_views.py` (slow tier, under `xvfb-run`)
+  renders 8 scenes on real Tk canvases, 56 pictures in all, and grabs them with
+  XGetImage:
+  - run7 at 300 and 800 codelets;
+  - run7's snag event view;
+  - run7's answer;
+  - run7's answer description;
+  - a click on run7's last clamp event in the Trace window;
+  - the justify run abc abd xyz xyd seed 1760747975;
+  - two answers compared in the Memory window (abc abd glz).
+
+  `python/tests/snapshots/views/` keeps one rendering of each. I inspected them:
+  - The Workspace, Slipnet, Coderack, Commentary, Temperature, theme panels, Trace,
+    Memory and EEG at run7's answer match `docs/screenshots/run7-wyz.png` item for item:
+    the same bridges, rules, concept-mapping lists and labels, activations, codelet
+    counts, comments, event icons and the snag/wyz icons.
+  - The glz comparison matches `racket/tests/snapshots/workspace-glz-compare.png`.
+  - Only Tk's text metrics differ: fonts come out a little larger, so the
+    concept-mapping list touches the top rule box.
+- **Mutation checks** by the subagents (each restored and verified with `cmp`; one of
+  them found that a same-size restore can run a stale .pyc, so they used
+  `PYTHONDONTWRITEBYTECODE=1`):
+  - engine: 13 of 15 caught. The survivors are equivalent on these inputs: the octagon
+    `(* a (/ 1 k))` → `(/ a k)`, and the EEG thunk map order (the thunks only read).
+  - theme, trace and memory panels: 11 of 11 caught. The icon grey-level mutant
+    survived the battery at first, because `b:clean` hides colours; a new
+    `test_memory_icon_colours` now catches it.
+- **Docs.**
+  - `docs/python-translation-plan.md`: "As built (item 14)".
+  - `docs/anomalies_and_quirks.md`: Chez's complex arithmetic and `magnitude`'s
+    `hypot`, the stale-bytecode trap in mutation checks, the Temperature window's `#f`
+    icon label, and updates to "exact complex" and "shared rule pexps".
+  - `python/README.md` and the tier comment in `python/run-tests.sh`.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1374 tests, 6 min 26 s).
+
+### Blockers
+None. Notes for item 15:
+- `TkHost` doesn't pass Tk's `<Configure>` events to the viewport. Resizing windows
+  (`make-resizable`) and mouse clicks need the GUI to bind them: `vp.configure(w, h)`
+  and `vp.mouse_press(i, j, mods)`.
+- A click in the Workspace window `(go)`es the run through
+  `views.set_thread_break_handler`. It raises until the control panel's engine thread
+  installs a handler.
+- gui.ss's speed settings are still `view_globals.p_num_of_flashes` and the other speed
+  variables. `attach_views` sets them to full speed with no flashing.
+- Not yet tested: the Memory window's icons over several runs in one process, and the
+  scrollable text window's unit behaviour (it is covered only through the
+  Commentary).
+
+### Next
+Item 15, the control panel and windows (`gui.ss`). Build on `views.attach_views` with
+`hosts.set_window_host_maker(hosts.tk_host_maker(root))`, `fonts.create_mcat_logo(root)`
+and `tk scaling` 96/72, as `tests/render_views.py` does. Run the engine in a worker
+thread (run.py's `toplevel`/`go` already park a break) or step it with `after`. Bind
+mouse and resize events to the viewports. The GUI run's trace can be checked with
+`headless`-style recorders (`install_recorders`).
+

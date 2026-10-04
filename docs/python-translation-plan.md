@@ -767,6 +767,60 @@ from symbols").
   16 pixels. `tests/snapshots/sgl-fixture.png` is that rendering, for comparison with
   racket/tests/snapshots/sgl-fixture.png. The two differ only in text metrics.
 
+### As built (item 14)
+
+- **Split between engine and views**, as in the Racket port (porting-notes.md, items 13
+  and 14). The engine (`metacat/*.py`, no tkinter, no `metacat.gui`) has what the model
+  calls whether or not a window exists: `general_graphics.py` (the pexp builders and text
+  helpers, `*platform*`, `*tcl/tk-version-8_3?*`), `group_graphics.py`,
+  `bridge_graphics.py`, `rule_graphics.py`, `theme_graphics.py` (`relation-name`),
+  `trace_graphics.py` (`group-event-pexp-text-string`) and `eeg_graphics.py`
+  (`%EEG-table%`, `make-EEG`, `*EEG*`; headless.py's null `*EEG*` is gone, so headless
+  runs use the engine's EEG, as the oracle does). The views (`metacat/gui/`) have the
+  windows: `constants.py` (constants.ss's graphics part), `general_graphics.py`
+  (`make-graphics-window` as `GraphicsWindow`, the scrollable text window, the resize
+  listener on a thread and a `queue.Queue`), and `slipnet_`, `workspace_`,
+  `temperature_`, `coderack_`, `theme_`, `trace_`, `memory_`, `commentary_` and
+  `eeg_graphics.py`. Each has a `load()`; `views.load_views()` calls them in
+  metacat.ss's order, after `fonts.load()` and `sgl.load()`.
+- **Hooks**: the original's. The model reaches windows only through `setup.g_*_window`,
+  the switches (`setup.p_workspace_graphics` ...) and `view_globals.py`. A view's
+  top-level define of a name the model reads (colours, the Workspace and Coderack fonts,
+  `restore-current-state`, `*fg-color*`) is installed by its `load()` with
+  `engine.set_global`. `views.attach_views(scale)` is racket/gui/views.rkt's
+  `attach-views!`: every window as `(setup)` makes it, every switch on, full speed
+  without flashing. `headless.run_problem(..., views=attach_views)` attaches them before
+  the run, then wraps the views' Commentary and Trace windows with the recorders
+  (`install_recorders`, racket/headless.rkt's `install-recorders!`; the Trace wrapper is
+  `trace_writer.wrap_trace_window`).
+- **Window hosts** (`gui/hosts.py`): SWL's `<toplevel>` and frame are one host, which
+  gives the viewport its canvas. `OffscreenHost` (the default) draws nothing and counts
+  items; text is measured by `OffscreenHiddenCanvas`, the sgl-tcl.ss fixed metric. So
+  runs with every view attached need no display. `TkHost` (via
+  `set_window_host_maker(tk_host_maker(root))`) puts each window in a Toplevel with a
+  tkinter Canvas, for pictures and item 15's GUI.
+- **Port changes** (`# port:`): the host replaces SWL's widgets
+  (`get-scrollbar-from-frame` asks the host, `reposition-vertical-scrollbar` calls
+  `host.set_vertical_view`); `swl:sync-display` flushes through sgl's hook; SWL's
+  `thread-break` (a click in the Workspace window `(go)`es the REPL) raises until item 15
+  installs a handler (`views.set_thread_break_handler`); fonts made by `set!` in the
+  `select-...-fonts` procedures are module globals; `relation-names-pexp`, never defined
+  in the original, raises Chez's unbound-variable error. Record-case clauses ignore extra
+  arguments where the original relies on it (trace.ss sends `draw-string-letters` a tag;
+  without that every run crashed at its first answer with the views on).
+  `update-rule-pexps!` mutates in place, as the original's `set-car!` does, and returns
+  the pexp, so either caller style works.
+- **chez.py**: exact and flonum complex arithmetic part by part with signed zeros,
+  `magnitude` (libm `hypot`, i.e. `abs(complex)`, not `math.hypot`), `angle` (exact 0 for
+  positive reals), `make-polar`, `cos`/`sin`/`tan`/`acos` with Chez's exact results
+  (anomalies_and_quirks.md).
+- **Tests**: `test_graphics.py` (the 48 tests of graphics-battery.scm and the engine
+  modules' structure), `test_panels.py` (the 36 tests of panels-battery.scm), 
+  `test_gui_windows.py` and `test_gui_panels_a.py` (the windows on recording canvases,
+  structure), `test_views.py` (one short golden with every view attached in the fast
+  tier; the 109 goldens and the crash run with every view attached, and the eight
+  rendered scenes of `tests/render_views.py` under Xvfb, in the slow tier).
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

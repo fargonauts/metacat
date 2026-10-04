@@ -36,6 +36,7 @@ __all__ = [
     "negative_p", "add1", "sub1", "exact", "inexact", "round_", "floor_", "ceiling", "truncate",
     "exact_round", "exact_floor", "exact_ceiling", "exact_truncate",
     "sqrt", "exp", "log", "tanh", "expt", "atan", "make_rectangular", "real_part", "imag_part",
+    "magnitude", "angle", "make_polar", "cos", "sin", "tan", "acos",
     "string_to_number", "make_vector",
     "map_", "for_each", "andmap", "ormap", "sort", "remq", "remv", "remove",
     "memq", "memv", "member", "assq", "assv", "assoc", "eq_p", "eqv_p", "equal_p",
@@ -88,9 +89,9 @@ class Vector(list):
 class ExactComplex:
     """An exact non-real number such as 3+4i, which Python's complex (two
     floats) cannot hold: utilities.ss's coord is make-rectangular, and the
-    graphics build coordinates from exact integers.  Only construction, the
-    parts, eqv? and printing are implemented (item 03); arithmetic on
-    coordinates is for the graphics items."""
+    graphics build coordinates from exact integers.  Construction, the
+    parts, eqv? and printing (item 03); + - * / with Chez's rules, magnitude,
+    angle and make-polar (the graphics engine, section 4b)."""
     __slots__ = ("real", "imag")
 
     def __init__(self, real, imag):
@@ -99,6 +100,9 @@ class ExactComplex:
 
     def __repr__(self):
         return f"ExactComplex({self.real!r}, {self.imag!r})"
+
+    def __neg__(self):
+        return ExactComplex(-self.real, -self.imag)
 
 
 def _is_exact(x) -> bool:
@@ -246,6 +250,8 @@ def _add2(a, b):
         return a
     _check(a, "+")
     _check(b, "+")
+    if ta in _COMPLEX_TYPES or tb in _COMPLEX_TYPES:
+        return _cx_add(a, b)
     r = a + b
     return r.numerator if type(r) is Fraction and r.denominator == 1 else r
 
@@ -274,6 +280,8 @@ def _sub2(a, b):
         return a
     if type(a) is int and a == 0:           # (- 0 0.0) is -0.0
         return -b
+    if ta in _COMPLEX_TYPES or tb in _COMPLEX_TYPES:
+        return _cx_sub(a, b)
     r = a - b
     return r.numerator if type(r) is Fraction and r.denominator == 1 else r
 
@@ -297,6 +305,8 @@ def _mul2(a, b):
     _check(b, "*")
     if (type(a) is int and a == 0) or (type(b) is int and b == 0):
         return 0                            # exact 0 annihilates, even a flonum
+    if ta in _COMPLEX_TYPES or tb in _COMPLEX_TYPES:
+        return _cx_mul(a, b)
     r = a * b
     return r.numerator if type(r) is Fraction and r.denominator == 1 else r
 
@@ -327,8 +337,8 @@ def _div2(a, b):
     if _is_exact(a) and _is_exact(b):
         r = Fraction(a, b) if type(a) is int and type(b) is int else Fraction(a) / b
         return r.numerator if r.denominator == 1 else r
-    if type(b) is complex or type(a) is complex:
-        return a / b
+    if ta in _COMPLEX_TYPES or tb in _COMPLEX_TYPES:
+        return _cx_div(a, b)
     fa, fb = float(a), float(b)
     if fb == 0.0:                           # IEEE division by a signed zero
         if fa == 0.0 or fa != fa:
@@ -702,6 +712,121 @@ def imag_part(z):
         return z.imag
     _check(z, "imag-part")
     return 0
+
+
+# ---------------------------------------------------------------------------
+# 4b. Complex numbers (general-graphics.ss's coordinates)
+#
+# Probed against Chez 10 (docs/porting-notes.md, "The graphics engine"): a
+# real and a complex number combine part by part, the real's imaginary part
+# being exact 0, so (- 0.5 0.1+0.0i) is 0.4-0.0i and (+ 1/2 0.1-0.0i) is
+# 0.6-0.0i; (* 0 z) is exact 0 but (* 0.0 z) is 0.0+0.0i; a complex divided by
+# a real is divided part by part.  An exact result with a zero imaginary part
+# is a real (make-rectangular's rule).  magnitude is libm's hypot (Python's
+# abs(complex); math.hypot differs in the last bit), angle is atan2, and the
+# angle of a real is exact 0, or pi for a negative one (-0.0 included).
+
+_COMPLEX_TYPES = frozenset((complex, ExactComplex))
+
+
+def _parts(z):
+    t = type(z)
+    if t is complex or t is ExactComplex:
+        return z.real, z.imag
+    return z, 0
+
+
+def _cx_add(a, b):
+    (ar, ai), (br, bi) = _parts(a), _parts(b)
+    return make_rectangular(_add2(ar, br), _add2(ai, bi))
+
+
+def _cx_sub(a, b):
+    (ar, ai), (br, bi) = _parts(a), _parts(b)
+    return make_rectangular(_sub2(ar, br), _sub2(ai, bi))
+
+
+def _cx_mul(a, b):
+    (ar, ai), (br, bi) = _parts(a), _parts(b)
+    if type(a) not in _COMPLEX_TYPES:
+        return make_rectangular(_mul2(a, br), _mul2(a, bi))
+    if type(b) not in _COMPLEX_TYPES:
+        return make_rectangular(_mul2(ar, b), _mul2(ai, b))
+    return make_rectangular(_sub2(_mul2(ar, br), _mul2(ai, bi)),
+                            _add2(_mul2(ar, bi), _mul2(ai, br)))
+
+
+def _cx_div(a, b):
+    if type(b) in _COMPLEX_TYPES:
+        # never needed by Metacat; Chez's algorithm for it is not pinned
+        raise NotImplementedError("division by a complex number")
+    ar, ai = _parts(a)
+    return make_rectangular(_div2(ar, b), _div2(ai, b))
+
+
+def magnitude(z):
+    """Chez: magnitude (libm's hypot for a flonum complex; exact where Chez's
+    sqrt is, for an exact one)"""
+    t = type(z)
+    if t is complex:
+        return abs(z)
+    if t is ExactComplex:
+        return sqrt(_add2(_mul2(z.real, z.real), _mul2(z.imag, z.imag)))
+    return abs_(z)
+
+
+def angle(z):
+    """Chez: angle ((angle 0.5) and (angle 1/2) are exact 0; (angle -0.0) is pi;
+    (angle 0) is an error)"""
+    t = type(z)
+    if t is complex:
+        return math.atan2(z.imag, z.real)
+    if t is ExactComplex:
+        return math.atan2(inexact(z.imag), inexact(z.real))
+    _check(z, "angle")
+    if t is float:
+        return math.pi if math.copysign(1.0, z) < 0 else 0
+    if z == 0:
+        raise SchemeError("angle", "undefined for ~s", z)
+    return math.pi if z < 0 else 0
+
+
+def cos(x):
+    """Chez: cos ((cos 0) is exact 1)"""
+    if type(x) is int and x == 0:
+        return 1
+    _check(x, "cos")
+    return math.cos(inexact(x))
+
+
+def sin(x):
+    """Chez: sin ((sin 0) is exact 0)"""
+    if type(x) is int and x == 0:
+        return 0
+    _check(x, "sin")
+    return math.sin(inexact(x))
+
+
+def tan(x):
+    """Chez: tan ((tan 0) is exact 0)"""
+    if type(x) is int and x == 0:
+        return 0
+    _check(x, "tan")
+    return math.tan(inexact(x))
+
+
+def acos(x):
+    """Chez: acos ((acos 1) is exact 0; real arguments in [-1, 1] only)"""
+    if type(x) is int and x == 1:
+        return 0
+    _check(x, "acos")
+    return math.acos(inexact(x))
+
+
+def make_polar(m, a):
+    """Chez: make-polar, (make-rectangular (* m (cos a)) (* m (sin a))):
+    (make-polar 1/2 0) is 1/2, (make-polar 1/2 0.0) is 0.5+0.0i"""
+    return make_rectangular(mul(m, cos(a)), mul(m, sin(a)))
 
 
 def string_to_number(s):

@@ -177,6 +177,17 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   porting-notes.md, item 14.
 - **Status:** not a bug (harmless redundancy); ported verbatim.
 
+### The Temperature window's icon label is `#f`
+- **Seen:** loop0002 item 14, translating temperature-graphics.ss to Python.
+- **What:** `new-temperature-window` sends `(tell graphics-window 'set-icon-label title)`
+  right after its `let*`, where `title` is still `#f`: the title ("Temperature" or
+  "Temp.") is only chosen later, by `initialize-parameters`. constants.ss has no
+  `%temperature-icon-label%`, unlike the other windows. So the icon label is `#f`.
+- **Evidence:** temperature-graphics.ss lines 48–75; python/tests/test_gui_panels_a.py's
+  `test_temperature_window` checks the `set-icon-label` message.
+- **Status:** won't fix (it's the original's behaviour); ported verbatim in Racket and
+  Python.
+
 ### Exact bond densities meet flonum thresholds: 1/5, 2/5 and 4/5 fall into the hotter class
 - **Seen:** loop0002 iteration 7 (item 06), writing python/oracle/batteries/workspace-extra-battery.scm.
 - **What:** formulas.ss's `current-translation-temperature-threshold-distribution` computes
@@ -582,6 +593,54 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: `chez.ExactComplex` and `chez.make_rectangular`,
   `real_part`, `imag_part`, printed by `number_to_string`. Arithmetic on coordinates
   (the graphics: `magnitude`, `+` on coords) isn't there yet; the graphics items add it.
+- **Update (loop0002, the graphics engine):** chez.py now does `+ - * /` on
+  `ExactComplex` and `complex` with Chez's rules, plus `magnitude`, `angle`,
+  `make-polar`, `cos`, `sin`, `tan` and `acos` (next entry).
+
+### Chez's complex arithmetic: part by part, signed zeros, libm's `hypot`, exact angles
+- **Seen:** loop0002, the graphics engine (general-graphics.ss's line builders, Python).
+- **What:** probed under `scheme --script`:
+  - a real and a complex number combine part by part, the real's imaginary part being
+    an exact 0: `(- 0.5 0.1+0.0i)` is `0.4-0.0i`, `(+ 1/2 0.1-0.0i)` is `0.6-0.0i`,
+    `(* 2 0.1-0.0i)` is `0.2-0.0i`; `(* 0 z)` is exact `0` but `(* 0.0 z)` is
+    `0.0+0.0i`; a complex divided by a real is divided part by part. Python's `complex`
+    turns the real into `x+0j` first and loses the signed zeros;
+  - `magnitude` of a flonum complex is libm's `hypot` (Python's `abs(complex)`);
+    Python's `math.hypot` has its own algorithm and differs in the last bit on 36 of
+    20,000 random arguments (`0.8455286293882489-0.5842277562918272i`: Chez
+    `1.027735731760336`, `math.hypot` `1.0277357317603362`);
+  - `(angle 0.5)` and `(angle 1/2)` are the exact `0`, `(angle -0.0)` is `pi`,
+    `(angle 0)` is an error; `(make-polar 1/2 0)` is `1/2` but `(make-polar 1/2 0.0)`
+    is `0.5+0.0i`; `(cos 0)` is `1`, `(sin 0)`, `(tan 0)` and `(acos 1)` are `0`.
+  These keep exact horizontal lines exact (dotted-line's points stay rationals).
+- **Evidence:** python/tests/test_graphics.py, `test_complex_arithmetic_as_chez` (Chez's
+  printed values) and the graphics battery (flonum coordinates to the last bit).
+- **Status:** worked around: chez.py section 4b. Division by a complex number raises
+  `NotImplementedError` (Metacat never divides by one).
+
+### Mutation checks: a restored file can run as its mutant (stale `.pyc`)
+- **Seen:** loop0002, the graphics engine's mutation checks.
+- **What:** a mutant that keeps the file's size (`sign = add if ... else sub` swapped),
+  restored with `cp` in the same second, is not recompiled: Python's `.pyc` check is the
+  source's size and mtime in whole seconds, so the next run imported the mutant's
+  bytecode and a correct file failed a test.
+- **Evidence:** reproduced by mutating and restoring python/metacat/bridge_graphics.py
+  within one second, then running python/tests/test_graphics.py.
+- **Status:** worked around: run mutation checks with `PYTHONDONTWRITEBYTECODE=1` and
+  delete the module's `__pycache__` entry after each restore.
+
+### Parallel scene renders grab each other's windows (port test bug, fixed)
+- **Seen:** loop0002 iteration 15, gate fix 1: `test_render_scenes` failed with
+  `temperature-run7-300.png: blank` (one colour), although the scene renders correctly by itself.
+- **What:** python/tests/render_views.py runs the eight scenes as parallel processes on one
+  Xvfb display. Each one moves its windows to `+0+0`, raises them and grabs them with
+  XGetImage, which reads the screen rather than the window's own contents. So when another
+  scene raised a window between our lift and our grab, the picture showed that window's
+  plain background. Whether it happens depends on timing and machine load.
+- **Evidence:** reproduced only under the full suite's load; `render_views.py OUTDIR run7-300`
+  alone always gave 5 colours for the Temperature window.
+- **Status:** fixed: the raise-and-grab step holds an exclusive `fcntl` lock on
+  `OUTDIR/.grab-lock`, so only one scene grabs at a time (the runs still go in parallel).
 
 ### Python's `bool` is an `int`, so a Scheme `#f` that reaches arithmetic computes silently
 - **Seen:** loop0002 iteration 5 (item 04), translating coderack.ss's `get-removal-weight`
@@ -1018,6 +1077,10 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `update-rule-pexps!` returns an updated copy and the window stores it in the
   description. tests/diff/graphics-battery.scm checks the result against the
   original's mutated pexp.
+- **Update (loop0002, the graphics engine):** Python lists are mutable, so
+  python/metacat/rule_graphics.py's `update_rule_pexps_bang` updates in place as the
+  original does (and returns the pexp, so a caller written after the Racket port also
+  works); test_graphics.py's `test_update_rule_pexps_is_in_place` checks it.
 
 ### One resize queue for every window
 - **Seen:** iteration 16 (item 15), at setup.

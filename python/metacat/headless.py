@@ -23,7 +23,6 @@ where `prepare()` has run.
 from __future__ import annotations
 
 import sys
-import types
 
 import metacat as _metacat
 from metacat import chez, engine, run, setup, trace_writer
@@ -140,7 +139,10 @@ def install_headless_windows():
     s("*trace-window*", make_null_window("trace", ("initialize", "add-event")))
     s("*temperature-window*", make_null_window("temperature", ("initialize",
                                                                "update-graphics")))
-    s("*EEG-window*", make_null_window("EEG", ("initialize",)))
+    # port: plot-current-values too, which the model sends with workspace
+    # graphics on (a run with only the Workspace window attached, as
+    # racket/headless.rkt's null windows accept it)
+    s("*EEG-window*", make_null_window("EEG", ("initialize", "plot-current-values")))
     # Each codelet type keeps its own reference to the Coderack window, set by the
     # window (coderack-graphics.ss); a codelet's 'run tells it
     # 'set-last-codelet-type whatever the graphics switches say.
@@ -205,13 +207,6 @@ def prepare():
     _prepared = True
     engine.load()
     install_headless_windows()
-    # eeg-graphics.ss's *EEG* (the panels item translates it): workspace.ss's
-    # initialize tells it 'initialize; the rest is gated by %workspace-graphics%
-    if "metacat.eeg_graphics" not in sys.modules:
-        eeg = types.ModuleType("metacat.eeg_graphics")
-        eeg.g_EEG = make_null_window("EEG", ("initialize",))
-        sys.modules["metacat.eeg_graphics"] = eeg
-        _metacat.eeg_graphics = eeg
     trace_writer.on_answer = on_answer
     trace_writer.on_halt = on_halt
     trace_writer.install_trace()
@@ -219,14 +214,51 @@ def prepare():
     run.quiet_break = headless_break
 
 
+def wrap_comment_window():
+    """racket/headless.rkt's install-recorders! for the Commentary: a wrapper of
+    the views' Commentary window that prints and emits each paragraph, as
+    HeadlessCommentWindow does.  The wrapper is the window's self, so the
+    window's own (tell self 'add-comment ...) in new-problem is recorded too."""
+    window = setup.g_comment_window
+
+    def comment_window_fn(self, msg, *args):
+        if msg == "add-comment":
+            lines1, lines2 = args
+            paragraph = "".join(lines1 if setup.p_eliza_mode is not False else lines2)
+            trace_writer.emit("comment", ("text", paragraph))
+            chez.printf("Comment: ~a~%", paragraph)
+        return window(self, msg, *args)
+
+    setup.g_comment_window = Lambda(comment_window_fn)
+
+
+_recorded = []
+
+
+def install_recorders():
+    """racket/headless.rkt: install-recorders!, around windows the views
+    installed after prepare(); the headless windows record by themselves."""
+    if (not isinstance(setup.g_comment_window, HeadlessCommentWindow)
+            and setup.g_comment_window not in _recorded):
+        wrap_comment_window()
+        _recorded.append(setup.g_comment_window)
+    if setup.g_trace_window not in _recorded:
+        _recorded.append(trace_writer.wrap_trace_window())
+
+
 def run_problem(strings, seed, max_codelets=False, keep_going=False, trace_port=None,
-                verbose=False):
+                verbose=False, views=None):
     """chez_scheme/oracle/run.ss's driver, after its argument checks: strings are
     3 or 4 symbols, seed a valid seed, max_codelets a positive integer or #f.
     Prints what run.ss prints and returns (reason, answers).  An error of the
-    run propagates (the trace written so far is flushed)."""
+    run propagates (the trace written so far is flushed).  views, if given, is
+    called before the run to attach windows (racket/headless.rkt's #:views),
+    e.g. metacat.gui.views.attach_views."""
     global VERBOSE
     prepare()
+    if views is not None:
+        views()
+        install_recorders()
     VERBOSE = verbose
     setup.p_verbose = verbose
     ANSWERS.clear()
