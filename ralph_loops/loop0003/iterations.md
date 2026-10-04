@@ -1,6 +1,6 @@
 # loop0003 — one window for all of Metacat (PySide6): items
 
-- [!] **00 Inventory and design.** Write `docs/qt-gui-plan.md`.
+- [x] **00 Inventory and design.** Write `docs/qt-gui-plan.md`.
     (1) **Inventory every element of today's tkinter GUI:**
     - each graphics window: its title, default size, whether it can be resized, which
       file draws it, and its mouse bindings (left, shift-left and right click);

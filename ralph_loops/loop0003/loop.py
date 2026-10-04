@@ -12,6 +12,7 @@ exhausted, or knobs.json says stop.
     python3 loop.py 3            # run at most 3 iterations
     python3 loop.py --fresh      # reset PROGRESS.md first
     python3 loop.py --dry-run    # print the prompt for the next item and exit
+    python3 loop.py --resume-wip # start on top of uncommitted work (after a crash)
 
 Peeking while it runs (all files live in this folder):
 
@@ -34,6 +35,8 @@ fix attempt, so they can be turned while the loop runs:
     sleep_between_s       pause between iterations (default 0)
     run_tests             false = skip the test gate (not recommended)
     push                  false = commit only; true = `git push origin` after each commit
+    gate_timeout_min      wall-clock limit on one gate run; a hung gate counts as failed
+                          (default 30)
 """
 from __future__ import annotations
 
@@ -81,6 +84,7 @@ DEFAULT_KNOBS = {
     "sleep_between_s": 0,
     "run_tests": True,
     "push": True,
+    "gate_timeout_min": 30,
 }
 
 
@@ -228,7 +232,8 @@ Read these two files first, in full:
 {item}
 
 Do exactly this item and nothing else. When finished:
-1. Run `python3 ralph_loops/{LOOP_NAME}/gate.py` and make it pass.
+1. Run `timeout 1800 python3 ralph_loops/{LOOP_NAME}/gate.py` and make it pass. A gate
+   that hits the timeout has a hung test (a deadlock): find and fix it.
 2. Append an `## Iteration {n} — <date time>` section to {PROGRESS} with
    `### Completed`, `### Blockers`, `### Next`, and update the
    `Current: k/{n_items()} SOLVED` line.
@@ -265,10 +270,31 @@ Do not commit and do not push."""
 # ------------------------------------------------------------ test + commit
 
 def tests_pass() -> tuple[bool, str]:
+    """Run the gate under a wall-clock limit (knob gate_timeout_min). A hung test (a
+    deadlock) kills the gate's whole process group and counts as a failure, so the fix
+    sessions see it instead of the loop waiting forever."""
     status(phase="tests", started=_started, item=_item_title)
-    proc = subprocess.run(TEST_CMD, cwd=REPO, capture_output=True, text=True)
-    tail = "\n".join((proc.stdout + proc.stderr).splitlines()[-40:])
-    ok = proc.returncode == 0
+    limit = float(knobs()["gate_timeout_min"]) * 60
+    proc = subprocess.Popen(TEST_CMD, cwd=REPO, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    try:
+        out, _ = proc.communicate(timeout=limit)
+        timed_out = False
+    except subprocess.TimeoutExpired:
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(proc.pid, sig)
+                out, _ = proc.communicate(timeout=30)
+                break
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                out = ""
+        timed_out = True
+    tail = "\n".join((out or "").splitlines()[-40:])
+    if timed_out:
+        tail += (f"\nGATE TIMED OUT after {limit / 60:g} min: a test hung (a deadlock?). "
+                 "Find it: count the finished tests in the pytest progress line, and map "
+                 "the count onto `pytest --collect-only -q`.")
+    ok = proc.returncode == 0 and not timed_out
     log("tests " + ("passed" if ok else "FAILED") + f": {tail.splitlines()[-1] if tail else ''}")
     return ok, tail
 
@@ -346,7 +372,9 @@ def main() -> None:
         print(iteration_prompt(item, 1, knobs()["iteration_cap_hours"]) if item else "no items left")
         return
     dirty = git("status", "--porcelain", "--", "Metacat", *CODE_DIRS)
-    if dirty:
+    if dirty and "--resume-wip" in argv:
+        log("--resume-wip: starting on top of uncommitted work:\n" + dirty)
+    elif dirty:
         log("uncommitted changes in code directories; commit or stash first:\n" + dirty)
         sys.exit(1)
     k = knobs()

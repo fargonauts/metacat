@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 5/12 SOLVED
+- **Current**: 6/12 SOLVED
 
 ---
 
@@ -454,3 +454,120 @@ Item **05 Engine thread and run control**: SOLVED.
   - the input dialog in `controls.py` can be reused.
 - Mouse presses on panes aren't wired yet (item 07). The breakpoint scenario resumes
   with Go, not with a click on the Workspace.
+
+---
+
+## Iteration 7 — 2026-10-04 19:32:43
+Item **06 Control strip and menus**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** I wrote `python/tests/test_qt_menus.py` and its
+  driver `python/tests/drive_qt_menus.py` before any code. First run: `20 failed` (the
+  driver stopped at the first state: no Demos, View, Memory or Help menus, no
+  `command_line_look`). The extra test `test_the_strip_fits_a_1080p_window_with_every_message`
+  came from a screenshot (the window grew to 2015 px once the self-watching warning
+  showed) and failed before its fix. While the tests went green, five of my own
+  expectations were wrong and I corrected them rather than the code: problems as
+  `update-current-problem` stores them (5 elements); Tk's help line count (`end-1c` counts
+  the empty last line, as Qt's `blockCount` does); the theme state is taken before edit
+  mode deletes the themes; the self-watching inventory also lists the EEG and Logo
+  (hidden from the start); the commentary faces are Qt's (item 03).
+- **`python/metacat/qt/controls.py`**:
+  - the menu bar in the order Help, Demos, View, Options, Memory. Every item of
+    gui.ss/gui.py is there, with its label, SWL font (the action's font and its
+    `swl-font` property), kind and action;
+  - **Demos**: all 35 demo items in their submenus (`gui.DEMO_ITEMS`, `gui.figure`).
+    Each calls `init-new-problem` and is highlighted (checked) until the next problem;
+  - **Options**: Set/Clear breakpoint and Step mode interval (item 05), the seven check
+    items with gui.py's actions (Eliza, Slipnet graphics, Coderack graphics, codelet
+    counts, last codelet type, self-watching, verbose), Clamp theme pattern, Clamp codelet
+    pattern ▸ (5), Undo last clamp, Commentary font face ▸ (12, each in its own font) and
+    size ▸ (6), with gui.ss's update-menu-fonts and highlighting, and Save commentary to
+    file (Qt's file dialog; `set_file_dialog` for tests). Self-watching off shows the
+    warning, disables the three clamp items, undoes the last clamp, deletes the themes and
+    hides the Themes panes;
+  - **View** (`attach_windows`): gui.ss's window controllers for the 11 panes (checkable
+    actions), Show/Hide all panes and Reset layout;
+  - **Memory > Clear Memory** and **Help > Metacat help**;
+  - the dialogs: `SwlDialog` (SWL's toplevel: the destroy handler runs once on close,
+    Escape or `destroy`), `confirm_dialog` (Clear Memory; the yellow theme-edit dialog
+    with gui.ss's instructions) and the Help window (help.txt, Courier on bisque,
+    read-only, word wrap, one window only);
+  - the control panel's remaining messages: `ready-to-edit?`, `edit-theme-type`,
+    `raise-theme-edit-dialog`, `theme-edit-mode-on/off`, `clear-memory`, `hide-window`,
+    `raise`, plus the rest of select-control-panel-fonts. Run and disabled modes disable
+    the Demos, Options and Memory cascades only, as gui.ss does.
+- **`mainwindow.py`**: `place_control_panel` fills the menu bar; `set_pane_visible`,
+  `update_splitters` (an empty nested splitter hides itself) and `reset_layout`.
+  `QtHost.sync` reports a visibility change, so the splitters follow. The info label is
+  wide enough for a problem and its seed (it was clipped). The breakpoint message and the
+  warning are stacked.
+- **Results** (`drive_qt_menus.py`, offscreen on a 1920×1200 screen like the inventory's,
+  about 5 s): the Qt menu tree equals the inventory's, mapped as `docs/divergences.md`
+  says, and so does every item state and control-panel widget (enabled state, text,
+  colours, font, justification, Enter action) in the five states: initial, input,
+  disabled, run, self-watching off. Every scenario passes: 35 demos; View toggles, an
+  empty splitter, show/hide all, Reset layout; the Options switches; Slipnet graphics
+  blanking; the 5 codelet clamps and Undo; the commentary fonts; Help; Clear Memory
+  (Cancel, close, Yes after a real run); theme edit (Cancel restores, Clamp Themes clamps,
+  "No current problem!"); Save commentary; a real run with only Stop enabled.
+- **Pictures, inspected**: the window with the menu bar and strip, each menu (Options,
+  Demos, View, the font face menu in its own fonts), the Help window, and the Clear
+  Memory and theme-edit dialogs. The driver grabs them into
+  `python/tests/screenshots-qt/menus/`.
+- **Two bugs found and fixed, both logged in `docs/anomalies_and_quirks.md`:**
+  - two errors within 700 ms left the first on the panel. This is a port bug: the timer
+    replaced the original's blocking pause. Fixed in Qt; the tkinter GUI still has it;
+  - a segfault when Python's cycle collector freed a closed dialog in the engine thread.
+    Fixed with `deleteLater` in `SwlDialog.closeEvent`.
+- **Docs**: `docs/divergences.md` has a new section, "Python Qt GUI: the menus and dialogs";
+  `docs/qt-gui-plan.md` has "As built (item 06)"; `python/tests/README.md` has rows for
+  `test_qt_menus.py` and `drive_qt_menus.py`, and the new totals (1585: 1149 fast, 436
+  slow). `test_qt_engine.py`'s `enabled()` now reads the Options cascade's action.
+- Gate: GATE_PLACEHOLDER
+
+### Blockers
+- None for item 06. Item 00 is still `[!]` from session 1 (its deliverables exist and
+  their tests pass; see iteration 2).
+
+### Next
+- Item 07: wire mouse presses on the panes to `viewport.mouse_press`. The theme-edit
+  dialog is ready for clicks on the Themes panes (`ready-to-edit?` and `edit-theme-type`
+  work; the driver calls them directly).
+- Item 08: save the splitter sizes and hidden panes with `QSettings`. Reset layout
+  already restores the default panes and sizes. Add the About/logo item to Help.
+- The panes are still blank for the first few seconds after start: the startup redraw
+  goes one panel per 250 ms listener pause (item 04).
+
+## Iteration 7 — 2026-10-04 21:04:04
+### Completed
+- (driver) session ended with outcome `error` without marking the item
+### Blockers
+- see session_it07.log
+### Next
+- revisit or re-open this item
+
+---
+
+## Owner's note — 2026-10-04 22:45 (between iterations, written for the owner)
+- **Item 00 is DONE.** Session 1 finished it, but the API connection dropped (EAI_AGAIN)
+  before it could mark it. The driver's gate passed on its work, which is committed in
+  6ce8de2: `docs/qt-gui-plan.md`, `python/tests/data/tk-gui-inventory.json` and
+  `test_tk_gui_inventory.py`.
+- **Item 06 is re-opened, and only the hang remains.** Session 7's report above lists
+  everything item 06 built, and that work is on disk, uncommitted. The session then died
+  of an API timeout while chasing a **deadlock that only shows in the full suite**:
+  `tests/test_qt_panes.py::test_fonts_measure_from_several_threads_at_once` passes alone
+  and hangs after the other Qt tests. The driver's gate (with no time limit then) hung on
+  it for 1 h 37 min, and the owner stopped it.
+- **Evidence:** `ralph_loops/loop0003/hang-it07-faulthandler.log` (pytest with
+  `-o faulthandler_timeout=60`). Two worker threads are blocked in the Qt canvas's `tcl`
+  (canvas.py:67/68 → displaylist.py:450/487/500), both measuring fonts through
+  `fonts.py:211 get_pixel_size` → `swl.py:109`. Find what the threads are waiting on (a
+  lock held across a blocking call to the GUI thread, or state left by an earlier test),
+  fix it, and make the whole gate pass. Then finish item 06's PROGRESS entry (its gate line
+  says GATE_PLACEHOLDER) and mark the item.
+- **Driver changes:** each gate run is now limited by `gate_timeout_min` (30); a timeout
+  counts as a failure. Sessions are told to run the gate under `timeout 1800`.
+
+---
