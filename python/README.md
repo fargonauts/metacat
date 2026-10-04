@@ -350,3 +350,12 @@ the help text as package data, and the commands `metacat` (`metacat.__main__:mai
   under xvfb-run; then the same through `pip install -e` and a regular install into fresh
   venvs (`--system-site-packages` only so that pip finds setuptools offline), run from
   another directory, with `metacat-gui` opening too.
+
+Final audit (item 17): `tests/test_engine_modules.py` checks the module rules of
+docs/python-translation-plan.md. Every engine module imports alone in a fresh
+interpreter, without loading the engine or drawing a random number. Cross-module
+`from`-imports are limited to chez, objects, sugar, utilities and names, plus four named
+pure helpers. `tests/test_gui.py::test_a_headless_run_loads_no_gui_module` checks that a
+headless run never loads tkinter or any `metacat.gui` module. `tests/quirk_sites.py
+--write` regenerates the plan's list of `# chez:` and `# 1.2:` sites, and
+`tests/test_quirk_sites.py` fails when the list and the code differ.

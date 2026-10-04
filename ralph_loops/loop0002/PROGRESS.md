@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 17/18 SOLVED
+- **Current**: 18/18 SOLVED
 
 ---
 
@@ -1913,3 +1913,86 @@ Item 17, the final audit. Rerun `python3 python/oracle/bench_runs.py
 docs/python-run-times.md` on an idle machine (item 12's note: it rewrites the file, so
 append the Speed-ups section again). The README's run figures (109 goldens, 720 extra
 seeds) should be confirmed then.
+
+---
+
+## Iteration 18 — 2026-10-04 03:45
+
+### Completed
+Item 17, the final audit: **SOLVED**.
+- **Everything re-run**, in the foreground, under a load average of about 30 from
+  another user's jobs:
+  - test_golden.py, test_extra_seeds.py and test_views.py: the 109 goldens, the 720 extra
+    seeds against the oracle's frozen results plus their live re-capture, and the 109
+    goldens with every view attached. 256 passed in 4 min 47 s.
+  - everything else: the batteries, the CLI against the live oracle, the Tk renders, the
+    GUI driven through its widgets under xvfb-run (every GUI run's trace equals its
+    golden), and the venv installs. 1151 passed in 2 min 34 s.
+  - the gate twice: 1409 tests in 6 min 56 s mid-item, then 1412 at the end (below).
+- **No engine module imports tkinter.** The AST check found no `tkinter` or `metacat.gui`
+  import outside `metacat/gui/`, at the top or nested. The run-time check found one leak:
+  `engine.translated_modules()` treated `"gui"` in `LOAD_ORDER` (gui.ss) as the
+  `metacat.gui` package and imported its `__init__` on `engine.load()`. It brought no
+  tkinter, ran no `load()` and changed no run. I wrote
+  `test_gui.py::test_a_headless_run_loads_no_gui_module` first: in a fresh process it
+  imports every engine module, calls `engine.load()`, runs a headless run, and checks
+  `sys.modules`. It failed with `['metacat.gui']`. Fix: `translated_modules()` skips
+  packages. New anomalies entry.
+- **The plan re-read against the code.** A read-only subagent checked every name, path
+  and behaviour the plan states, and I checked what it found. Nine statements were wrong
+  or stale, for example:
+  - `continuation_point` is really `continuation_point_star`;
+  - only the CLI raises the recursion limit;
+  - the GUI uses `ThreadSafeTk`, not `after` polling;
+  - the CLI's crash error is a `SchemeError`;
+  - the `define_codelet_procedure_star` "decorator" is a plain function;
+  - `trace_writer.py`;
+  - the `from`-imports of graphics helpers;
+  - the codelet total.
+
+  Thirteen future-tense statements had since been done, some differently. I corrected
+  each in place, marked "item 17". The two codelet totals are both right: 272,957 events,
+  and 272,857 final counts, because 99 suspends and 1 halt stop inside a codelet (new
+  anomalies entry).
+- **Risk 6's promised tests never existed.** `tests/test_engine_modules.py` (new) has
+  them now:
+  - every engine module imports alone in a fresh interpreter, without loading the engine
+    or drawing a random number;
+  - an AST check limits cross-module `from`-imports to chez/objects/sugar/utilities/names,
+    plus four named pure drawing helpers that nothing rebinds or wraps.
+
+  This test checks existing code, so it passed when written. Mutation checks, each
+  restored and verified with `cmp`: a `from metacat.bonds import build_bond` in rules.py,
+  a random draw at memory.py's import and a cross-module read at its import all fail it.
+- **The `# chez:` and `# 1.2:` sites are listed in the plan.** The plan has a new
+  "Audit (item 17)" section. Its list is generated from the code's real comments
+  (tokenize, so docstrings don't count) by `python/tests/quirk_sites.py --write`.
+  `tests/test_quirk_sites.py` fails when the list drifts. It failed before the list
+  existed. There are 242 sites:
+  - 167 `# chez:`: 80 map order, 33 stochastic-if* coin first, 17 evaluation order, 10
+    recursion or sequence order, 7 truthiness, 6 characters/strings, 6 sort, 4 numbers,
+    2 record-case, 2 other;
+  - 75 `# 1.2:`.
+
+  Each site is named by module and function, with a per-module table.
+- **Docs**:
+  - `docs/follow-ups.md`: a new "Python (loop0002)" section covering the safety net and
+    tiers, idiomatic clean-up (objects, module boundaries, the model/graphics coupling,
+    the test-side translations, the speed-up assumptions, latent paths), performance and
+    features;
+  - `docs/anomalies_and_quirks.md`: the two entries above;
+  - `docs/python-translation-plan.md`: the audit section and the in-place corrections;
+  - `python/README.md`: the audit's tests.
+- The README's figures (109 goldens, 720 extra seeds, every window attached) are
+  confirmed by this audit's runs.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1412 tests, 6 min 57 s).
+
+### Blockers
+None. Not done: re-running `python/oracle/bench_runs.py` for docs/python-run-times.md,
+which needs an idle machine (the load average was about 30 throughout). It is listed in
+docs/follow-ups.md.
+
+### Next
+The loop is complete. See docs/follow-ups.md, "Python (loop0002)", for a next loop.
+
+LOOP_COMPLETE

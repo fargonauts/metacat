@@ -80,11 +80,11 @@ where a battery has no vector.
 | `sqrt`, `exp`, `log`, `expt` | `chez.sqrt` etc. | exact in, exact out where the result is exact: `(sqrt 16)` → `4`, `(sqrt 1/4)` → `1/2`, `(exp 0)` → `1`, `(log 1)` → `0`, `(expt 1/2 2)` → `1/4`, `(expt 0.0 0)` → `1` (exact!). Otherwise IEEE doubles from libm (`math.sqrt` etc.), bit-equal on item 02's vectors. *Item 02:* `expt` has more rules: only a `1/2` power is an exact root (`(expt 8 1/3)` → `2.0`), an exact 1 base gives `1`, an exact 0 base gives `0` for a positive power, and `(expt 0.0 -1)` is `+inf.0` (anomalies_and_quirks.md) |
 | `tanh` | `math.tanh` | workspace.ss's mapping strengths; Racket took Chez's own primitive, item 02 checked `math.tanh` against Chez bit for bit on about 1,100 arguments (`tanh-*` fixtures): equal |
 | `exact->inexact` of a ratnum | `chez.inexact` (`float(Fraction)`) | correctly rounded in both; equal on item 02's 400 random ratnums |
-| utilities.ss `round`, `floor`, `ceiling`, `truncate` (exact results) | `round_` (Python `round`: half to even, returns `int`), `math.floor`, `math.ceil`, `math.trunc` | Chez's `round` is half to even too (`(round 5/2)` → `2`, `(round 7/2)` → `4`, `(round 2.5)` → `2.0`) |
+| utilities.ss `round`, `floor`, `ceiling`, `truncate` (exact results) | `round_` (Python `round`: half to even, returns `int`), `math.floor`, `math.ceil`, `math.trunc`. *Item 17:* as built they are `chez.exact_round`, `exact_floor`, `exact_ceiling`, `exact_truncate` (utilities.py) | Chez's `round` is half to even too (`(round 5/2)` → `2`, `(round 7/2)` → `4`, `(round 2.5)` → `2.0`) |
 | `=`, `<`, … | Python operators | mixed exact/inexact comparisons are exact in both |
 | `eqv?`/`equal?` on numbers | `chez.eqv_p`, `chez.equal_p` | `(equal? 2 2.0)` is `#f` but Python's `2 == 2.0` is `True`, and likewise `Fraction(1, 2) == 0.5`. Only where a list compared with `equal?` can hold numbers of mixed exactness (memory.ss, rules.ss, justify.ss sites) |
 | `1+`, `-1+`, `add1`, `sub1` | `add1`, `sub1` | |
-| `random`, `random-seed` | `chez.random`, `chez.random_seed` | the 32-bit LCG of trace-format.md; `(random 1.0)` is `M/2^52` exactly; one module-level state. Must accept an `int` only (normalise Fractions first) |
+| `random`, `random-seed` | `chez.random`, `chez.random_seed` | the 32-bit LCG of trace-format.md; `(random 1.0)` is `M/2^52` exactly; one module-level state. Must accept an `int` only (normalise Fractions first). *Item 17:* `chez.random` normalises a Fraction with denominator 1 itself |
 | flonum printing | `chez.number_to_string` | shortest round-trip digits (Python's `repr` gives the same digits **except at exact ties, where Chez rounds the last digit up and Python to even**, item 02), laid out Chez's way: positional when the leading digit's exponent e is in (−4, 10), else `d.ddde<exp>` with no `+` and no exponent padding. So `1e21`, `1e-7`, `1.234567890125e11`, `1000000000.0`. Python's `repr` writes `1e+21`, `1e-07`, `123456789012.5` |
 | ratnum printing | `str(Fraction)` | `"102/5"`, `"-1/2"`, as Chez; normalised ints print as ints |
 
@@ -149,7 +149,8 @@ the item's PROGRESS entry.
 - `==` when the operands are symbols (Python `str`, not reliably interned) or fixnums.
 
 `chez.eq_p(a, b)` (`a is b`, or both are `str`, or both are non-bool `int`, and they
-are equal) is the version for `memq`, `assq`, `remq` and calls where the operand types
+are equal; *item 17:* also two equal `Char`s, and any two empty lists, so `'()` is not
+compared by identity) is the version for `memq`, `assq`, `remq` and calls where the operand types
 vary. Model objects never define `__eq__`, so `==` on them is identity too. Python
 lists and tuples compare by content, so a list is never compared with `==` where Scheme
 used `eq?`.
@@ -182,7 +183,9 @@ with `write`/`~s`; the only `~s` is in run.ss's `no-prompt` error and in fonts.s
 debugging. It never compares a string with `eq?`. So:
 - **symbols are Python `str`** (`'bond` → `"bond"`), and so are Scheme strings.
   `string->symbol` and `symbol->string` are the identity. `symbol_p(x)` is
-  `isinstance(x, str)`, which is all the model's tests need.
+  `isinstance(x, str)`, which is all the model's tests need. *Item 17:* there is no
+  public `symbol_p`; justify.py's private `_symbol_p` is `isinstance(x, str)`, and
+  sugar.py's excludes `chez.String` and `chez.Char`.
 - characters are 1-character `str` (only `symbol->letter-categories` and the string
   utilities use them).
 - *Item 02:* where the printer's `write` (`~s`) must tell them apart, a Scheme string is a
@@ -226,7 +229,8 @@ Users:
 - utilities.ss:240, `symbol->letter-categories`, the original's only `eval` (of
   `plato-a` etc.) → `top_level_value("plato-a")`;
 - `reveal-obj` (utilities.ss) reads `format-slipnode` (rules.ss) as a top-level value.
-  rules.py must register it; Racket item 09 missed this and item 17 fixed it.
+  rules.py must register it; Racket item 09 missed this and item 17 fixed it. *(Item 17:
+  done; rules.py's `load()` registers it.)*
 
 Names the original never defines but `set!`s or reads (`*temperature-clamped?*`,
 `*initial-slipnode-unclamp-time*`, read before any `set!`; `same-direction?`,
@@ -239,7 +243,7 @@ module as Racket's `pending.rktl` does: the first two `False`, the last two rais
 - **`continuation-point*`** (15 sites: bonds.ss:90, groups.ss:295, 860, utilities.ss:75,
   86, rules.ss:1267, answers.ss:1283, justify.ss:184, 261, run.ss:100, 114, 148, and the
   codelet wrapper of `define-codelet-procedure*`) only ever escapes upwards, except at
-  run.ss:100/114. → `sugar.continuation_point(body)`: `body` receives an escape
+  run.ss:100/114. → `sugar.continuation_point_star(body)` (*item 17:* the name as built): `body` receives an escape
   procedure that raises a private `_Escape(token, value)`. The form catches only its own
   token and returns the value. An escape after the form has returned raises an error,
   as with call/ec. `fizzle` (the escape of the running codelet, a global set by every
@@ -255,10 +259,14 @@ module as Racket's `pending.rktl` does: the first two `False`, the last two rais
     break point then continues, as the continuation would. `*interrupt?*` and the step
     mode are flags the GUI thread sets. Views are called on the engine thread and must
     only queue drawing for Tk's thread (`after` polling), so they can't change the run.
+    *Item 17:* as built (item 15), no `after` polling: `swl.ThreadSafeTk` hands each Tcl
+    call to Tk's thread through a queue and a pipe that Tk's event loop watches, and the
+    engine thread waits for the result.
   - `reset` (Chez's REPL abort) → `raise Reset()`; `report-error-and-halt` reaches it.
 - **Python recursion depth.** The model recurses over short lists, and `remq`-style
   helpers are written as loops. The engine sets `sys.setrecursionlimit(10000)` as a
-  margin. The known infinite recursion (an object without `object-type` sent a bad
+  margin. *(Item 17: only the CLI's `main` does, in `metacat/__main__.py`; the goldens,
+  the batteries and the GUI run within Python's default limit.)* The known infinite recursion (an object without `object-type` sent a bad
   message: report-error-and-halt recurses forever, in the original too) shows up as a
   `RecursionError`. The prototype test hit it while it was being written.
 
@@ -407,7 +415,9 @@ def make_bond(from_object, to_object, bond_category, bond_facet,
 - Objects with nested `record-case` (coderack.ss:267) dispatch in a method body.
 
 Item 12 may speed up dispatch further (local aliases of `tell` in hot loops, caching the
-parent's table), keeping every trace identical.
+parent's table), keeping every trace identical. *(Item 17: item 12 did neither; it
+inlined `tell` in `tell_all` and sped up chez.py and utilities.py instead; see "As built
+(item 12)".)*
 
 ### As built (item 03)
 
@@ -445,7 +455,8 @@ parent's table), keeping every trace identical.
   `metacat.coderack.g_coderack` and `.make_codelet_type`,
   `metacat.slipnet.make_slipnode` and `.establish_link`. Those modules don't exist yet;
   tests provide them with `engine_module(...)` in test_utilities.py, which patches the real
-  module once it exists;
+  module once it exists (*item 17:* they all exist now; `engine_module` moved to
+  tests/engine_stubs.py);
 - `slipnet_node_list_star(specs, module=None)` and `codelet_type_list_star(specs,
   module=None)` define top-level values, and also module attributes (through
   `names.scheme_to_python`) when given the module;
@@ -486,7 +497,8 @@ from symbols").
   model reads (`urgency-color`, the codelet types' graphics methods, trace events), the
   speed settings and `restore-current-state`, all `#f` (or raising) until the views set
   them. constants.py keeps only the model's part of constants.ss.
-- **setup.py**: `setup` and `enable-resizing` are the GUI's (item 15). Other modules read
+- **setup.py**: `setup` and `enable-resizing` are the GUI's (item 15; *item 17:* in
+  gui/app.py). Other modules read
   and assign the globals qualified (`setup.g_temperature`).
 - **coderack.py**: the codelet closure that make-codelet makes is the `Codelet` class. It
   shares variables with its codelet type's closure (count, selection probability,
@@ -512,7 +524,8 @@ from symbols").
   `temp-adjusted-probability` (formulas.ss), `*themespace*` and `*workspace*` are read
   through the package at call time, so `engine.set_global` can replace them.
 - **images.py**: `Image` and `StringImage`. `fail` is any procedure that does not return
-  (it raises in the tests; rules.py will pass its escape). `replace-all` and every
+  (it raises in the tests; rules.py will pass its escape; *item 17:* it does, from
+  `continuation_point_star` in apply-rule). `replace-all` and every
   `tell-all` keep `chez.map_`'s order, since `fail` can escape midway and leave the images
   map already reached changed (pinned by `slipnet-extra`'s `image-replace-all-fail`).
   `make-letter`, `make-group` and `make-group-pexp` are read through the package.
@@ -535,7 +548,8 @@ from symbols").
   `rule_describable_bridge_p` (inside a lambda, so that filtering an empty bridge list never
   touches the module), `_metacat.trace`, `_metacat.group_graphics.group_graphics("erase",
   s)`, `_metacat.eeg_graphics.g_EEG` and `_metacat.run.g_temperature_clamped_p` (run.ss
-  creates `*temperature-clamped?*` with `set!`; run.py must define it).
+  creates `*temperature-clamped?*` with `set!`; run.py must define it; *item 17:* it
+  does).
 - **Tables** are `chez.Vector`s of rows. `flatten` doesn't descend into a `Vector`, so
   `get-proposed-bridges` turns rows into lists first, as `vector->list` does.
 - **Scheme strings**: `print-name`, `ascii-name` and `generic-name` return `chez.String`;
@@ -561,7 +575,8 @@ from symbols").
   `erase-group`/`draw-group` to `*workspace-window*`). The rest of group-graphics.ss
   (`make-group-pexp`, `draw-group-grope`, the arrowhead constants) is the panels item's;
   groups.py and images.py reach those names through `_metacat.group_graphics` only with
-  `%workspace-graphics%` on.
+  `%workspace-graphics%` on. *(Item 17: item 14 completed group_graphics.py in the
+  engine: `make-group-pexp`, `draw-group-grope` and the arrowheads are there now.)*
 - **Names from files not translated yet**, read at call time: `_metacat.bridges.break_bridge`,
   `incompatible_horizontal_CMs_p`/`incompatible_vertical_CMs_p` (only when bridges exist),
   `_metacat.trace.monitor_new_groups`, `_metacat.general_graphics` (graphics on).
@@ -571,7 +586,8 @@ from symbols").
   order, and its fights stop at the first loss (`andmap`). Every `stochastic-if*` draws its
   coin first; in top-down-group-scout:category the probability itself draws afterwards.
 - **The harness**: python/tests/codelet_harness.py translates tests/diff/codelet-harness.scm
-  (bonds-and-groups setting only; `b:bridges?`/`b:rules?` paths wait for items 08–09). The
+  (bonds-and-groups setting only; `b:bridges?`/`b:rules?` paths wait for items 08–09;
+  *item 17:* both added there). The
   59 cases run in a fork pool (about 6 s on 32 cores); about 1.5 ms per codelet,
   harness dumps included.
 
@@ -590,7 +606,8 @@ from symbols").
   `monitor-new-concept-mappings` and `entries`; justify.ss's
   `remove-whole/single-concept-mappings`; bridge-graphics.ss (graphics on only). The test
   harness supplies the three ungated themes.ss helpers as stand-ins until item 10's
-  themes.py (anomalies: "Bridges call themes.ss on every bridge").
+  themes.py (anomalies: "Bridges call themes.ss on every bridge"). *(Item 17: removed
+  by item 10.)*
 - **Evaluation order**: no site needed reordering. Every draw (the stochastic-picks of
   bridge type and objects, `stochastic-if*`, `random-pick`, the fights) sits in a `let*`,
   a body or an `and`/`cond`; the multi-argument calls and multi-binding `let`s (the appends
@@ -647,12 +664,14 @@ from symbols").
 - **trace.py is trace.ss.** Item 11's iterations.md text and TASK.md's layout also call the
   golden-trace writer `trace.py`; the module-per-file rule gives that name to trace.ss, so
   item 11 must put the writer under another name (for example `metacat/tracing.py` or
-  inside `headless.py`).
+  inside `headless.py`). *(Item 17: it is `metacat/trace_writer.py`.)*
 - **Early partial graphics modules**, as group_graphics.py: general_graphics.py
   (`find-next-space-position`, every rule's English), trace_graphics.py
   (`group-event-pexp-text-string`, every group event's name, which is in the trace) and
   theme_graphics.py (`relation-name`, trace.ss's `print-pattern`). Pure, verbatim; the
-  panels item adds the rest of each file.
+  panels item adds the rest of each file. *(Item 17: done differently: the views' parts
+  went to `metacat/gui/`'s modules of the same names, and the engine's theme_graphics.py
+  and trace_graphics.py still hold one function each.)*
 - **Stand-ins removed**: the themes.ss helpers in codelet_harness.py's `STAND_INS`, and
   test_rules.py's copies of `equivalent-workspace-objects?`, `find-next-space-position` and
   `diff`. The batteries' own fakes (fake Themespace, Trace, Memory, monitors) stay; they
@@ -666,7 +685,10 @@ from symbols").
   (the inner walk is an argument of the outer one), so it fails on a length mismatch
   before visiting anything and visits elements last to first; it is a length check and a
   reverse loop.
-- **The golden harness** (python/tests/golden_harness.py, golden_run.py): the oracle's
+- **The golden harness** (python/tests/golden_harness.py, golden_run.py; *item 17:*
+  superseded by item 11, which moved the loop to `metacat/run.py`, the windows and driver
+  to `metacat/headless.py` and the writer to `metacat/trace_writer.py`, and deleted
+  golden_run.py): the oracle's
   headless windows (prelude.ss), with the Racket port's headless Commentary window; the
   trace.ss writer and wrappers, installed by setting module attributes
   (`coderack.g_coderack`, `bonds.build_bond`, `formulas.update_temperature`,
@@ -675,7 +697,9 @@ from symbols").
   them with `from ... import`); run.ss's driver around golden_run.py, run.ss's loop
   translated in the tests and registered as `metacat.run`. Each golden runs in a fresh
   fork (`maxtasksperchild=1`) of a fresh Python process that has loaded the engine once.
-- **Speed**: the 109 goldens (272,957 codelets) take about 6 min of CPU, 35 s on 32 cores:
+- **Speed**: the 109 goldens (272,957 codelet events; *item 17:* their final counts sum
+  to 272,857, because the 99 runs that suspend and the halt run stop inside a codelet, before the count
+  goes up) take about 6 min of CPU, 35 s on 32 cores:
   about 1.4 ms per codelet, all updates included. The longest golden (17,000 codelets) sets
   the wall time.
 
@@ -698,7 +722,7 @@ from symbols").
   `init-mcat`/`clear-breakpoint` unwind a parked thread they drop (`_Abandoned`, a
   BaseException no model code catches). A Breakpoint resumes once: Chez could re-enter
   a continuation, which no run does. Item 15 can call `go` from a GUI worker rather
-  than Tk's thread.
+  than Tk's thread (*item 17:* it does: `app.EngineThread`).
 - **Trace wrappers when there is no trace**: they compute nothing when `trace_writer.PORT`
   is None; they only read, so the run is the same either way (the CLI's output with and
   without `--trace` is compared).
@@ -803,7 +827,8 @@ from symbols").
   (`get-scrollbar-from-frame` asks the host, `reposition-vertical-scrollbar` calls
   `host.set_vertical_view`); `swl:sync-display` flushes through sgl's hook; SWL's
   `thread-break` (a click in the Workspace window `(go)`es the REPL) raises until item 15
-  installs a handler (`views.set_thread_break_handler`); fonts made by `set!` in the
+  installs a handler (`views.set_thread_break_handler`; *item 17:* gui/app.py installs
+  gui.py's `thread-break`); fonts made by `set!` in the
   `select-...-fonts` procedures are module globals; `relation-names-pexp`, never defined
   in the original, raises Chez's unbound-variable error. Record-case clauses ignore extra
   arguments where the original relies on it (trace.ss sends `draw-string-letters` a tag;
@@ -870,6 +895,351 @@ from symbols").
   install into fresh venvs; the CLI's stdout against the live oracle, its trace against
   the golden, the GUI opening under xvfb-run).
 
+### Audit (item 17)
+
+Re-run on 2026-10-04, under a load average of about 30 from another user's jobs:
+the 109 goldens, the 109 goldens with every view attached, the 720 extra seeds and their
+oracle re-capture (4 min 47 s for the three files), then everything else, including the
+GUI driven through its widgets under xvfb-run and the venv installs (2 min 34 s). All 1407
+tests passed. With the audit's new tests the gate runs 1412, all passing (6 min 57 s).
+
+No engine module imports tkinter or `metacat.gui`, at the top or inside a function
+(checked on the AST). At run time the audit found one leak: `engine.translated_modules()`
+took `"gui"` in `LOAD_ORDER` (gui.ss) for the `metacat.gui` *package* and imported its
+`__init__` on `engine.load()`. No tkinter came with it and no `load()` ran, so runs were
+unchanged. It now skips packages, and `test_gui.py::test_a_headless_run_loads_no_gui_module`
+checks a fresh process: every engine module imported, `engine.load()`, a headless run,
+and no `tkinter` or `metacat.gui*` in `sys.modules`. The test failed before the fix.
+
+The plan was re-read against the code (a read-only subagent checked every name, path
+and stated behaviour; I checked its findings). Nine statements were wrong or stale and
+thirteen future-tense ones had since been done, some differently. They are corrected in
+place, each marked "item 17", and the originals are left as written. Risk 6's
+promised tests never existed: tests/test_engine_modules.py now imports every engine
+module alone in a fresh interpreter (no load, no draw) and checks the cross-module
+`from`-imports on the AST. Three mutants (a `from metacat.bonds import build_bond` in
+rules.py, a draw at import time and a cross-module read at import time) all fail it.
+
+#### The `# chez:` and `# 1.2:` sites
+
+A `# chez:` comment marks a place where the Python reproduces a Chez semantic that
+Python lacks; a `# 1.2:` comment marks a quirk of Metacat 1.2 itself, kept. The list
+below is generated from the code's comments (not docstrings) by
+`python/tests/quirk_sites.py --write`, and `tests/test_quirk_sites.py` fails when it
+drifts. The kinds are a rough sort by the comment's words. Sites are named by module and
+enclosing function, not line.
+
+<!-- quirk-sites:begin (python/tests/quirk_sites.py --write) -->
+
+242 sites: 167 `# chez:` (Chez's semantics that Python must reproduce) and 75 `# 1.2:` (Metacat 1.2's own quirks, kept).
+
+| `# chez:` kind | Sites |
+|---|---|
+| map's order | 80 |
+| stochastic-if* coin first | 33 |
+| evaluation order | 17 |
+| recursion and sequence order | 10 |
+| truthiness (only #f is false) | 7 |
+| characters, strings and symbols | 6 |
+| sort | 6 |
+| numbers and printing | 4 |
+| other | 2 |
+| record-case and case | 2 |
+
+| Module | `# chez:` | `# 1.2:` |
+|---|---|---|
+| `metacat.answers` | 11 | 0 |
+| `metacat.bonds` | 3 | 1 |
+| `metacat.breakers` | 3 | 0 |
+| `metacat.bridge_graphics` | 1 | 2 |
+| `metacat.bridges` | 10 | 6 |
+| `metacat.chez` | 2 | 0 |
+| `metacat.coderack` | 5 | 3 |
+| `metacat.concept_mappings` | 3 | 0 |
+| `metacat.descriptions` | 3 | 0 |
+| `metacat.eeg_graphics` | 1 | 0 |
+| `metacat.formulas` | 1 | 1 |
+| `metacat.general_graphics` | 0 | 2 |
+| `metacat.group_graphics` | 0 | 1 |
+| `metacat.groups` | 11 | 2 |
+| `metacat.gui.colors` | 0 | 1 |
+| `metacat.gui.gui` | 4 | 0 |
+| `metacat.gui.sgl` | 0 | 1 |
+| `metacat.gui.temperature_graphics` | 0 | 1 |
+| `metacat.gui.theme_graphics` | 0 | 1 |
+| `metacat.gui.workspace_graphics` | 1 | 4 |
+| `metacat.images` | 2 | 2 |
+| `metacat.jootsing` | 9 | 0 |
+| `metacat.justify` | 4 | 4 |
+| `metacat.memory` | 1 | 0 |
+| `metacat.objects` | 2 | 1 |
+| `metacat.rule_graphics` | 1 | 0 |
+| `metacat.rules` | 31 | 2 |
+| `metacat.run` | 3 | 0 |
+| `metacat.setup` | 1 | 0 |
+| `metacat.slipnet` | 4 | 0 |
+| `metacat.sugar` | 2 | 1 |
+| `metacat.themes` | 11 | 2 |
+| `metacat.trace` | 2 | 21 |
+| `metacat.trace_graphics` | 1 | 1 |
+| `metacat.trace_writer` | 1 | 0 |
+| `metacat.utilities` | 13 | 1 |
+| `metacat.workspace` | 10 | 6 |
+| `metacat.workspace_objects` | 3 | 3 |
+| `metacat.workspace_strings` | 5 | 4 |
+| `metacat.workspace_structure_formulas` | 0 | 1 |
+| `metacat.workspace_structures` | 2 | 0 |
+
+`# 1.2:` sites (module, function: comment):
+
+- `metacat.bonds`, `bonds_equal_p`: the last test calls same-direction?, which nothing defines (anomalies: "bonds-equal? calls same-direction?,...
+- `metacat.bridge_graphics`, `make_bridge_pexp`: a case without else
+- `metacat.bridge_graphics`, `draw_bridge_grope`: a case without else
+- `metacat.bridges`, `_BridgeClauses.boost_themespace_activations`: not gated by %workspace-graphics% (anomalies: "Bridges call themes.ss on every bridge")
+- `metacat.bridges`, `_BridgeClauses._calculate_external_strength`: a one-argument * (anomalies: "Dead code in bridges.ss")
+- `metacat.bridges`, `direction_incompatible_bridges`: cond without else: void, which partition applies (an error) if it ever compares two bridges
+- `metacat.bridges`, `propose_singleton_group`: never called (anomalies: "Dead code in bridges.ss")
+- `metacat.bridges`, `try_to_propose_singleton_group`: never called (anomalies: "Dead code in bridges.ss")
+- `metacat.bridges`, `letter_category_mappable_objects_p`: object1's group category twice (anomalies: "letter-category-mappable-objects? compares a group with itself")
+- `metacat.coderack`, `post_codelet_probability`: a case without else; the other codelet types give void
+- `metacat.coderack`, `num_of_codelets_to_post`: a case without else; the other codelet types give void
+- `metacat.coderack`, `thematic_codelet_urgency`: a case without else
+- `metacat.formulas`, `current_translation_temperature_threshold_distribution`: the exact density is compared with the flonums exactly, so 1/5, 2/5 and 4/5 fall into the hotter class (ano...
+- `metacat.general_graphics`, `remove_leading_blanks`: an all-blank line comes back unchanged
+- `metacat.general_graphics`, `grid.line`: a case without else
+- `metacat.group_graphics`, `make_group_pexp`: a cond without else
+- `metacat.groups`, `group_builder`: not gated by %workspace-graphics%
+- `metacat.groups`, `group_builder`: not gated by %workspace-graphics%
+- `metacat.gui.colors`, `swl_color`: an unknown name fails in (cadr #f)
+- `metacat.gui.sgl`, `Viewport.draw_text`: case without else gives void
+- `metacat.gui.temperature_graphics`, `new_temperature_window`: title is still #f here, so the icon label is #f (anomalies: "The Temperature window's icon label is `#f`")
+- `metacat.gui.theme_graphics`, `Panel.get_relation_names_pexp`: relation-names-pexp is never defined (the variable is relation-names-pexps); Chez raises when this runs, an...
+- `metacat.gui.workspace_graphics`, `WorkspaceWindow.get_rule_coord`: case without else
+- `metacat.gui.workspace_graphics`, `WorkspaceWindow.init_string_graphics`: case without else
+- `metacat.gui.workspace_graphics`, `WorkspaceWindow.init_string_graphics`: case without else
+- `metacat.gui.workspace_graphics`, `WorkspaceWindow.repair_built_bridges`: case without else
+- `metacat.images`, `StringImage.reset`: forgets the direction it was made with (anomalies: "A string image's reset forgets its original direction")
+- `metacat.images`, `StringImage.new_alpha_position_category`: sends new-start-letter (anomalies: "A string image's new-alpha-position-category sends new-start-letter")
+- `metacat.justify`, `get_unifying_slippages`: fail is #f (the function assumes the rules can be unified)
+- `metacat.justify`, `remove_whole_or_single_concept_mappings`: removes only the first match (select), not all of them
+- `metacat.justify`, `compare_rule_clause_lists`: tests rc-list1 twice (rc-list2 is never tested)
+- `metacat.justify`, `get_vertical_theme_pattern_to_clamp`: the test is the wrong way round (and the pattern is never printed)
+- `metacat.objects`, `report_error_and_halt`: recurses forever for an object without object-type (porting-notes.md, item 03)
+- `metacat.rules`, `apply_transforms`: (2nd (assq plato-bond-facet transforms)) is cadr of #f, an error, if no BondFacet transform comes with the...
+- `metacat.rules`, `get_change_phrase.phrase`: (3rd BondFacet-change) is caddr of #f, a Chez error, when the clause has no BondFacet change (anomalies: "`...
+- `metacat.sugar`, `mcat`: the validity test is an extend-syntax fender, so bad tokens are a syntax error
+- `metacat.themes`, `Themespace.thematic_pressure_on`: not gated by a graphics switch; the headless null window absorbs it
+- `metacat.themes`, `ThemeCluster.__init__`: alpha is fixed here, so set-sensitivity has no effect on it
+- `metacat.trace`, `TemporalTrace.undo_last_clamp`: a case without else
+- `metacat.trace`, `TemporalTrace.undo_last_clamp`: a case without else
+- `metacat.trace`, `AnswerEvent.get_rule`: a case without else
+- `metacat.trace`, `AnswerEvent.get_supporting_bridges`: a case without else
+- `metacat.trace`, `AnswerEvent.get_rule_ref_objects`: a case without else
+- `metacat.trace`, `ClampEvent.print_patterns`: a generic event has no print-patterns clause (tell halts)
+- `metacat.trace`, `ClampEvent.get_complement_codelet_pattern`: complement-codelet-pattern is never defined (anomalies_and_quirks.md)
+- `metacat.trace`, `ClampEvent.get_rule`: a case without else
+- `metacat.trace`, `ClampEvent.activate`: a case without else
+- `metacat.trace`, `ClampEvent.activate`: a case without else
+- `metacat.trace`, `ConceptMappingEvent.__init__`: a case without else
+- `metacat.trace`, `_rule_type_case`: a case without else
+- `metacat.trace`, `RuleEvent.__init__`: a case without else
+- `metacat.trace`, `SnagEvent.__init__`: a record-case without else
+- `metacat.trace`, `SnagEvent.print_`: the failure results are tagged SWAP, CONFLICT and CHANGE, and Chez 10 is case-sensitive, so this case never...
+- `metacat.trace`, `SnagEvent.get_explanation`: a record-case without else
+- `metacat.trace`, `SnagEvent.get_supporting_bridges`: a case without else
+- `metacat.trace`, `snag_object_phrase`: a cond without else
+- `metacat.trace`, `unflipped_group_name`: a cond without else
+- `metacat.trace`, `full_workspace_object_name`: a cond without else
+- `metacat.trace`, `patterns_equal_p`: a cond without else
+- `metacat.trace_graphics`, `group_event_pexp_text_string.descriptor_string`: a cond without else
+- `metacat.utilities`, `ascending_index_list`: (accumulate (sub1 n) '()) counts down from n - 1 and never reaches zero, so n = 0 loops forever (porting-no...
+- `metacat.workspace`, `Workspace.get_possible_bridge_objects`: (apply append <void>) is an error
+- `metacat.workspace`, `Workspace.get_activity`: (min 1.0 ...) makes the ratio a flonum before 100* rounds it (anomalies: "Exact bond densities meet flonum...
+- `metacat.workspace`, `Workspace.get_proposed_bridges`: (vector->list <void>) is an error
+- `metacat.workspace`, `Workspace.get_all_other_coincident_bridges`: (remq bridge <void>) is an error
+- `metacat.workspace`, `Workspace.delete_all_proposed_bridges`: for-each-vector-element* loops forever on an empty vector (ascending-index-list 0; porting-notes.md, item 03)
+- `metacat.workspace`, `Workspace.maximal_mapping_p`: tell-all on <void> is an error
+- `metacat.workspace_objects`, `WorkspaceObject.distinguishing_descriptor_p`: a cond without else; tell-all on void then fails, as in Chez
+- `metacat.workspace_objects`, `WorkspaceObject.update_average_unhappiness`: case without else; round then fails on void
+- `metacat.workspace_objects`, `WorkspaceObject.update_average_salience`: case without else; round then fails on void
+- `metacat.workspace_strings`, `WorkspaceString.__init__`: (ascending-index-list 0) loops forever, so an empty string never gets here
+- `metacat.workspace_strings`, `WorkspaceString.delete_all_proposed_bonds`: for-each-vector-element* loops forever on an empty table (ascending-index-list 0)
+- `metacat.workspace_strings`, `WorkspaceString.delete_all_proposed_groups`: for-each-vector-element* loops forever on an empty table (ascending-index-list 0)
+- `metacat.workspace_strings`, `WorkspaceString.get_relevance`: a single non-spanning object divides by zero, as in Chez
+- `metacat.workspace_structure_formulas`, `description_type_support`: a string without objects divides by zero, as in the original
+
+`# chez:` sites (module, function: comment):
+
+- `metacat.answers`, `most_recent_group_and_concept_mapping_events`: map's order of application (the procedure only reads)
+- `metacat.answers`, `get_unjustified_theme_pattern`: map's order of application (the procedure only reads)
+- `metacat.answers`, `average_theme_abstractness`: map's order of application (the procedure only reads)
+- `metacat.answers`, `answer_finder`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.answers`, `answer_finder`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.answers`, `get_rule_supporting_groups`: map's order of application (the procedure only reads)
+- `metacat.answers`, `make_translated_rule_bridges`: map's order of application
+- `metacat.answers`, `translate.body`: map's order of application (the procedure draws and can escape)
+- `metacat.answers`, `translate_rule_clause.translate_clause`: map's order of application (the procedure draws and can escape)
+- `metacat.answers`, `apply_to_change.apply_change`: (list ...) evaluates its arguments left to right, and both apply-slippages calls can draw and log slippages
+- `metacat.answers`, `apply_to_object_description`: (list ...) evaluates its arguments left to right, and the apply-slippages calls can draw and log slippages
+- `metacat.bonds`, `Bond.get_local_density`: a let*: all the left neighbours (drawn) before the right ones
+- `metacat.bonds`, `bond_evaluator`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.bonds`, `choose_bond_facet`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.breakers`, `breaker`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.breakers`, `breaker`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.breakers`, `breaker`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.bridge_graphics`, `bridge_graphics`: a two-binding let whose bindings only ask the bridge
+- `metacat.bridges`, `_BridgeClauses.get_average_theme_support`: map's order of application (the procedure only computes)
+- `metacat.bridges`, `_BridgeClauses.get_theme_support_values`: map's order of application
+- `metacat.bridges`, `bottom_up_bridge_scout`: map's order of application (get-mapping-strength only reads)
+- `metacat.bridges`, `bottom_up_bridge_scout`: map's order of application (the procedure only computes)
+- `metacat.bridges`, `bottom_up_bridge_scout`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.bridges`, `important_object_bridge_scout`: map's order of application (get-mapping-strength only reads)
+- `metacat.bridges`, `important_object_bridge_scout`: map's order of application (the procedure only computes)
+- `metacat.bridges`, `important_object_bridge_scout`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.bridges`, `bridge_evaluator`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.bridges`, `try_to_propose_singleton_group`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.chez`, `_flonum_digits`: when x lies exactly halfway between the two shortest candidates, Python's repr rounds the last digit half t...
+- `metacat.chez`, `(module level)`: R6RS constituents beyond ASCII; other characters are written \xHH; in a symbol (U+00AB, U+00AD, U+00A0, U+0...
+- `metacat.coderack`, `Coderack.initialize`: for*'s value is the last body's (anomalies: "sort, remq, for-each and one-armed if differ")
+- `metacat.coderack`, `post_codelet_probability`: #f only (supported-rule-exists? may answer a list)
+- `metacat.coderack`, `add_top_down_codelets`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.coderack`, `add_bottom_up_codelets`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.coderack`, `load`: the labels are strings, which the panels draw as text (anomalies: "The graphics and rules.ss tell strings f...
+- `metacat.concept_mappings`, `ConceptMapping.distinguishing_p`: (and ...) returns the last test's value, which need not be a boolean
+- `metacat.concept_mappings`, `ConceptMapping.relevant_distinguishing_p`: #f only
+- `metacat.concept_mappings`, `ConceptMapping.distinguishing_identity_or_opposite_p`: #f only
+- `metacat.descriptions`, `Description.__init__`: a let's order is unspecified (porting-notes.md says right to left here); both bindings are free of side eff...
+- `metacat.descriptions`, `Description.get_theme_support_values`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.descriptions`, `description_evaluator`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.eeg_graphics`, `EEG.initialize`: map's order of application (the thunks only read)
+- `metacat.formulas`, `temp_adjusted_values`: map's order of application (the procedure is pure)
+- `metacat.groups`, `Group.__init__`: let* order, binding by binding
+- `metacat.groups`, `Group.get_local_density`: evaluation order: both arguments of append draw (choose-...-neighbor), and Chez evaluates append's second a...
+- `metacat.groups`, `top_down_group_scout__category`: stochastic-if* draws its coin before the probability, which may draw itself (get-local-support -> get-local...
+- `metacat.groups`, `group_evaluator`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.groups`, `group_builder`: andmap goes first to last and stops at the first loss (and its draws)
+- `metacat.groups`, `group_builder`: adjacency-map is a two-list map, in Chez's order (build-bond has effects)
+- `metacat.groups`, `group_builder`: adjacency-map is a two-list map, in Chez's order (build-bond has effects)
+- `metacat.groups`, `group_builder`: map's order of application (break-bond and build-bond have effects)
+- `metacat.groups`, `propose_group`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.groups`, `polarize_bonds.body`: map's order of application (an escape can end it midway)
+- `metacat.groups`, `get_all_nested_groups`: map's order of application (the procedure only reads)
+- `metacat.gui.gui`, `_alphabetic_p`: char-alphabetic? is Unicode's Alphabetic property, str.isalpha the letter categories (anomalies: "str.isalp...
+- `metacat.gui.gui`, `_numeric_p`: char-numeric? is Unicode's Numeric property (½ and Arabic-Indic digits are numeric; fixture char-noise), as...
+- `metacat.gui.gui`, `_downcase`: char-downcase maps one character to one
+- `metacat.gui.gui`, `ControlPanel.theme_edit_mode_off`: map's order (the patterns only read)
+- `metacat.gui.workspace_graphics`, `WorkspaceWindow.draw_string_letters`: record-case ignores extra arguments; trace.ss sends a tag (docs/anomalies_and_quirks.md, "Chez's record-cas...
+- `metacat.images`, `StringImage.replace_all`: map's order of application; fail can escape midway (porting-notes.md, item 05)
+- `metacat.images`, `Image.replace_all`: map's order of application; fail can escape midway (porting-notes.md, item 05)
+- `metacat.jootsing`, `jootser`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.jootsing`, `jootser`: map's order of application (the procedure only reads)
+- `metacat.jootsing`, `jootser`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.jootsing`, `jootser`: map's order of application (the procedure only reads)
+- `metacat.jootsing`, `get_clamp_jootsing_probability`: map's order of application (the procedure only reads)
+- `metacat.jootsing`, `get_clamp_jootsing_probability`: (* exact 0.5) of an exact 0 is exact 0 (chez.mul)
+- `metacat.jootsing`, `joots_from_justify_clamps`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.jootsing`, `progress_watcher`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.jootsing`, `progress_watcher`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.justify`, `answer_justifier`: map's order of application (the procedure only reads)
+- `metacat.justify`, `answer_justifier`: of clamp-rules' arguments only get-vertical-theme-pattern-to-clamp draws (prob?); the others only read, so...
+- `metacat.justify`, `unify_rules.body`: map's order of application (the procedure only reads)
+- `metacat.justify`, `traverse_rule_clauses.walk`: (walk (1st x1) (1st x2) (walk (rest x1) (rest x2) results)): the rests are walked first, so lists of differ...
+- `metacat.memory`, `_check_reals`: comparing with #f (a bounding box never set) is an error; Python's bool is an int and would compare quietly
+- `metacat.objects`, `tell_all`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.objects`, `delegate_to_all`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.rule_graphics`, `_rule_layout`: map's order of application (the window answers each width)
+- `metacat.rules`, `Rule.set_abstracted_rule_information`: map's order of application (the procedure only reads)
+- `metacat.rules`, `Rule.set_translated_rule_information`: map's order of application (the procedure only builds lists)
+- `metacat.rules`, `Rule.get_degree_of_support`: map's order of application (the procedure only reads)
+- `metacat.rules`, `Rule.get_concept_pattern`: map's order of application (the procedure only builds lists)
+- `metacat.rules`, `Rule.revise_abstracted_rule_information`: map's order of application (the procedure only reads)
+- `metacat.rules`, `rule_scout`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `rule_scout`: map's order of application (the procedure only reads)
+- `metacat.rules`, `rule_scout`: map's order of application (instantiating a template draws)
+- `metacat.rules`, `rule_evaluator`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `abstract_change_descriptions`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `abstract_change_descriptions`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `abstract_change_descriptions`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `abstract_change_descriptions`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.rules`, `sort_templates`: Chez's sort algorithm and predicate calls
+- `metacat.rules`, `instantiate_rule_clause_template`: map's order of application (instantiate-change-template draws)
+- `metacat.rules`, `instantiate_rule_clause_template`: map's order of application (choose-description-for-rule draws)
+- `metacat.rules`, `sort_change_templates`: Chez's sort algorithm and predicate calls
+- `metacat.rules`, `ExtrinsicChangeDescription.__init__`: map's order of application (the procedure only reads)
+- `metacat.rules`, `changes_implied_by_string_position_swaps`: map's order of application (the procedure only reads)
+- `metacat.rules`, `apply_rule.body`: map's order of application (the procedure only builds lists)
+- `metacat.rules`, `check_for_conflicts`: map's order of application (the procedure only reads)
+- `metacat.rules`, `apply_transforms`: Chez's sort algorithm and predicate calls
+- `metacat.rules`, `get_extrinsic_transforms.clause_transforms`: map's order of application (attach-length-description, fail)
+- `metacat.rules`, `get_extrinsic_transforms`: map's order of application (attach-length-description, fail)
+- `metacat.rules`, `get_dimension_transforms.dimension_transforms`: map's order of application (attach-length-description)
+- `metacat.rules`, `get_dimension_transforms.dimension_transforms`: map's order of application (the procedure only builds lists)
+- `metacat.rules`, `get_intrinsic_transforms`: map's order of application
+- `metacat.rules`, `transcribe_to_english`: map's order of application (the phrases only read; a crash in one clause's phrases is the same whichever cl...
+- `metacat.rules`, `get_rule_clause_phrases.phrases`: map's order of application (the phrases only read)
+- `metacat.rules`, `get_swap_phrase`: map's order of application (the phrases only read)
+- `metacat.rules`, `punctuate`: map's order of application (format only computes)
+- `metacat.run`, `Breakpoint.__call__`: a continuation can be re-entered; a thread cannot
+- `metacat.run`, `init_workspace`: let inits last first; none of them draws
+- `metacat.run`, `update_everything`: the coin first (stochastic-if*)
+- `metacat.setup`, `coderack_off`: a string, which the window draws as text (anomalies: "The graphics and rules.ss tell strings from symbols")
+- `metacat.slipnet`, `Slipnode.spread_activation`: (* a b c) multiplies left to right
+- `metacat.slipnet`, `Slipnode.attempt_to_post_top_down_codelets`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.slipnet`, `update_slipnet_activations`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.slipnet`, `number_to_platonic_number`: list-tail of a negative index is an error (Python's l[-1] is not)
+- `metacat.sugar`, `for_star`: for-each's value is the last application's (anomalies: "sort, remq, for-each and one-armed if differ")
+- `metacat.sugar`, `stochastic_if_star`: the coin first, then the probability (anomalies: "Chez doesn't evaluate arguments left to right"; plan, "Ev...
+- `metacat.themes`, `Themespace.__init__`: map's order of application (making clusters draws nothing)
+- `metacat.themes`, `Themespace.get_complete_state`: map's order of application (the procedure only reads)
+- `metacat.themes`, `Themespace.get_all_complete_theme_patterns`: map's order of application (the procedure only reads)
+- `metacat.themes`, `Themespace.get_all_dominant_theme_patterns`: map's order of application (the procedure only reads)
+- `metacat.themes`, `ThemeCluster.__init__.net_effect`: (* alpha 0) is exact 0 and (tanh 0) exact 0
+- `metacat.themes`, `ThemeCluster.update_dominant_theme`: Chez's sort and its predicate calls (utilities.sort_by_method)
+- `metacat.themes`, `BridgeTheme.spread_activation_to_slipnet`: stochastic-if* draws its coin before the probability (sugar.stochastic_if_star)
+- `metacat.themes`, `BridgeTheme.spread_activation_to_slipnet`: stochastic-if* draws its coin before the probability
+- `metacat.themes`, `thematic_bridge_scout`: map's order of application (the procedure only reads; its two tells only read)
+- `metacat.themes`, `thematic_bridge_scout`: tell-all's map order (one stochastic-pick-by-method per cluster)
+- `metacat.themes`, `thematic_bridge_scout.selection_entry`: #f only ('() is a condition list)
+- `metacat.trace`, `AnswerEvent.display_workspace`: the extra 'answer tag is ignored by the window's record-case (anomalies: "Chez's record-case ignores extra...
+- `metacat.trace`, `AnswerEvent.make_answer_description_pexp`: the extra tags are ignored by the window's record-case
+- `metacat.trace_graphics`, `group_event_pexp_text_string`: map's order of application (the procedure only reads)
+- `metacat.trace_writer`, `names`: map over pure getters; the order is not observable
+- `metacat.utilities`, `exists_p`: only #f is false (docs/python-translation-plan.md, "Booleans and truthiness")
+- `metacat.utilities`, `all_same_p`: eq? on flonums is identity (fixture all-same)
+- `metacat.utilities`, `flatmap`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.utilities`, `sort_wrt_order`: Chez's sort algorithm and predicate calls (anomalies: "sort, remq, for-each and one-armed if differ")
+- `metacat.utilities`, `sort_by_method`: Chez's sort algorithm and predicate calls (anomalies: "sort, remq, for-each and one-armed if differ") speed...
+- `metacat.utilities`, `rough`: the size is drawn (let binding) before the sign (body)
+- `metacat.utilities`, `select_extreme`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.utilities`, `adjacency_map`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.utilities`, `cross_product_filter_map`: f recurses on (rest l1) before g walks l2, so l1 runs last to first
+- `metacat.utilities`, `cross_product_map_filter`: l1 last to first, as in cross_product_filter_map
+- `metacat.utilities`, `pairwise_map`: the recursive call before the map (anomalies: "Chez evaluates append's second argument first")
+- `metacat.utilities`, `partition`: (insert (1st l) (partition (rest l))): the rest is partitioned first
+- `metacat.utilities`, `bounded_random_partition`: every pick (and draw) happens before the first insert
+- `metacat.workspace`, `_table_lists`: map's order is irrelevant here (vector->list is pure)
+- `metacat.workspace`, `Workspace._four`: append's argument order is unspecified; these tells are pure
+- `metacat.workspace`, `Workspace.get_youngest_structures_average_age`: Chez's sort and its predicate calls (ties on age)
+- `metacat.workspace`, `Workspace.get_equivalent_bridge`: a let's order is unspecified; both bindings are pure
+- `metacat.workspace`, `Workspace.check_if_rules_possible`: subset?'s two arguments are pure (rule-describable-bridge? only reads)
+- `metacat.workspace`, `Workspace.choose_object`: tell-all in map's order
+- `metacat.workspace`, `Workspace.update_average_unhappiness_values`: a let's order is unspecified; these bindings are pure
+- `metacat.workspace`, `spanning_group_possible_p.possible_for.relation`: a let's order is unspecified; both bindings are pure
+- `metacat.workspace`, `spanning_group_possible_p.possible_for`: adjacency-map is a two-list map (chez.map_ order); relation is pure
+- `metacat.workspace`, `rough_num_of_objects`: (~ 4) is drawn only when the first test fails (cond)
+- `metacat.workspace_objects`, `Letter.__init__`: let* order (the workspace object, then the image, ...)
+- `metacat.workspace_objects`, `WorkspaceObject.get_concept_pattern`: map's order (the procedure is pure; kept for uniformity)
+- `metacat.workspace_objects`, `WorkspaceObject.choose_neighbor`: append's arguments draw nothing, so their order doesn't matter
+- `metacat.workspace_strings`, `WorkspaceString.__init__`: let* order
+- `metacat.workspace_strings`, `WorkspaceString.choose_object_with_description_type`: the weights are computed (with tell-all's order) before the null? test
+- `metacat.workspace_strings`, `WorkspaceString.get_constituent_objects`: Chez's sort (sort-by-method)
+- `metacat.workspace_strings`, `WorkspaceString.get_all_reference_objects`: map's order of application
+- `metacat.workspace_strings`, `WorkspaceString.get_reference_objects`: map's order of application
+- `metacat.workspace_structures`, `wins_fight_p`: a body sequence: the challenger's strength is updated before the defender's
+- `metacat.workspace_structures`, `wins_all_fights_p`: andmap goes first to last and stops at the first loss, so the draws stop there too
+
+<!-- quirk-sites:end -->
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the
@@ -927,13 +1297,19 @@ Racket had to include everything into one module. Python can do better:
    concept-mappings, workspace-structure-formulas, run, formulas, slipnet, images, rules,
    answers, themes, justify, trace, jootsing, memory, then the engine parts of the
    graphics files, demos). A reference to a later module during load fails, as in Chez.
+   *(Item 17: `engine.LOAD_ORDER` also names `fonts`, `sgl_interpreter` and `gui`, which
+   have no engine module; `translated_modules()` skips them, and skips the `metacat.gui`
+   package.)*
 4. **References.** Inside a module, names are used unqualified. Module globals are
    looked up at call time, so `setattr(bonds, "build_bond", wrapper)` reaches in-file
    callers too. **Across modules, always qualified**: `bonds.build_bond(...)`,
    `setup.g_temperature`. `chez`, `objects`, `sugar` and `utilities` are the exception:
    their names are imported directly (`from metacat.utilities import tell, prob_p, ...`)
    because nothing rebinds them. Never `from metacat.bonds import build_bond`, which
-   copies the binding and silently defeats wrappers and `set!`.
+   copies the binding and silently defeats wrappers and `set!`. *(Item 17: as built,
+   bridge_graphics.py, group_graphics.py and rule_graphics.py `from`-import pure drawing
+   helpers of general_graphics.py, and bridge_graphics.py `both_spanning_groups_p`;
+   nothing rebinds them. tests/test_engine_modules.py allows exactly these.)*
 5. **Assignment.** `(set! *temperature* 50)` in formulas.ss → `setup.g_temperature = 50`.
    Drivers and tests use `engine.set_global("*temperature*", 50)`, which maps the Scheme
    name to its defining module and attribute and raises if there is none. This is
@@ -975,16 +1351,18 @@ As in `iterations.md`, with these notes:
    evaluation-order probes for the record.
 2. **03 `objects.py`, `sugar.py`, `utilities.py`**: C3 from the prototype; the 22 macros
    as functions (`stochastic_if_star(prob_thunk, body_thunk)` draws first), decorators
-   (`define_codelet_procedure_star`) or explicit loops (`for*`, `repeat*`); the name
+   (`define_codelet_procedure_star`; *item 17:* a plain function `(name, proc)` called in
+   each `load()`) or explicit loops (`for*`, `repeat*`); the name
    mapping moves to `metacat/names.py`. All 197 utilities tests.
 3. **04–10** the model, battery by battery, each through `engine.load()` and a Python
    version of the battery's harness (`tests/diff/codelet-harness.scm` → a pytest helper
    module). Each item: fixture tests first and failing, then the translation, an
    evaluation-order audit of its files, then `# chez:`/`# 1.2:` comments.
-4. **11** run.ss, `trace.py`, `headless.py`, the CLI, and the 109 goldens in parallel.
+4. **11** run.ss, `trace.py` (*item 17:* `trace_writer.py`), `headless.py`, the CLI, and the 109 goldens in parallel.
    From here on the goldens are in the gate's tier.
 5. **12** the 720 extra seeds, then profiling. Expected hot spots: `tell`, `Fraction`
-   arithmetic, `chez.map_`, list copying.
+   arithmetic, `chez.map_`, list copying. *(Item 17: measured: `tell`, then chez.py's
+   type checks, `get-removal-weight` and `memq`; docs/python-run-times.md.)*
 6. **13–15** SGL on `tkinter.Canvas` (fixture: the oracle's `swl:tcl-eval` stream),
    panels as views, the control panel with the engine on a worker thread (the `break`
    design above), all under `xvfb-run`.
@@ -1007,7 +1385,9 @@ As in `iterations.md`, with these notes:
    codelets) take about 1–2 minutes and the 720 extra seeds (2.15 M codelets) about
    5–10 minutes, which is too slow for every gate. Mitigation: a fork-after-load worker
    pool, a fast tier per item, the full golden suite in the gate from item 11, and the
-   extra seeds in a slow tier. Item 12 measures and decides.
+   extra seeds in a slow tier. Item 12 measures and decides. *(Item 17: measured 1.23 ms
+   per codelet before item 12's speed-ups, about 9× Chez; the 109 goldens take about
+   35 s on 32 cores and the 720 extra seeds about 2 min, both in the gate.)*
 4. **Evaluation order.** Python is uniformly left to right, which removes Racket's
    surprises but keeps Chez's. The known sites are listed above. Unknown ones show up as
    an `rng` mismatch in a trace. Mitigation: per-item audits, and the codelet-level
@@ -1020,7 +1400,9 @@ As in `iterations.md`, with these notes:
    cross-module work at import time, breaks the wrappers or the load order silently.
    Mitigation: the rules above, plus a test that imports each engine module alone (no
    cross-module calls at import time) and an AST check that engine modules don't
-   `from`-import names from each other.
+   `from`-import names from each other. *(Item 17: neither existed until the final
+   audit; both are in tests/test_engine_modules.py now, with the four pure-helper
+   imports above allowed by name.)*
 7. **The `break`/`go` resume** in the GUI (threads), and the views' thread discipline.
    Mitigation: item 15's control-panel test runs stop/resume runs to the golden's
    codelet count and generator state, as Racket's did.
@@ -1031,7 +1413,9 @@ As in `iterations.md`, with these notes:
    anomalies file. Python must crash or halt at the same codelet, with the same output.
    The goldens and cli tests include the halt and the crash. Python's exception for the
    crash is a `TypeError`/`IndexError` where Chez says `caddr`, so the CLI maps it to the
-   oracle's exit code 1 and stdout; stderr text may differ (as in Racket).
+   oracle's exit code 1 and stdout; stderr text may differ (as in Racket). *(Item 17: as
+   built, chez.py raises `SchemeError("caddr", ...)`, and the CLI's first stderr line is
+   the oracle's own, `Error: Exception in caddr: incorrect list structure #f`.)*
 
 ## What makes it easier than it looks
 

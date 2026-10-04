@@ -41,11 +41,14 @@ _loaded = False
 
 
 def translated_modules():
-    """The engine modules of LOAD_ORDER that exist so far, imported, in order."""
+    """The engine modules of LOAD_ORDER that exist so far, imported, in order.
+    A package is not an engine module: "gui" (gui.ss) is the view
+    metacat/gui/gui.py, and metacat.gui is never imported here."""
     modules = []
     for name in LOAD_ORDER:
         full = "metacat." + name
-        if full in sys.modules or importlib.util.find_spec(full) is not None:
+        spec = importlib.util.find_spec(full)
+        if spec is not None and spec.submodule_search_locations is None:
             modules.append(importlib.import_module(full))
     return modules
 

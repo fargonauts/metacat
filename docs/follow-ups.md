@@ -100,3 +100,81 @@ docs/divergences.md.
   frames.
 - **Problems beyond the letter-string domain** belong to a different project; the
   docs/robotone_numbo_metacat_* notes compare Metacat with its FARG relatives.
+
+## Python (loop0002)
+
+Written by the final audit of loop0002 (item 17, 2026-10-04). The Python port in
+`python/` reproduces the oracle byte for byte on the 109 goldens, on the 720 extra-seed
+runs (exit code, stdout and trace hash), on the CLI's output and on every differential
+battery. The GUI runs give their goldens' traces too. The Racket items above still
+apply to `racket/`. These are the Python port's own items. As above, an item must keep
+the goldens and extra seeds identical, or else become a divergence in docs/divergences.md.
+
+### Safety net
+
+- `bash python/run-tests.sh` is the gate's tier: about 7 min on 32 cores, half of it the
+  720 extra seeds and their oracle re-capture (test_extra_seeds.py), which only matter
+  when the engine changes. The `--fast` tier (about 10 s) runs one short golden (a b z seed 1). A middle
+  tier would help a refactoring loop: the 109 goldens (35 s in forks) plus the batteries'
+  fast cases.
+- `python/tests/quirk_sites.py --write` keeps the plan's list of `# chez:` and `# 1.2:`
+  sites, and test_quirk_sites.py fails when it drifts. A clean-up that moves a site
+  must keep its comment. Removing a site's comment should mean the site is gone, and
+  the list's diff says so.
+- `docs/python-run-times.md`'s main table predates item 12's speed-ups, and it and the
+  speed-up timings were measured on a shared, loaded machine. Rerun
+  `python3 python/oracle/bench_runs.py docs/python-run-times.md` on an idle machine.
+  It rewrites the file, so add the Speed-ups section back afterwards.
+
+### Idiomatic clean-up
+
+- **Objects.** Every model object is a `SchemeObject` subclass answering `tell(obj,
+  "msg", ...)` through a per-class message dict (candidate C3 of the plan), with
+  `delegate` to parent objects. Plain methods (`obj.get_strength()`) would be
+  faster and readable, but `tell`'s dispatch, `delegate`'s receiver and `INVALID` answers
+  are where the original's halts come from (anomalies: `report-error-and-halt`). Convert
+  per message family, keeping the halt runs and goldens green.
+- **Module boundaries.** Cross-module references are written `module.name` and are
+  resolved at call time, because the original's files are mutually recursive and `set!`
+  each other's globals. `engine.set_global` takes Scheme names. As for Racket: real
+  dependencies along docs/code-map.md, then explicit hooks instead of global writes.
+- **Model/graphics coupling.** Seven engine modules hold graphics code that the model
+  calls: `general_graphics`, `group_graphics`, `bridge_graphics`, `rule_graphics`,
+  `trace_graphics`, `theme_graphics` and `eeg_graphics` (pexp builders, the EEG, ungated
+  `group-graphics 'erase`), plus `view_globals`' colours and fonts set to `#f`. An
+  event interface from model to views would remove them, as for Racket.
+- **Test-side translations.** The batteries' fakes and set-ups are translated in
+  `python/tests/` (codelet_harness.py's `STAND_INS`, test_rules.py's fake Trace and
+  Memory, engine_stubs.py). They are faithful to `tests/diff/`, so they are verbose.
+  They could share one fixture module per battery family.
+- **Speed-up assumptions** (plan, "As built (item 12)"): `sort-by-method` caches pure
+  keys, and `memq` compares by identity only where `eq?` is identity. A new caller with an
+  effectful sort key needs the uncached form.
+- **Latent code paths** that are translated but never run headless or in a test:
+  `apply-transforms`' `cadr` of `#f` on a GroupCtgy transform without a BondFacet
+  transform, and the REPL's `ask` (minimal reader). `Breakpoint` resumes once, where a
+  Chez continuation could be re-entered. Nothing in the original does that.
+- **Divergence candidates** are the original's, listed above. The Python port
+  reproduces each of them (the `caddr` crash with exit code 1, the halts).
+
+### Performance
+
+- About 9× slower than Chez per codelet before item 12 (1.23 vs 0.13 ms), about 25% less
+  CPU after it. `tell` dominates (36 M calls in a 14,000-codelet run), then Chez arithmetic's
+  type checks, `get-removal-weight` (every post to a full coderack weighs every codelet)
+  and `memq`. Not yet tried: method calls in place of `tell` on the hottest messages,
+  caching the highest bin's urgency in `delete-codelets`, and PyPy. PyPy is untested: the
+  printer's tie correction and `float(Fraction)` would need the vectors of the chez
+  fixtures re-run there.
+- A golden run needs a fresh process because the Memory outlives a run, and the test
+  session's engine is shared. A `reset` of every module's globals would make batch runs
+  and the test suite cheaper.
+
+### Features
+
+- A batch mode (`python3 -m metacat ... --seeds N`) with answer statistics, as for Racket.
+- GUI: HiDPI (fonts are fixed at 96 dpi with `tk scaling` 96/72); the theme edit dialog
+  is only tested through Cancel; window placement isn't remembered across sessions.
+  On a model error, a GUI run goes to input mode with an "Error: ..." line. The original
+  dropped into the REPL.
+- Only Linux with Tk 8.6 under Xvfb is tested; macOS and Windows Tk are untried.

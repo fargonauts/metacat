@@ -836,6 +836,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   `--no-build-isolation --no-index --no-deps`, on a clean copy of `python/` in a temporary
   directory, so the checkout gets no egg-info. A user with a network needs none of this.
 
+### Two codelet totals for the goldens: 272,957 and 272,857
+- **Seen:** loop0002 iteration 18 (item 17, final audit): the plan quoted 272,957 codelets
+  for the 109 goldens in one place (item 10) and 272,857 in another
+  (docs/python-run-times.md, item 11).
+- **What:** both are right. The goldens hold 272,957 `codelet` events. The final
+  codelet counts (the `end` event's `t`, and the CLI's `Codelets:` line) sum to 272,857.
+  A run that suspends (99 goldens) or halts (1) stops inside its last codelet, before
+  run.ss increments `*codelet-count*`, so that codelet has an event but no count. The 9
+  capped runs end between codelets.
+- **Evidence:** count the `"ev":"codelet"` lines of `tests/golden/*.jsonl` and sum
+  each file's last `t`. The difference per run is 1 for every suspend and halt and 0 for
+  every cap.
+- **Status:** explained (the original's behaviour; item 11's break-inside-a-codelet test
+  shows the same at 2427/2428).
+
+### Python: `engine.load()` imported the `metacat.gui` package (port bug, fixed)
+- **Seen:** loop0002 iteration 18 (item 17, final audit): a headless run with every
+  engine module imported had `metacat.gui` in `sys.modules`.
+- **What:** `engine.LOAD_ORDER` names metacat.ss's files, and the last one, gui.ss,
+  maps to `gui`. `translated_modules()` imported `metacat.<name>` for every name that
+  `find_spec` found, and `metacat.gui` is the views *package*, so its `__init__` was
+  imported. The `__init__` holds only a docstring: no tkinter came with it, nothing was
+  loaded or drawn, and no run changed. The static checks didn't see it, because they
+  only look at each module's own import statements, and the package's `__init__` has
+  none. gui.ss's translation is the view `metacat/gui/gui.py`.
+- **Evidence:** `python/tests/test_gui.py::test_a_headless_run_loads_no_gui_module`
+  (fails on the old `translated_modules`).
+- **Status:** fixed. `translated_modules()` skips packages.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

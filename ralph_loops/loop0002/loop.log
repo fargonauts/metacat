@@ -102,3 +102,9 @@
 [2026-10-04 02:47:18] claude session it17 (cap 3.00 h) -> session_it17.log
 [2026-10-04 02:58:37] session it17: ok (exit 0, 28 tool calls)
 [2026-10-04 03:05:47] tests passed: GATE PASSED
+[2026-10-04 03:05:47] committed 25afa6e: 16 Packaging and docs. `python3 -m metacat` (CLI) and `python3 -m meta
+[2026-10-04 03:05:50] pushed 25afa6e to origin
+[2026-10-04 03:05:50] === iteration 18: 17 Final audit. Re-run everything: the 109 goldens, the 720 extra seeds, and the
+[2026-10-04 03:05:50] claude session it18 (cap 3.00 h) -> session_it18.log
+[2026-10-04 03:34:07] session it18: ok (exit 0, 113 tool calls)
+[2026-10-04 03:41:24] tests passed: GATE PASSED

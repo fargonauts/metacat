@@ -125,7 +125,7 @@
     command. Write `python/README.md` (with screenshots) and add the Python port to the
     top-level README.md. Tests: install into a fresh venv and run `abc abd xyz` there.
 
-- [ ] **17 Final audit.** Re-run everything: the 109 goldens, the 720 extra seeds, and the
+- [x] **17 Final audit.** Re-run everything: the 109 goldens, the 720 extra seeds, and the
     GUI checks. Confirm no engine module imports tkinter. Re-read the translation plan
     against the code; list the remaining `# chez:` and `# 1.2:` sites in the plan;
     update `docs/anomalies_and_quirks.md` and `docs/follow-ups.md` (a Python section).

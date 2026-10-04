@@ -227,6 +227,26 @@ def test_no_engine_module_imports_the_gui():
         assert not any(str(n).startswith(("tkinter", "metacat.gui")) for n in every), mod
 
 
+def test_a_headless_run_loads_no_gui_module():
+    """In a fresh process, importing every engine module, engine.load() and a headless
+    run leave tkinter and every metacat.gui module (the package included) unloaded."""
+    code = (
+        "import sys, io, contextlib, pkgutil, importlib, metacat\n"
+        "for m in pkgutil.iter_modules(metacat.__path__, 'metacat.'):\n"
+        "    if m.name not in ('metacat.gui', 'metacat.__main__'):\n"
+        "        importlib.import_module(m.name)\n"
+        "from metacat import engine, headless\n"
+        "engine.load()\n"
+        "with contextlib.redirect_stdout(io.StringIO()):\n"
+        "    headless.run_problem(['abc', 'abd', 'xyz'], seed=7, max_codelets=200)\n"
+        "print(sorted(k for k in sys.modules\n"
+        "             if k.split('.')[0] in ('tkinter', '_tkinter') or k.startswith('metacat.gui')))\n")
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                          cwd=HERE.parent, timeout=120)
+    assert proc.returncode == 0, proc.stderr[-3000:]
+    assert proc.stdout.strip() == "[]"
+
+
 # the GUI, driven under Xvfb ---------------------------------------------------------------
 
 @pytest.mark.slow
