@@ -14,9 +14,11 @@
     `xvfb-run`, and commit it as `python/tests/data/tk-gui-inventory.json`.
     (2) **The single-window design:**
     - an ASCII wireframe of the default layout at 1920×1080 and at 1366×768;
-    - the pane mechanism: `QDockWidget`s in a `QMainWindow`, or splitters, and why;
-    - how panels are shown, hidden, floated and tabbed, and how the layout is saved and
-      restored (`QSettings`), plus "reset layout";
+    - the splitter tree: nested horizontal and vertical `QSplitter`s, with which panes go
+      where and their default proportions (fixed splitters, not docks: the owner's
+      decision);
+    - how panes are hidden and shown (the View menu), how splitter sizes are saved and
+      restored (`QSettings`), and "reset layout";
     - the resize policy per panel;
     - the threading bridge;
     - the canvas backend.
@@ -115,14 +117,15 @@
 - [ ] **08 Layout polish.**
     - the default layouts for 1920×1080 and 1366×768 from item 00, chosen by screen
       size;
-    - panes that can be dragged, floated and tabbed;
+    - splitter handles that resize panes, with sensible minimum pane sizes;
+    - hiding and showing panes from the View menu, with the splitters closing up the gap;
     - layout saved and restored with `QSettings`, plus a View → Reset layout item;
     - high-DPI scaling;
     - the window's minimum size;
     - an app icon, built from the original's logo if `fonts.ss`'s `create-mcat-logo` can
       be drawn.
 
-    Tests: layout save and restore round-trips; every pane is visible and non-empty at
+    Tests: splitter-size save and restore round-trips; reset layout restores the default; every pane is visible and non-empty at
     both sizes after a run. Inspect screenshots at both sizes.
 
 - [ ] **09 Packaging and docs.**

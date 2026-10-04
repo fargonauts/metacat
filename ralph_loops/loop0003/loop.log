@@ -1,0 +1,3 @@
+[2026-10-04 14:57:33] loop start: up to 30 iterations, cap 3.0 h each, model default
+[2026-10-04 14:57:33] === iteration 1: 00 Inventory and design. Write `docs/qt-gui-plan.md`.
+[2026-10-04 14:57:33] claude session it01 (cap 3.00 h) -> session_it01.log

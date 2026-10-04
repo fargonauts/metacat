@@ -34,13 +34,19 @@
   deliberate difference from the original's GUI in `docs/divergences.md`, in a Python Qt
   section.
 - **Small, verifiable steps.** If something can't be verified, it isn't done.
+- **Fixed splitters, not docks (the owner's decision).** The panes sit in a fixed
+  arrangement of nested `QSplitter`s: no floating, tabbing or dragging panes around. The
+  existing tkinter GUI already offers separate windows, so the Qt GUI is the
+  everything-in-one-place dashboard. The user can resize panes by dragging the splitter
+  handles and hide or show panes from the View menu. The splitter sizes are saved, and
+  View → Reset layout restores the default.
 
 ## Current Focus
 `python3 -m metacat.qt` opens one window. A control strip and menu bar are at the top, and
 every panel is visible below. You type `abc abd xyz 3852097033` and press Enter, and the
 Workspace, Slipnet, Coderack, Temperature, Themes, Trace, Memory, Commentary and EEG all
 animate in the same window, exactly as the separate windows do today. Panels can be
-resized, rearranged, hidden and restored, and the layout persists.
+resized with splitters, hidden and restored, and the splitter sizes persist.
 
 ## Target Problems (in order)
 See `iterations.md`. Work on the first item not marked `[x]` (done) or `[!]` (blocked).
