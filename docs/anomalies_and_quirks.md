@@ -702,6 +702,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** won't fix. Only a problem typed with such characters would see it, and the
   original's letters are a–z.
 
+### Text items at half pixels: the original sends Tk exact ratios
+- **Seen:** iteration 14 (loop0002 item 13), capturing the Tcl stream of the SGL fixture
+  from the oracle (`python/oracle/sgl-tcl.ss`).
+- **What:** the viewport's `draw-text` puts a text item at
+  `(+ (x->pixel 0 ox) text-relative-x-offset justification-offset)`, and the
+  justification offset is `(* 1/2 width)` or `(* -1/2 width)`. For an odd text width
+  the x coordinate is an exact ratio: the original sends
+  `(tcl v1 create text 249/2 383 -text "cleared" ...)` to `swl:tcl-eval`. How SWL
+  turned a ratnum into a Tcl word is unknown (SWL is not available). Tk reads canvas
+  coordinates as doubles, so `249/2` itself would be an error; SWL presumably sent
+  `124.5`.
+- **Evidence:** `python/fixtures/sgl-tcl/v1.txt` (`grep "create text [0-9]*/2"`);
+  `python/tests/test_sgl.py::test_tcl_stream_covers_every_form_and_command`.
+- **Status:** worked around. The Python viewport sends the same exact ratio to its
+  window (the stream test compares them), and `swl.tcl_word` turns a `Fraction` into
+  a float when the command reaches Tk through tkinter. Tk then places the text at the
+  half pixel as it does for any fractional coordinate.
+
+### Tk's canvas PostScript leaves out the background
+- **Seen:** iteration 14 (loop0002 item 13), rendering the SGL fixture to PNG.
+- **What:** `canvas postscript` paints the items but not the canvas's background
+  colour, so the fixture's ivory background (from `(clear "ivory")`) came out white
+  through ghostscript, and the page was 643 × 483 pixels at 96 dpi.
+- **Evidence:** a first version of `python/tests/render_sgl_fixture.py`, which used
+  `postscript` + `gs`, failed its ivory pixel checks.
+- **Status:** worked around. The script grabs the canvas window from the Xvfb server with
+  Xlib's `XGetImage` (through ctypes) and writes the PNG itself with zlib, so the PNG
+  holds exactly the pixels Tk drew. That needs neither PIL nor ghostscript.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
@@ -719,6 +748,14 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   output.
 - **Status:** open. The items that translate those files must keep the distinction there:
   `chez.String` for the strings those tests see, or an explicit tag.
+- **Update (loop0002 iteration 14, item 13):** sgl-interpreter.ss and fonts.ss keep it.
+  `metacat/gui/sgl.py` tests `isinstance(x, chez.String)` where the original has
+  `string?`, so a text, a colour name and an `erase` colour must be `chez.String`, and a
+  colour given as a symbol reaches Tk unconverted, as in the original (the stream
+  fixture has one: `(foreground-color red)` → `-fill red`). Colour names in
+  `gui/colors.py` are `chez.String`, because `swl-color` looks them up with `assoc`
+  (`equal?`, which never equates a string with a symbol). A mutant that let `lookup`
+  convert symbols too fails the stream test.
 
 ### Model state that only a window can provide
 - **Seen:** iteration 2 (item 01).

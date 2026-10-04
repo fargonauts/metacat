@@ -202,3 +202,27 @@ Extra seeds and speed (item 12):
 - `oracle/bench_speed.py [DIR ...]` measures the CPU time of five fixed runs, interleaving
   the repetitions across copies of `python/`; docs/python-run-times.md records each
   speed-up (marked `speed (item 12)` in the code) and its gain.
+
+The SGL interpreter on tkinter (item 13):
+- `metacat/gui/sgl.py`: sgl-interpreter.ss. `draw_bang`, `erase_bang`, `draw_exp`, the
+  environment (`lookup`, `extend`, `init_env`), and `Viewport`, the original's
+  `<viewport>`. Its methods send the original's Tcl commands, argument for argument, to
+  a window: `swl.TkCanvas(tkinter_canvas)` on screen, a recording window in the tests.
+- `metacat/gui/fonts.py`: fonts.ss (`swl_font`, `make_mfont`, `make_fixed_font`,
+  `select_face`, `create_mcat_logo`). Text is measured on the hidden Tk canvas, as in
+  the original. Call `fonts.load()` and then `sgl.load()` once Tk is up.
+- `metacat/gui/colors.py`: `swl_color`, `*color-names*` and the common colours (`Rgb`).
+- `metacat/gui/swl.py`: `swl_tcl_eval`, `tcl_word` (Scheme values to Tcl words) and
+  `TkCanvas`.
+
+  Tests: `tests/test_sgl.py`.
+  - Every test of `tests/diff/sgl-battery.scm`.
+  - The Tcl command stream of `oracle/sgl-fixture.scm` (every SGL form, the tag
+    operations, degenerate shapes), compared command for command with
+    `fixtures/sgl-tcl/`. `python3 python/oracle/capture_sgl_tcl.py` captures that
+    stream from the unedited original through `oracle/sgl-tcl.ss`, which records
+    `swl:tcl-eval`.
+  - Fonts, colours and the viewport's mouse handling.
+  - Slow tier: the fixture rendered on a real Canvas under `xvfb-run`
+    (`tests/render_sgl_fixture.py OUT.png --check`, which grabs the window and checks
+    pixels; `tests/snapshots/sgl-fixture.png` is one rendering).

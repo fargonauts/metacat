@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 13/18 SOLVED
+- **Current**: 14/18 SOLVED
 
 ---
 
@@ -1499,3 +1499,121 @@ battery's 48 fixtures (`python/fixtures/sgl/`). Recall from item 03 that the gra
 strings from symbols (`string?` in sgl-interpreter.ss:386/398/432, fonts.ss:93), so text
 arguments must stay `chez.String` where the original has strings. Engine modules must not
 import tkinter; the interpreter's canvas operations can be recorded headless for the tests.
+
+---
+
+## Iteration 14 — 2026-10-04 01:01
+
+### Completed
+Item 13, the SGL interpreter on tkinter: **SOLVED**.
+- **The oracle's Tcl stream.** The prelude's `swl:tcl-eval` returns `""` and its
+  `define-class` skips `<viewport>`, so nothing in the oracle sent Tcl yet. Three new
+  files in `python/oracle/` capture it:
+  - `sgl-fixture.scm`: the fixture as data. It has the pictures of
+    racket/tests/sgl-fixture.rkt: every form, every `let-sgl` binding, nested and rational
+    origins, erase, clear, rule, and the tag operations (move, move-pixels, raise, retag,
+    delete, hidden rectangles and unhide). Offscreen extras add `erase!`, `rescale`,
+    degenerate shapes and a symbol colour. It is drawn on two viewports: v1 is
+    640 × 480 at 1:1, v2 is 320 × 240 at 2:1.
+  - `sgl-tcl.ss` loads the unedited original through the prelude, as diff-eval.ss does,
+    and adds:
+    - a recording `swl:tcl-eval`. Windows are written by name, colours as `(rgb r g b)`,
+      SWL fonts as `(font face size style)`. The hidden canvas answers `bbox` from a
+      fixed text metric.
+    - a `define-class` that makes `<viewport>` a closure over its ivars, with a
+      `<canvas>` base;
+    - a calling `send`.
+
+    It then reloads the unedited sgl-interpreter.ss. fonts.ss runs unchanged, so its
+    `get-pixel-size` (create, bbox, delete on the hidden canvas) is in the stream too.
+  - `capture_sgl_tcl.py` runs it and writes `python/fixtures/sgl-tcl/{v1,v2}.txt`
+    (318 commands each) and `SOURCES`. A second capture is byte-identical (the slow
+    tier re-captures it).
+- **Tests first.** `python/tests/test_sgl.py` (69 tests) and the helper
+  `tests/scheme_reader.py` (Scheme text to chez.py data) were written before any
+  `metacat/gui` module existed. Run then: **9 failed, 4 passed, 56 errors**, all
+  `ModuleNotFoundError: metacat.gui`. The 4 that passed only read fixtures or engine
+  files. The tests:
+  - all 48 tests of `tests/diff/sgl-battery.scm` against `python/fixtures/sgl/`, with
+    sgl-chez-setup.ss's recording `b:vp` translated;
+  - the Tcl stream of both viewports, command for command, through a recording window
+    and a fake hidden canvas with the capture's metric. Also checked: the stream covers
+    every item kind, option and tag command, and the fixture is fresh;
+  - fonts (`select-face`, mfont/fixed-font messages, `resize`, the small-fonts switch,
+    the bare-font error), colours (the 752 names against constants.ss), Tcl words,
+    `remove-unsupported-tcl-args`, mouse handlers and resizing;
+  - structure: every `define` of the two files has its Python name, docstrings name
+    their origin, the viewport has all 26 public methods, the modules import without a
+    display or tkinter, and no engine module imports `metacat.gui`;
+  - slow: `tests/render_sgl_fixture.py` under `xvfb-run` draws the fixture on a real
+    tkinter Canvas, with text measured by Tk on `create-mcat-logo`'s hidden canvas, then
+    grabs the window and checks 16 pixels: the ivory clear, a hidden item, unhide,
+    delete with retag, raise, move, erase, a pie slice, a polygon fill. The grab uses
+    XGetImage through ctypes, and the PNG is written with zlib.
+- **Code** (new): `python/metacat/gui/`:
+  - `sgl.py`: sgl-interpreter.ss. `Viewport` keeps every `<viewport>` method with its
+    `tcl-eval` calls, argument for argument.
+  - `fonts.py`: fonts.ss.
+  - `colors.py`: constants.ss's colour part, with `Rgb`. The table is generated from
+    constants.ss and checked against it.
+  - `swl.py`: `swl_tcl_eval`, `tcl_word` and `TkCanvas`, which hands the commands to a
+    tkinter Canvas's widget command.
+
+  With the code in place, **the 48 battery cases and both Tcl streams matched Chez on
+  the first run**. The three first failures were mistakes in the tests:
+  - `set-mouse-handlers! #f #f` keeps the old handlers;
+  - the original has 26 public methods, not 25;
+  - the docstring check caught the `init_env` lambda.
+- **Look at what you draw.** The Tk rendering (`python/tests/snapshots/sgl-fixture.png`)
+  matches `racket/tests/snapshots/sgl-fixture.png` cell for cell: shapes, dashes,
+  dotted lines, pie slices, rings, erase, raise, delete and unhide. Only the text metrics
+  differ (Tk vs Pango), which moves the relative-text letters by a few pixels. A first
+  version rendered through `canvas postscript` and ghostscript, and lost the background
+  (new anomalies entry); the X grab replaced it.
+- **Mutation checks** (`/tmp/mut13/mutate.py`, not kept; each mutant applied, test_sgl.py
+  run, the file restored, then `diff -r` against a copy). Of 23 mutants:
+  - **20 caught at once:** the justification sign, the dashed point length, extend
+    binding origin, the dotted dash string, draw-exps order, the arc `>= 360`, the ring's
+    inner outline, baseline floor for round, the relative y sign, the move y sign,
+    raise without `all`, erase without swl-color, the default tag, the hidden canvas not
+    cleared, the image box inset, origin y, clear without delete, swl-font's style test,
+    the M width, the relative x offset.
+  - **3 survived:**
+    - the filled-rectangle guard `or` → `and`;
+    - `mouse-press` matching modifiers by inclusion;
+    - `lookup` converting symbol colours too.
+
+    I added degenerate shapes and a symbol colour to the fixture, recaptured from Chez,
+    and added control-clicks to the mouse test. All 23 are now caught.
+- **Evaluation order.** The interpreter draws nothing at random. The only argument
+  lists with effects are the hidden canvas's nested `tcl-eval` (inner first, as written)
+  and draw-text's `let*` (in order).
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: "Text items at half pixels: the original sends Tk
+    exact ratios" (`249/2`; Python sends the ratio to its window and a float to Tk),
+    "Tk's canvas PostScript leaves out the background", and an update to "The graphics
+    and rules.ss tell strings from symbols";
+  - `docs/python-translation-plan.md`: "As built (item 13)";
+  - `python/README.md`: the new modules and tests;
+  - `python/run-tests.sh`: the tier comment.
+
+  `test_fixtures.py` skips `sgl-tcl/`, which is not a battery.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1101 tests, 5 min 42 s).
+
+### Blockers
+None. Notes for later items:
+- `fonts.create_mcat_logo` uses white and times 24 bold italic in place of
+  `%logo-background-color%` and `%logo-font%`, which are in constants.ss's graphics part
+  (item 14). The scrollbar sizes come from tkinter Scrollbars.
+- `SwlFont.get_actual_values` reports the request in points at 96 dpi, as the Racket
+  port does, not Tk's `font actual`. The render script sets `tk scaling` to 96/72; the
+  GUI (item 15) should do the same so that pictures don't depend on the display.
+
+### Next
+Item 14, the panels. general-graphics.ss's `make-graphics-window` should build
+`sgl.Viewport(swl.TkCanvas(canvas), ...)` with its own transforms (test_sgl.py's
+`make_viewport` follows racket/tests/sgl-fixture.rkt's). Call `fonts.load()` and
+`sgl.load()` when the views start, and write colour names as `chez.String`. The
+graphics battery's fixtures are in `python/fixtures/graphics/` and
+`python/fixtures/panels/`. `oracle/sgl-tcl.ss`'s `define-class`/`send`/`swl:tcl-eval`
+recipe can capture the Tcl stream of other panels if the batteries aren't enough.

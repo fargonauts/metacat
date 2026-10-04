@@ -28,9 +28,10 @@ def test_every_battery_is_captured():
     assert local == ["bridge-extra", "chez", "codelet-extra", "coderack-extra", "rule-extra",
                      "slipnet-extra", "trace-extra", "utilities-extra",
                      "workspace-extra"]   # python/oracle/batteries/ (items 02-10)
-    # extra-seeds/ holds whole runs, not a battery (capture_extra_seeds.py, item 12)
+    # extra-seeds/ holds whole runs, not a battery (capture_extra_seeds.py, item 12);
+    # sgl-tcl/ holds the SGL interpreter's Tcl stream (capture_sgl_tcl.py, item 13)
     assert sorted(p.name for p in FIXTURES.iterdir()
-                  if p.is_dir() and p.name != "extra-seeds") == BATTERIES
+                  if p.is_dir() and p.name not in ("extra-seeds", "sgl-tcl")) == BATTERIES
 
 
 @pytest.mark.parametrize("battery", BATTERIES)

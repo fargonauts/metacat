@@ -94,7 +94,7 @@
     list copies), and record each one with its gain. Settle the test tiers so the gate
     stays under about 15 minutes.
 
-- [ ] **13 The SGL interpreter on tkinter.** Translate `sgl-interpreter.ss` and `fonts.ss`
+- [x] **13 The SGL interpreter on tkinter.** Translate `sgl-interpreter.ss` and `fonts.ss`
     to `metacat/gui/sgl.py`, drawing on a `tkinter.Canvas` with the same items, tags,
     dashes, anchors and fonts that the original sent to Tk. Tests:
     - `sgl-battery.scm` against its fixture;

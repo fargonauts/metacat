@@ -726,6 +726,47 @@ from symbols").
   `sort-by-method` with a key that has effects would have to drop the cache.
   docs/python-run-times.md has each one's gain.
 
+### As built (item 13)
+
+- **Package**: `metacat/gui/` holds the views. `sgl.py` (sgl-interpreter.ss),
+  `fonts.py` (fonts.ss), `colors.py` (constants.ss's `swl-color`, `*color-names*` and
+  `=white=` … `=orange=`) and `swl.py` (SWL's `swl:tcl-eval`, `swl:tcl->scheme`,
+  `swl:sync-display`, and `TkCanvas`). None imports tkinter at module level, so they
+  import and the stream tests run without a display. The engine never imports
+  `metacat.gui` (test_sgl.py walks every engine module's imports).
+- **The viewport sends Tcl, as the original did.** Unlike the Racket port, which had no
+  Tk and emulated the canvas on racket/draw, `Viewport` keeps every `<viewport>` method
+  with its `tcl-eval` calls, argument for argument. A window is any object with
+  `tcl(*args)`. `swl.TkCanvas` wraps a tkinter Canvas and turns each argument into a Tcl
+  word (`tcl_word`: an `Rgb` becomes `#rrggbb`, an `SwlFont` its font description, a
+  `Fraction` a float, a list a Tcl list), then calls the widget command. So the items,
+  tags, dashes (`"- "`, `". "`), anchors and fonts are Tk's own, and move, raise,
+  delete, retag, unhide and scale are Tk's commands. `tcl_eval` is `swl_tcl_eval`,
+  because Tk 8.5 is at least 8.3. `remove_unsupported_tcl_args` is translated but unused,
+  as in the original.
+- **Fonts**: text is measured as fonts.ss measures it: a text item is created on
+  `*hidden-canvas*`, Tk is asked for its `bbox`, and then `delete all`.
+  `create_mcat_logo(root)` makes the logo window and that hidden canvas. `SwlFont`'s
+  `get_actual_values` reports the request in points at 96 dpi, as the Racket port does
+  (Tk's `font actual` would make the < 7-point test depend on the machine). `serif`,
+  `sans_serif`, `fancy` and `sgl.init_env` are made by `fonts.load()` and `sgl.load()`
+  when the views start, since asking Tk for its families needs a display.
+  `fonts.load(families)` fixes the family list (the tests use the oracle prelude's).
+- **SGL data**: chez.py's representation, read from Scheme text in the tests by
+  `tests/scheme_reader.py`. Strings are `chez.String` wherever the original tests
+  `string?` (anomalies: "The graphics and rules.ss tell strings from symbols").
+- **`mouse-press`** takes the event's modifiers as a set of symbols (`left-button`,
+  `right-button`, `shift`, …) and matches them exactly, which is how this port reads
+  SWL's `(event-case ((modifier= mods)) ...)`.
+- **Tests** (`tests/test_sgl.py`): the 48 tests of tests/diff/sgl-battery.scm; the Tcl
+  stream of `python/oracle/sgl-fixture.scm` (racket/tests/sgl-fixture.rkt's pictures plus
+  offscreen extras) on two viewports (1:1 and 2:1), against
+  `python/fixtures/sgl-tcl/`, captured from the oracle's `swl:tcl-eval` by
+  `python/oracle/capture_sgl_tcl.py`; and, under Xvfb, `tests/render_sgl_fixture.py`,
+  which draws the fixture on a real Canvas, grabs the window with XGetImage and checks
+  16 pixels. `tests/snapshots/sgl-fixture.png` is that rendering, for comparison with
+  racket/tests/snapshots/sgl-fixture.png. The two differ only in text metrics.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the
