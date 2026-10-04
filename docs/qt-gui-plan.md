@@ -503,6 +503,20 @@ always one word (never a list). `bbox` targets an id, `delete` `all` or a tag,
 needs none of them: `-arrow`, `-smooth`, `-justify`, `lower`, `coords`, `find`, `gettags`,
 `addtag`, window items.
 
+**As built (item 02).** `qt/displaylist.py` is layer 1, with no Qt: `DisplayList.tcl` takes
+Tcl words, holds one `RLock` per command, and also answers `find all`, `type`, `coords`,
+`itemcget` and `gettags`, which the tests read the display list through. Text extents come
+from a measurer (`text_width`, `linespace`, `ascent`). `qt/fonts.py`'s `QtMetrics` measures
+with the `QFont` the scene draws with (a first mapping; item 03 completes it). Instead of a
+journal, the display list records a set of dirty ids and a "restacked" flag. So `sync()`
+(`qt/canvas.py`, GUI thread) costs one update per changed item, however many commands
+changed it, and nothing for items that were created and deleted between two syncs. Each
+item is a `TkItem` (one `QGraphicsItem` class that paints its kind as X11 does), with z
+equal to its stacking position. The background colour is applied at the next `sync()`.
+Tk's bbox rules were checked against Tk 8.6.13 on 192 items
+(`docs/anomalies_and_quirks.md`, "Tk 8.6.13's bounding boxes, measured"). Colour words
+are read as Tk 8.6 reads them.
+
 **The pane** (`qt/hosts.py`): a `QtHost` stands for `hosts.TkHost`, with the same methods
 (`make_canvas`, `set_scroll_region_bang`, `get_scrollbar`, `set_vertical_view`,
 `show_window`/`hide_window`, `set_title_bang`, …). Its widget is a `QGraphicsView` over

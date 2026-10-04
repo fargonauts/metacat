@@ -23,6 +23,7 @@ To compare these with Marshall's own 1999 screenshots, see
 | `panels/*-run7-*.png`, `panels/EEG-run7-800.png` | Python | [`python/tests/render_views.py`](../../python/tests/render_views.py) (slow test tier, under `xvfb-run`). It replays a golden run with every window attached on real Tk canvases, then raises each window and grabs it with `XGetImage` into `WINDOW-SCENE.png`. These files are the same bytes as `python/tests/snapshots/views/`. |
 | `panels/sgl-fixture-racket.png` | Racket | `racket/tests/sgl-test.rkt`'s pixel snapshot of `racket/tests/sgl-fixture.rkt` (the same file as `racket/tests/snapshots/sgl-fixture.png`). |
 | `panels/sgl-fixture-python.png` | Python | [`python/tests/render_sgl_fixture.py`](../../python/tests/render_sgl_fixture.py). It draws `python/oracle/sgl-fixture.scm` on a 640×480 tkinter Canvas at a fixed 96 dpi and grabs it from the X server (the same file as `python/tests/snapshots/sgl-fixture.png`). |
+| `panels/sgl-fixture-qt.png` | Python (Qt) | `python/tests/test_qt_canvas.py::test_sgl_fixture_renders_like_tk` (offscreen, no X server). It draws the same fixture through `metacat/gui/sgl.py` onto the Qt canvas (`metacat/qt/canvas.py`), with text measured on a Qt hidden canvas, and renders the `QGraphicsScene` into a 640×480 image (also written to `python/tests/screenshots-qt/`, which is not committed). |
 
 GUI scripts in this repo always run under `xvfb-run` with `WAYLAND_DISPLAY` unset. On the
 owner's Wayland desktop, GTK ignores Xvfb's `DISPLAY` otherwise and opens windows on the
@@ -195,3 +196,12 @@ Neither port's picture is compared to the other's by pixels. Each port checks it
 drawing: Racket with a pixel-for-pixel snapshot, Python with `--check` on pixels whose
 colours only a faithful drawing gives. The Python port also compares the canvas operations
 with the Tcl command stream that the original sends for the same fixture under the oracle.
+
+The Qt GUI (loop0003) draws the same fixture on its Qt canvas, a `QGraphicsScene` that
+runs the panels' Tk canvas commands:
+
+![SGL fixture drawn by the Python port's Qt canvas](panels/sgl-fixture-qt.png)
+
+It matches the tkinter picture cell for cell and passes the same pixel checks. Text is a
+pixel lower, because Qt's metrics of the same faces are taller (fonts are loop0003 item
+03). Qt draws the 5-pixel white line in "erase" straight, where X11 puts a jog in it.

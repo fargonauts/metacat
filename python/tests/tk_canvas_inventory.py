@@ -53,7 +53,8 @@ NOT_TARGETED = ("create", "canvasx", "canvasy")
 # the calls that pass a command on without naming it: (file, function)
 FORWARDERS = {("metacat/gui/swl.py", "swl_tcl_eval"),
               ("metacat/gui/sgl.py", "_tcl_eval_8_0"),
-              ("metacat/gui/sgl.py", "tcl")}
+              ("metacat/gui/sgl.py", "tcl"),
+              ("metacat/qt/canvas.py", "tcl")}     # the Qt canvas itself (item 02)
 
 # name of the callable -> index of the command among its arguments
 SENDERS = {"tcl_eval": 1, "_tcl_eval_8_0": 1, "swl_tcl_eval": 1, "tcl": 0}

@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 1/12 SOLVED
+- **Current**: 2/12 SOLVED
 
 ---
 
@@ -82,3 +82,96 @@ Item **01 Skeleton and test harness**: SOLVED.
 - Item 02, the Qt canvas: implement exactly the commands in `tk-canvas-commands.json`
   (display list first, then the scene), and test it against tkinter by replaying the
   `sgl-tcl` streams.
+
+---
+
+## Iteration 3 — 2026-10-04 16:41:46
+Item **02 The Qt canvas**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** `python/tests/test_qt_canvas.py` and its helper
+  `python/tests/canvas_streams.py` were written before any code. The tkinter reference
+  `python/tests/data/tk-display-lists.json` was generated, then the first run gave
+  `12 failed, 2 passed` (`ModuleNotFoundError: metacat.qt.canvas`). After the first
+  implementation, the exact comparison failed on Tk's polygon bbox rule (see below), and
+  then on a wrong expectation in my own scene test (it forgot the paint margin).
+- **The reference** (`canvas_streams.py`, under `xvfb-run`, under a second): the two
+  `sgl-tcl` fixture streams (parsed directly, because the test reader can't read
+  `\x2D;`), and a synthetic stream that reaches what the fixtures don't. That covers
+  arrows (first, last, both), `-smooth`, `-justify` with multi-line text, all nine
+  anchors, `lower`, `raise` above an item, ids as targets, tag lists, `scale` (negative
+  too), `move all`, hidden, disabled and fill-less items, colour forms (`#abc`,
+  `#123456789`, CamelCase names), and 160 random arcs, rectangles, ovals, lines and
+  polygons at fractional coordinates. Each stream is replayed into tkinter Canvases. The
+  dump records the display list through `find all`, `type`, `coords`, `itemcget` (every
+  option of the item's kind), `gettags` and `bbox`, plus the answers of every `create`,
+  `bbox` and `canvasx`/`canvasy`, and Tk's own text metrics (`font measure`, `font
+  metrics -linespace`).
+- **`python/metacat/qt/displaylist.py`** (no Qt): Tk 8.6's display list, with ids that
+  are never reused, the stacking order, tag/id/`all` searches, `create` with Tk's
+  defaults and option checks (errors as `TclError`), `delete`, `move`, `scale`,
+  `raise`/`lower` (Tk's RelinkItems), `itemconfigure`, `bbox` with Tk's per-kind rules
+  (rect/oval bloat, arc end points and quadrants, line and polygon fudge, arrowheads,
+  text anchors with ROUND and the cursor fudge), `canvasx`/`canvasy`, and the queries
+  above. Colour words are read as Tk 8.6 reads them. Arc angles are normalised, and
+  rectangle/oval/arc corners are sorted. One `RLock` covers each command, so any thread
+  may draw. The display list records dirty ids and a "restacked" flag for the scene.
+- **`python/metacat/qt/canvas.py`**: `QtCanvas`, with `tcl` (answers shaped like
+  `swl.TkCanvas`'s), `get_background_color`, `set_background_color_bang`, `set_origin`,
+  and `sync()`, which runs on the GUI thread and applies the changes to the
+  `QGraphicsScene`. `TkItem` paints each kind as X11 does: rounded corners, Tk's pen
+  widths and DashConvert patterns, butt caps, round joins on lines and polygons, pies and
+  chords, arrowheads, Tk's spline for `-smooth`, and justified multi-line text. There
+  is no antialiasing except on text. **`python/metacat/qt/fonts.py`**: Tk font word →
+  `QFont` (negative size = pixels, positive = points at 96 dpi, styles), and
+  `QtMetrics`, which measures with the same `QFont`. This is a first mapping; item 03
+  completes it.
+- **Results:**
+  - with Tk's text metrics, the Qt display list is **identical** to Tk's for all three
+    streams (ids, order, kinds, coordinates, every option, tags, every bbox, `bbox all`,
+    every answer);
+  - with Qt's fonts, only text extents differ: widths by 1 px at most, heights by 5 px
+    at most (tolerance 6);
+  - every inventoried command and option is accepted, and the Tk errors are raised;
+  - 8 threads drawing at once produce 1600 unique ids;
+  - the scene follows the display list: z order after `raise`, hidden items, delete,
+    move, background.
+- **Pictures, inspected:** `sgl-fixture.scm` drawn through `metacat/gui/sgl.py` onto the Qt
+  canvas, with text measured on a Qt hidden canvas, passes all 16 of
+  `render_sgl_fixture.py`'s pixel checks. 97.7% of its pixels match
+  `docs/screenshots/panels/sgl-fixture-python.png` within 24 levels. I looked at it next
+  to the tkinter one, at 3× zoom on rectangles, arcs, dashes and the "erase" cell. The
+  differences are antialiased text a pixel lower (Qt's taller metrics), dash phase,
+  slightly rounder 2-px circles, and X11's jog in the 5-px diagonal line, which Qt draws
+  straight. Committed as `docs/screenshots/panels/sgl-fixture-qt.png`, with a section in
+  `docs/screenshots/README.md`. The frozen v1 stream replayed into the Qt canvas passes
+  the same pixel checks.
+- **Logged** in `docs/anomalies_and_quirks.md`:
+  - Tk 8.6 gives five colour names web values (TIP 403), and reads `#abc` as `#aabbcc`;
+  - Tk 8.6.13's measured bbox rules: a polygon's outline adds `(int)(width+1)/2`;
+    `canvasx` rounds to a whole pixel; a text without fill has no bbox;
+  - Qt's font metrics are taller than Xft's for the same faces (open, item 03);
+  - X11's jog in wide lines.
+
+  `docs/divergences.md` has a new "Python Qt GUI" section, and `docs/qt-gui-plan.md` 2.6
+  an "As built" paragraph: dirty ids instead of a journal, so one update per changed
+  item per sync.
+- `tk_canvas_inventory.py`: `metacat/qt/canvas.py`'s `tcl` added to `FORWARDERS`. It is a
+  canvas that passes on what it's given. `python/tests/README.md`: rows for
+  `test_qt_canvas.py` and `canvas_streams.py`, and new totals (1454: 1028 fast, 426
+  slow).
+- Gate: `python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1454 passed in 7:37, no
+  warnings; racket/ unchanged).
+
+### Blockers
+- None for item 02. Item 00 is still `[!]` from session 1 (its deliverables exist and
+  their tests pass; see iteration 2).
+
+### Next
+- Item 03, fonts and colours: make Qt's text metrics match Tk's (the heights: Qt
+  `ascent+descent` 15 against Tk's linespace 12 for 11-px Helvetica), then tighten
+  `TEXT_TOLERANCE` in `test_qt_canvas.py`. Check the tiny Coderack labels. The colour
+  reading is already in `displaylist.color_rgb`.
+- Item 04 will need `QtCanvas.sync()` called on a timer (item 05 batches it) and
+  `set_origin` from the view's scroll position.
+

@@ -41,7 +41,7 @@
     the command inventory is complete. A test fails if any panel module sends a command
     that is missing from the list.
 
-- [ ] **02 The Qt canvas.** `qt/canvas.py`: an object with the panel canvas interface
+- [x] **02 The Qt canvas.** `qt/canvas.py`: an object with the panel canvas interface
     (`tcl`, background getters and setters) that executes the inventoried Tk canvas
     commands on a `QGraphicsScene`:
     - item kinds and their options (fill, outline, width, dash, arrow, smooth, anchor,

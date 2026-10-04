@@ -102,3 +102,26 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
 - **Tests:** racket/tests/cli-test.rkt (the CLI against the oracle's run.ss, output and
   exit codes, including `--verbose`), racket/gui-tests/dist-test.rkt (the standalone
   program), racket/gui-tests/control-panel-test.rkt (the GUI).
+
+## Python Qt GUI: the Tk canvas on a QGraphicsScene (loop0003 item 02)
+- **What:** in the Qt GUI (`python3 -m metacat.qt`), the panels' Tk canvas commands are not
+  run by Tk. `python/metacat/qt/displaylist.py` keeps Tk 8.6's display list itself: ids,
+  stacking, tags, options, `move`, `scale`, `raise`/`lower`, `itemconfigure`, and `bbox`
+  with Tk's rules. `python/metacat/qt/canvas.py` paints each item on a `QGraphicsScene`
+  as X11 would: corners rounded to whole pixels, Tk's pen widths and dash patterns,
+  butt caps, no antialiasing except for text. So:
+  - pixels differ from the tkinter GUI's: Qt rasterises wide lines, arcs and dash phases
+    a little differently (X11's jog in wide diagonal lines is gone), and text is drawn
+    by Qt;
+  - text extents come from Qt's metrics of the same fontconfig faces. The widths agree
+    within a pixel, but the heights are up to 5 pixels taller (item 03 maps the fonts);
+  - colour words are read as Tk 8.6 reads them (`gray` is `#808080`), but the panels
+    only send `#rrggbb`.
+- **Why:** the single-window GUI is Qt; Tk can't draw into it.
+- **Tests:** `python/tests/test_qt_canvas.py` replays every `sgl-tcl` stream and a
+  synthetic one into the Qt canvas and into a tkinter Canvas (reference
+  `python/tests/data/tk-display-lists.json`). With Tk's text metrics, every item, option,
+  tag, coordinate and `bbox` answer is identical; with Qt's fonts, only text extents
+  differ, by 5 pixels at most. The SGL fixture drawn on the Qt canvas passes
+  `render_sgl_fixture.py`'s pixel checks, and 97.7% of its pixels match the tkinter
+  picture.

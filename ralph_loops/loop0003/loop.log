@@ -13,3 +13,9 @@
 [2026-10-04 15:37:26] claude session it02 (cap 3.00 h) -> session_it02.log
 [2026-10-04 16:02:31] session it02: ok (exit 0, 62 tool calls)
 [2026-10-04 16:09:54] tests passed: GATE PASSED
+[2026-10-04 16:09:54] committed f10cb74: 01 Skeleton and test harness. Create `python/metacat/qt/`:
+[2026-10-04 16:09:57] pushed f10cb74 to origin
+[2026-10-04 16:09:57] === iteration 3: 02 The Qt canvas. `qt/canvas.py`: an object with the panel canvas interface
+[2026-10-04 16:09:57] claude session it03 (cap 3.00 h) -> session_it03.log
+[2026-10-04 16:42:24] session it03: ok (exit 0, 61 tool calls)
+[2026-10-04 16:49:53] tests passed: GATE PASSED

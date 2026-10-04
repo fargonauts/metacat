@@ -914,6 +914,61 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: python/tests/conftest.py runs every `test_qt_*.py` file after
   all the others (`test_qt_tests_run_after_the_others` checks it).
 
+### Tk 8.6 gives five colour names web values, not X11's
+- **Seen:** loop0003 iteration 3 (item 02), replaying the synthetic canvas stream into a
+  tkinter Canvas under Xvfb.
+- **What:** Tk 8.6.13 answers `gray` and `grey` as `#808080`, `green` as `#008000`,
+  `maroon` as `#800000` and `purple` as `#800080`. X11's rgb.txt, and so constants.ss's
+  `*color-names*` (python/metacat/gui/colors.py), give `#bebebe`, `#00ff00`, `#b03060` and
+  `#a020f0`. The other 747 names agree. Tk 8.6 adopted the web's values (TIP 403). Tk
+  also reads `#abc` as `#aabbcc`, whereas X11's XParseColor gives `#a0b0c0`.
+- **Evidence:** `python/tests/data/tk-display-lists.json`, synthetic stream, items 34–37;
+  `winfo rgb . gray` under Xvfb.
+- **Status:** explained. The panels never send these names to Tk: they pass `Rgb`s made
+  by `swl-color` from constants.ss's table, which Tk receives as `#rrggbb`. The Qt canvas
+  (python/metacat/qt/displaylist.py, `color_rgb`) reads colour words as Tk 8.6 does.
+
+### Tk 8.6.13's bounding boxes, measured: the polygon outline rule
+- **Seen:** loop0003 iteration 3 (item 02), the first comparison of the Qt display list with
+  Tk's.
+- **What:** Tk's `bbox` follows per-kind rules (an outline's bloat, one or two pixels of
+  fudge, C truncation of the first point and rounding of the others). The rules were taken
+  from Tk's sources and checked on 192 items. One did not match the source as remembered.
+  A polygon with an outline grows by `(int)(width + 1) / 2` pixels plus 1 (0, 1, 1, 1, 2,
+  2, 3 for widths 0, 1, 1.5, 2, 3, 4, 5), not by `(int)(width + 0.5)` plus 1. Also,
+  `canvasx` and `canvasy` round the screen coordinate to a whole pixel before adding the
+  scroll offset (`canvasy 7.5` is `8.0`), and a text item with `-fill ""` has an empty
+  bbox, like a hidden one.
+- **Evidence:** `python/tests/test_qt_canvas.py::test_display_list_is_tks_with_tks_metrics`,
+  against `python/tests/data/tk-display-lists.json` (the slow tier regenerates it with
+  `canvas_streams.py` under Xvfb).
+- **Status:** explained: the Qt canvas copies what Tk does, not what its source seemed to
+  say.
+
+### Qt's metrics of a font are taller than Tk's (Xft) for the same face
+- **Seen:** loop0003 iteration 3 (item 02), the Qt display lists with Qt's own fonts.
+- **What:** both toolkits pick Nimbus Sans and Nimbus Roman through fontconfig, and the
+  text widths agree within a pixel ("cleared" in 11-pixel Helvetica: 36 in both). The
+  heights differ: Qt's `ascent + descent` is 15 for 11-pixel Helvetica, where Tk's
+  linespace is 12, and 30 against 27 for 22-pixel bold italic Times. So a Qt text item's
+  bbox is up to 5 pixels taller than Tk's, and its baseline sits a pixel lower.
+- **Evidence:** `test_display_list_with_qt_fonts` (tolerance 6 pixels on text extents
+  only); `QFontMetrics(QFont("helvetica")).ascent()` with `setPixelSize(11)` is 12, while
+  Tk's `font metrics {helvetica -11}` gives `-ascent 10 -descent 2`.
+- **Status:** open, for loop0003 item 03 (fonts). Only the pictures depend on it: the
+  engine never measures text.
+
+### X11 draws a wide diagonal line with a jog
+- **Seen:** loop0003 iteration 3 (item 02), comparing the SGL fixture drawn by Qt with
+  `docs/screenshots/panels/sgl-fixture-python.png`.
+- **What:** in the "erase" cell, Tk (X server rasterisation, Xvfb) draws the 5-pixel white
+  line with a one-pixel step halfway along. Qt draws it straight. Dashes also start at
+  slightly different phases, and 2-pixel circles are a little rounder in Qt.
+- **Evidence:** `docs/screenshots/panels/sgl-fixture-qt.png` against
+  `sgl-fixture-python.png`; 97.7% of the pixels agree within 24 levels per channel.
+- **Status:** not a bug: two rasterisers. Recorded in `docs/divergences.md` (Python Qt
+  GUI).
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
