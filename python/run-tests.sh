@@ -8,7 +8,8 @@
 #                                     # the 720 extra-seed runs and their oracle
 #                                     # re-capture, the 109 goldens with every
 #                                     # view attached, the panels drawn on Tk and
-#                                     # the SGL fixture drawn on Tk
+#                                     # the SGL fixture drawn on Tk, the GUI
+#                                     # driven through its widgets (drive_gui.py)
 #                                     # under xvfb-run, never on the real screen);
 #                                     # about 7 min on 32 idle cores
 #   bash python/run-tests.sh --fast   # fast tier: skips tests marked slow (about

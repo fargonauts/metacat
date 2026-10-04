@@ -3,7 +3,7 @@
 ## Ralph Loop 0002 Status
 - **Started**: 2026-10-03
 - **Target**: 18 items
-- **Current**: 15/18 SOLVED
+- **Current**: 16/18 SOLVED
 
 ---
 
@@ -1719,3 +1719,121 @@ thread (run.py's `toplevel`/`go` already park a break) or step it with `after`. 
 mouse and resize events to the viewports. The GUI run's trace can be checked with
 `headless`-style recorders (`install_recorders`).
 
+
+
+---
+
+## Iteration 16 — 2026-10-04 02:35
+
+### Completed
+Item 15, the control panel and windows: **SOLVED**.
+- **Expected values from Chez.** `python/oracle/batteries/gui-battery.scm` (new, 8 tests)
+  is captured into `python/fixtures/gui/` through the unedited diff-eval.ss, which loads
+  gui.ss and demos.ss on the prelude's SWL stubs. It covers:
+  - `tokenize-string` on 29 inputs (case, noise, digits glued to letters, non-ASCII
+    letters and digits, tabs and newlines, out-of-range seeds);
+  - the Step/Go/Reset decision on each input;
+  - `char-noise?`;
+  - the speed slider's four settings for every value 0–100, and the speed constants;
+  - the figure titles, all 35 demo problems, and the five clamp-codelets patterns (by
+    codelet type name).
+- **Tests first.** `python/tests/test_gui.py` and `python/tests/drive_gui.py` were written
+  before any code. Run then: **18 failed, 2 passed**. The two that passed were the
+  MANIFEST check and "no engine module imports the GUI". Everything else failed with
+  `ModuleNotFoundError: metacat.gui.gui`, `metacat.demos`, or `cannot import name 'app'`.
+  Now every test passes. test_gui.py checks:
+  - the battery;
+  - every one of gui.ss's 61 and demos.ss's 36 definitions has its Python name;
+  - docstrings name their origin;
+  - demos.py imports no GUI, gui.py and app.py import tkinter only inside functions, and
+    no engine module imports `metacat.gui`;
+  - slow tier: `drive_gui.py` under `xvfb-run`.
+- **drive_gui.py** builds the GUI as `python3 -m metacat.gui` does, with trace.ss's writer
+  installed and the Commentary and Trace windows recorded. Tk's main thread runs
+  `mainloop`, and a driver thread uses the widgets: it types into the command line,
+  presses the buttons, invokes menu entries and dialog buttons, and clicks on canvases.
+  Its scenarios:
+  - **windows:** titles; the 12 window controllers with EEG and Logo hidden; the buttons
+    start disabled; no window overlaps the control panel.
+  - **invalid input:** "Invalid input!" appears, then goes; the slider at Fast gives
+    (1 1 1 1).
+  - **full run** (abc abd ijk 1): Enter stops at codelet 0 with seed 1; Go runs to the
+    answer ijd.
+  - **step mode:** the step interval is set to 40 through its dialog; Step gives 40, 80
+    and 120 codelets; Go finishes.
+  - **demo, stop and go:** Demos ▸ Run 7; Go; Stop mid-run (at codelet 466–480 in
+    practice); Go again to wyz at 2170. While the engine runs, the main thread answers
+    within 0.002 s.
+  - **breakpoint and click:** a breakpoint at 100 through the dialog stops the run there,
+    and a click on the Workspace canvas resumes it (workspace-window-press-handler, then
+    thread-break).
+  - **reset:** Reset re-initializes the problem.
+  - **menus:** hiding and showing windows, EEG, Eliza mode, self-watching off and on (the
+    warning label and the theme windows), the theme edit dialog (Cancel), a manual
+    codelet clamp and its undo, Help (shows help.txt), the commentary font size.
+  - **save commentary:** the file equals the Commentary's lines.
+  - **resize:** the Workspace at 1000×750 gets that visible size through the resize
+    listener.
+  - **screenshot:** the whole screen, grabbed with XGetImage on the root window.
+
+  **Every GUI run's trace equals its golden byte for byte** (abc-abd-ijk_1 four times:
+  full, step, breakpoint and click, reset; abc-abd-xyz_3852097033 once, after the demo
+  and stop/go), and so does each end state (codelet count, generator state). The whole
+  driver takes about 20 s.
+- **Code** (new): `metacat/gui/gui.py` (gui.ss), `metacat/demos.py` (demos.ss),
+  `metacat/gui/app.py` (setup.ss's `setup` and `enable-resizing`, the engine thread, the
+  window layout) and `metacat/gui/__main__.py`. Changed:
+  - `gui/hosts.py`: `TkHost` show/hide, real geometry, the window manager's close, and
+    `<Configure>` and mouse presses passed to the viewport;
+  - `gui/general_graphics.py`: the host gets its viewport;
+  - `gui/fonts.py`: the logo uses constants.ss's colour and font;
+  - `gui/swl.py`: `ThreadSafeTk`;
+  - `chez.py`: `string_to_number` reads ASCII digits only.
+- **Engine thread vs `after`: a worker thread with a queue.** `app.EngineThread` stands
+  for the REPL thread. The control panel's `thread-break`s queue thunks on it, and each
+  runs through item 11's `run.toplevel`, so break and go work as in the CLI tests.
+  `after`-driven stepping was rejected because suspend breaks from inside a codelet, and
+  only a parked thread can resume there. Recorded in the plan ("As built (item 15)") and
+  app.py's docstring.
+- **A crash found and fixed:** tkinter's own cross-thread Tk calls segfaulted in
+  `mainloop` during the first GUI run. All Tk calls from other threads now go through
+  `swl.ThreadSafeTk`, a queue and a pipe watched by Tk's event loop (new anomalies entry).
+- **Look at what you draw.** I inspected `python/tests/snapshots/gui-run7.png`, the whole
+  2560×1600 screen right after run7's answer. It shows the control panel (menubar Help,
+  Demos, Windows, Options, Clear Memory; the problem and seed; the slider; the buttons),
+  the Temperature at 15, the Workspace with wyz and both rules, the Coderack, the
+  Commentary ending "The answer "wyz" occurs to me", the Slipnet, the theme panels, the
+  Memory (SNAG, wyz) and the Trace (SNAG and Clamp icons). Item for item, that is the
+  content of `docs/screenshots/run7-wyz.png`. `gui-final.png` is the screen at the end of
+  the driver.
+- **Mutation checks** (`/tmp/mut15.py`, not kept; gui.py restored and checked with `cmp`):
+  6 of 6 caught.
+  - the driver caught: Stop not setting `*interrupt?*`; init-new-problem without
+    quiet-break; Step turning step mode off; a window controller's show not showing;
+  - the battery caught: the flash range floor 2 → 3; the tokenizer accepting digits after
+    letters.
+- **Docs**:
+  - `docs/anomalies_and_quirks.md`: three entries (the Tk cross-thread crash, non-ASCII
+    digits in `string->number`, generated keys going to the focus window);
+  - `docs/python-translation-plan.md`: "As built (item 15)";
+  - `python/README.md`;
+  - the tier comment in `python/run-tests.sh`;
+  - `test_fixtures.py` now expects the local battery `gui`.
+- `python3 -m metacat.gui` under Xvfb prints "Initializing windows...done" and waits in
+  Tk's main loop.
+- `python3 ralph_loops/loop0002/gate.py`: GATE PASSED (1397 tests, 6 min 46 s).
+
+### Blockers
+None. Notes:
+- Widget colours follow gui.ss. Tk 8.6's disabled-entry colours are set to the entry's own
+  colours, so "running..." shows green on black as in SWL's Tk.
+- Model errors in a GUI run go to `engine-error` (input mode and an "Error: ..." line), as
+  in the Racket port. In the original they went to the REPL.
+- help.txt is read from `chez_scheme/original/`. Item 16's packaging must make it
+  reachable from an installed package.
+
+### Next
+Item 16, packaging and docs: `pip install -e python` with a `metacat` command
+(`metacat.__main__`), and a GUI entry (`metacat.gui.app:main`). Ship help.txt with the
+package, or find it from the checkout. Use `python/tests/snapshots/gui-run7.png` for the
+README screenshots.

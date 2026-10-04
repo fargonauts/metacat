@@ -143,6 +143,7 @@ class GraphicsWindow(SchemeObject):
         this.frame = this.top
         canvas = this.top.make_canvas(visible_w, visible_h, bg_color)
         this.vp = sgl.Viewport(canvas, pixel_to_x, pixel_to_y, x_to_pixel, y_to_pixel)
+        this.top.show_viewport(this.vp)   # port: the host passes Tk's events to vp
         this.resizable_p = False
         this.position = False
         this.cache_mode_p = False

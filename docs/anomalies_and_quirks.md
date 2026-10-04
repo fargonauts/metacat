@@ -790,6 +790,40 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   Xlib's `XGetImage` (through ctypes) and writes the PNG itself with zlib, so the PNG
   holds exactly the pixels Tk drew. That needs neither PIL nor ghostscript.
 
+### Python: tkinter's cross-thread Tk calls crash; the GUI marshals them itself
+- **Seen:** loop0002 iteration 16 (item 15), the first GUI run driven under Xvfb.
+- **What:** Tcl here is threaded, so tkinter lets any thread call Tk: it hands the call
+  to the main thread and waits. With the engine drawing from its own thread (about 45,000
+  canvas commands in run7), the process died with a segmentation fault in `mainloop`
+  during the first run. Tcl objects that tkinter returns can be freed in the calling
+  thread, and Tcl's per-thread memory does not allow that.
+- **Evidence:** `python3 -X faulthandler python/tests/drive_gui.py` before the fix: the
+  engine thread was in `sgl.draw_exps` (bridge-builder's graphics), the main thread in
+  `mainloop`.
+- **Status:** worked around. `gui/swl.py`'s `ThreadSafeTk` is the root's `.tk` (every
+  widget shares it). A call from another thread is queued, a pipe that Tk's event loop
+  watches wakes the main thread, and the result comes back as plain Python values.
+  drive_gui.py then ran all its scenarios without a crash. The main thread answers within
+  a few milliseconds during a run.
+
+### Python: `int()` and `\d` read non-ASCII digits; Chez's `string->number` does not
+- **Seen:** loop0002 iteration 16 (item 15), gui-battery.scm's `tokenize-string`.
+- **What:** gui.ss's command-line parser reads "١٢" (Arabic-Indic digits) as a number
+  token, because `char-numeric?` accepts those digits. Chez's `string->number` then gives
+  `#f`, where Python's `int("١٢")` gives 12. Likewise "½" is numeric to both, and
+  `string->number` gives `#f` for it.
+- **Evidence:** python/fixtures/gui/000-tokenize-string.txt.
+- **Status:** fixed in chez.py: `string_to_number` returns `False` for any non-ASCII
+  string. The original's quirk is kept: a token list with `#f` in it is invalid input.
+
+### Python tests: Tk sends a generated key to the window with the focus
+- **Seen:** loop0002 iteration 16 (item 15), drive_gui.py.
+- **What:** `event_generate("<Return>")` on the command line went to the input dialog
+  that had just taken the focus, not to the command line. Go then read the typed problem
+  and started a new one, so the run stood at codelet 0 instead of the breakpoint.
+- **Status:** test-side. The driver gives the field the focus first (`focus_force`), as a
+  user's click would.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

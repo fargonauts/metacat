@@ -25,9 +25,9 @@ def test_every_battery_is_captured():
     frozen = [b for b in BATTERIES if capture.battery_path(b).parent == capture.DIFF]
     local = [b for b in BATTERIES if capture.battery_path(b).parent == capture.LOCAL]
     assert len(frozen) == 10              # tests/diff/*-battery.scm
-    assert local == ["bridge-extra", "chez", "codelet-extra", "coderack-extra", "rule-extra",
+    assert local == ["bridge-extra", "chez", "codelet-extra", "coderack-extra", "gui", "rule-extra",
                      "slipnet-extra", "trace-extra", "utilities-extra",
-                     "workspace-extra"]   # python/oracle/batteries/ (items 02-10)
+                     "workspace-extra"]   # python/oracle/batteries/ (items 02-10, 15)
     # extra-seeds/ holds whole runs, not a battery (capture_extra_seeds.py, item 12);
     # sgl-tcl/ holds the SGL interpreter's Tcl stream (capture_sgl_tcl.py, item 13)
     assert sorted(p.name for p in FIXTURES.iterdir()

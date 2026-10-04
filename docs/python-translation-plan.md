@@ -821,6 +821,40 @@ from symbols").
   tier; the 109 goldens and the crash run with every view attached, and the eight
   rendered scenes of `tests/render_views.py` under Xvfb, in the slow tier).
 
+
+### As built (item 15)
+
+- `metacat/gui/gui.py` is gui.ss: one function or class per definition (61). The
+  control panel (`ControlPanel`) and the window controllers are `SchemeObject`s with the
+  original's messages. They add `get-widgets` (for tests), `visible?` and `engine-error`.
+  SWL widgets are tkinter's own (Toplevel, Label, Entry, Scale, Button, Frame), packed in
+  gui.ss's order with its options. SWL's menu items are objects (`MenuItem`, `Menu`):
+  they keep their options until the main menu is attached, then pass them to their Tk
+  entries. Tk's X11 menubar holds Help and Clear Memory as commands, as SWL's did.
+  `SwlToplevel.destroy` runs the destroy-request handler first, as SWL's did, and the
+  dialogs depend on that. The `(pause 700)` in the GUI thread becomes `after(700)`.
+- `metacat/demos.py` is demos.ss. `metacat/gui/app.py` holds setup.ss's `setup` and
+  `enable-resizing`, the engine thread, and the window layout (racket/gui/gui.rkt's
+  `arrange-windows!`). `python3 -m metacat.gui [SCALE]` calls `app.main`.
+- **The engine runs in a worker thread with a queue**, not in `after`-driven steps.
+  `EngineThread` stands for the REPL thread. SWL's `thread-break` (`gui.thread_break`)
+  queues thunks on it, and it runs each one through `run.toplevel`. A break parks the
+  run (item 11), and the next thunk (`go`) resumes it. The `after` alternative was
+  rejected because suspend breaks from inside a codelet (answers.ss). Only a parked thread
+  can resume there; stepping from `after` would need codelets split in two.
+- Tk is only ever touched from the main thread. `swl.ThreadSafeTk`, the root's `.tk`,
+  marshals calls from other threads through a queue and a pipe
+  (docs/anomalies_and_quirks.md). The control panel's actions never wait for the
+  engine.
+- `TkHost` (hosts.py) now has show/hide, the real geometry and the window manager's close
+  (toplevel-destroy-action). A resizable window turns `<Configure>` into the viewport's
+  `configure`, and the resize listener redraws it. Mouse presses go to the viewport's
+  `mouse-press` with SWL's modifiers. `create-mcat-logo` uses constants.ss's logo colour
+  and font.
+- Tests: `tests/test_gui.py` and `tests/drive_gui.py`. gui-battery.scm pins the parser,
+  the speed slider, the figure titles, the demos and the clamp patterns. The driver works
+  the widgets under xvfb-run, and each GUI run's trace equals its golden.
+
 ## Names
 
 `python/metacat/names.py` (`scheme_to_python`; moved into the package by item 03) maps every name the

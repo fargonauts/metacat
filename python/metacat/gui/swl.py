@@ -24,6 +24,86 @@ from metacat import chez
 g_tk_root = False
 
 
+class ThreadSafeTk:
+    """port: the Tcl interpreter of the GUI, callable from any thread.
+
+    SWL serialized every Tk call through its own event thread.  Here the engine
+    runs in its own thread (gui/app.py) and draws, and Tcl may only be touched
+    from the thread that created it: a call made elsewhere is queued, the main
+    thread is woken through a pipe that Tk's event loop watches, runs the call,
+    and hands back the result, made of plain Python values (tkinter's own
+    cross-thread calls let Tcl objects die in the calling thread, which crashed
+    under Xvfb: docs/anomalies_and_quirks.md).  In the main thread a call goes
+    straight to Tcl.  Installed as the root's .tk before any widget exists, so
+    every widget shares it."""
+
+    def __init__(self, tkapp):
+        import os
+        import queue
+        import threading
+        import tkinter
+        self._tkapp = tkapp
+        self._main = threading.get_ident()
+        self._queue = queue.SimpleQueue()
+        self._r, self._w = os.pipe()
+        os.set_blocking(self._r, False)
+        tkapp.createfilehandler(self._r, tkinter.READABLE, self._serve)
+
+    def _serve(self, fd, mask):
+        import os
+        try:
+            os.read(self._r, 4096)
+        except BlockingIOError:
+            pass
+        while True:
+            try:
+                fn, args, box, done = self._queue.get_nowait()
+            except Exception:   # noqa: BLE001 - queue.Empty
+                return
+            try:
+                box.append((True, _plain(fn(*args))))
+            except BaseException as e:   # noqa: BLE001 - re-raised in the caller
+                box.append((False, e))
+            done.set()
+
+    def _marshal(self, name):
+        import os
+        import threading
+        method = getattr(self._tkapp, name)
+
+        def call(*args):
+            if threading.get_ident() == self._main:
+                return method(*args)
+            box = []
+            done = threading.Event()
+            self._queue.put((method, args, box, done))
+            os.write(self._w, b"x")
+            done.wait()
+            ok, value = box[0]
+            if ok:
+                return value
+            raise value
+        return call
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        value = getattr(self._tkapp, name)
+        if callable(value) and name not in ("mainloop", "dooneevent", "quit"):
+            value = self._marshal(name)
+        setattr(self, name, value)
+        return value
+
+
+def _plain(x):
+    """port: a Tcl result as plain Python values (no Tcl objects)"""
+    if isinstance(x, tuple):
+        return tuple(_plain(a) for a in x)
+    if isinstance(x, (str, int, float, bool, bytes)) or x is None:
+        return x
+    return str(x)
+
+
 def swl_tcl_eval(win, *args):
     """port: SWL's swl:tcl-eval (one Tcl command to a widget)"""
     return win.tcl(*args)

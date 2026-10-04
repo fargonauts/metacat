@@ -112,7 +112,7 @@
       justify run, inspect the PNGs, and compare with `docs/screenshots/`;
     - a run with all views attached still matches its golden.
 
-- [ ] **15 The control panel and windows.** Translate `gui.ss` to tkinter: the control panel
+- [x] **15 The control panel and windows.** Translate `gui.ss` to tkinter: the control panel
     (command line, Go, Step, Stop, Reset, speed), the menus (Demos with
     `demos.ss`'s runs, Windows, Options, Memory, Help, Save commentary), and window layout
     and resizing. The engine runs so the GUI stays responsive: a worker thread with a

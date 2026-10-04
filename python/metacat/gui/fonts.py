@@ -92,20 +92,28 @@ def create_mcat_logo(root=None):
     """fonts.ss: create-mcat-logo"""
     # port: a Tk toplevel with two canvases, as SWL made it; the scrollbar sizes are
     # those of a tkinter Scrollbar.  %logo-background-color% and %logo-font% are
-    # constants.ss's (the panels item); white and times 24 bold italic until then.
+    # gui/constants.py's once it is loaded (white and times 24 bold italic before).
     global g_scrollbar_width, g_scrollbar_height, g_mcat_logo, g_hidden_canvas
+    import sys
     import tkinter
+    from metacat.gui import general_graphics
+    K = sys.modules.get("metacat.gui.constants")
+    background = (swl.tcl_word(K.p_logo_background_color) if K is not None else "white")
+    font = (swl.tcl_word(K.p_logo_font) if K is not None and K.p_logo_font
+            else ("times", 24, "bold", "italic"))
     top = tkinter.Toplevel(root, width=110, height=80)
     top.title("Logo")
     top.resizable(False, False)
-    logo = tkinter.Canvas(top, width=110, height=80, background="white",
+    top.protocol("WM_DELETE_WINDOW",
+                 lambda: general_graphics.toplevel_destroy_action(top))
+    logo = tkinter.Canvas(top, width=110, height=80, background=background,
                           highlightthickness=0)
     hidden = tkinter.Canvas(top, width=110, height=80)
     logo.pack(expand=True, fill="both")
     probe = tkinter.Scrollbar(top, orient="vertical")
     g_scrollbar_width = probe.winfo_reqwidth()
     g_scrollbar_height = tkinter.Scrollbar(top, orient="horizontal").winfo_reqheight()
-    logo.create_text(55, 50, text="Metacat", anchor="s", font=("times", 24, "bold", "italic"))
+    logo.create_text(55, 50, text="Metacat", anchor="s", font=font)
     g_mcat_logo = swl.TkCanvas(logo, background=None)
     g_hidden_canvas = swl.TkCanvas(hidden)
     return "done"

@@ -107,6 +107,8 @@ class OffscreenHost:
         self.canvas = None
         self.width = 0
         self.height = 0
+        self.viewport = None
+        self.visible = True
 
     def make_canvas(self, visible_w, visible_h, bg_color):
         """the <viewport>'s canvas, visible_w x visible_h pixels"""
@@ -116,6 +118,18 @@ class OffscreenHost:
 
     def set_scroll_region_bang(self, x1, y1, x2, y2):
         return None
+
+    def show_viewport(self, vp):
+        """the viewport drawn on this host's canvas (make-graphics-window's)"""
+        self.viewport = vp
+
+    def show_window(self):
+        """SWL's show on the toplevel"""
+        self.visible = True
+
+    def hide_window(self):
+        """SWL's hide on the toplevel"""
+        self.visible = False
 
     def set_title_bang(self, title):
         self.title = title
@@ -165,7 +179,14 @@ class OffscreenHost:
 
 
 class TkHost(OffscreenHost):
-    """port: a tkinter Toplevel and Canvas (scrollbars as the scrolling asks)."""
+    """port: a tkinter Toplevel and Canvas (scrollbars as the scrolling asks).
+
+    Closing the toplevel from the window manager runs make-graphics-window's
+    destroy action (toplevel-destroy-action: the control panel hides it).  Once
+    the window is resizable (make-resizable), a change of the canvas's size is
+    Tk's <Configure> on SWL's viewport: the viewport's configure gets the new
+    size plus SWL's 2-pixel border, and its resize handler does the rest.
+    Mouse presses go to the viewport's mouse-press with SWL's modifiers."""
 
     def __init__(self, root, scrolling, destroy_action):
         super().__init__(scrolling, destroy_action)
@@ -174,8 +195,10 @@ class TkHost(OffscreenHost):
         self.top = tkinter.Toplevel(root)
         self.top.title("")
         self.top.resizable(False, False)
+        self.top.protocol("WM_DELETE_WINDOW", lambda: self.destroy_action(self))
         self.widget = None
         self.scrollbars = {}
+        self.resizable = False
 
     def make_canvas(self, visible_w, visible_h, bg_color):
         import tkinter
@@ -194,8 +217,30 @@ class TkHost(OffscreenHost):
             sb.pack(side="bottom", fill="x")
             self.scrollbars["horizontal"] = sb
         self.widget.pack(expand=True, fill="both")
+        self.widget.bind("<Configure>", self._configure)
+        self.widget.bind("<ButtonPress-1>",
+                         lambda e: self._press(e, ("left-button",)))
+        self.widget.bind("<Shift-ButtonPress-1>",
+                         lambda e: self._press(e, ("shift", "left-button")))
+        self.widget.bind("<ButtonPress-3>",
+                         lambda e: self._press(e, ("right-button",)))
         self.canvas = swl.TkCanvas(self.widget, background=bg_color)
         return self.canvas
+
+    def _configure(self, event):
+        # Tk's <Configure> on the viewport, once the window is resizable
+        w, h = event.width, event.height
+        if self.resizable and self.viewport is not None and (w, h) != (self.width, self.height):
+            self.width, self.height = w, h
+            self.viewport.configure(w + 2, h + 2)
+
+    def _press(self, event, mods):
+        if self.viewport is not None:
+            try:
+                self.viewport.mouse_press(event.x, event.y, mods)
+            except Exception:   # noqa: BLE001 - SWL reported handler errors and went on
+                import traceback
+                traceback.print_exc()
 
     def set_scroll_region_bang(self, x1, y1, x2, y2):
         from metacat.gui import swl
@@ -209,6 +254,9 @@ class TkHost(OffscreenHost):
         self.geometry = g
         self.top.geometry(g)
 
+    def get_geometry(self):
+        return self.top.geometry()
+
     def get_width(self):
         return self.top.winfo_width()
 
@@ -216,16 +264,30 @@ class TkHost(OffscreenHost):
         return self.top.winfo_height()
 
     def set_resizable_bang(self, w, h):
+        self.resizable = bool(w and h)
         self.top.resizable(bool(w), bool(h))
 
     def set_min_size_bang(self, w, h):
         self.top.minsize(w, h)
+
+    def set_aspect_ratio_bounds_bang(self, a, b):
+        from fractions import Fraction
+        a, b = Fraction(a), Fraction(b)
+        self.top.aspect(a.numerator, a.denominator, b.numerator, b.denominator)
 
     def get_scrollbar(self, orientation):
         return self.scrollbars.get(orientation, False)
 
     def set_vertical_view(self, fraction):
         self.widget.yview_moveto(fraction)
+
+    def show_window(self):
+        self.visible = True
+        self.top.deiconify()
+
+    def hide_window(self):
+        self.visible = False
+        self.top.withdraw()
 
     def raise_(self):
         self.top.lift()

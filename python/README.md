@@ -244,3 +244,17 @@ The panels (item 14):
   `tests/render_views.py OUTDIR [SCENE...]` under xvfb-run, which draws eight scenes of
   run7, a justify run and a Memory comparison on Tk and grabs each window).
   `tests/snapshots/views/` holds one rendering of every scene.
+
+The control panel and windows (item 15): `python3 -m metacat.gui [SCALE]`.
+- `metacat/gui/gui.py` (gui.ss: the control panel, menus, dialogs, window controllers),
+  `metacat/demos.py` (demos.ss), `metacat/gui/app.py` (setup.ss's `setup` and
+  `enable-resizing`, the engine thread, the window layout).
+- The engine runs in a worker thread (`app.EngineThread`, the original's REPL thread).
+  Tk calls from other threads are marshalled to the main thread (`swl.ThreadSafeTk`).
+
+  Tests: `tests/test_gui.py` (python/oracle/batteries/gui-battery.scm, the structure;
+  slow: `tests/drive_gui.py OUTDIR` under xvfb-run). The driver uses the widgets for a
+  full run, step mode, Stop and Go, a demo, a breakpoint and a click on the Workspace,
+  Reset, the menus and dialogs, saving the commentary and a resize. Each GUI run's trace
+  must equal its golden. It grabs the screen: `tests/snapshots/gui-run7.png` and
+  `gui-final.png`.

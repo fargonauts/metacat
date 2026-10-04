@@ -831,8 +831,13 @@ def make_polar(m, a):
 
 def string_to_number(s):
     """Chez: string->number (radix 10): integers, n/d, decimals with
-    exponents; #f for anything else.  Only gui.ss uses it (the seed field)."""
+    exponents; #f for anything else.  Only gui.ss uses it (the seed field).
+    Digits are ASCII only: Python's \\d and int() accept any Unicode decimal
+    digit, Chez does not ("\u0661\u0662" is #f; gui fixture tokenize-string)."""
     import re as _re
+    s = str(s)
+    if not s.isascii():
+        return False
     if _re.fullmatch(r"[+-]?\d+", s):
         return int(s)
     m = _re.fullmatch(r"([+-]?\d+)/(\d+)", s)
