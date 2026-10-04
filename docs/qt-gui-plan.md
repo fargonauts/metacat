@@ -382,6 +382,44 @@ Resizing redraws only pictures. Fonts and layout feed only the drawing, never th
 a run with resizes gives the same trace. Item 04's test checks this with resizes
 interleaved.
 
+**As built (item 04).** `python/metacat/qt/hosts.py` and `mainwindow.py`:
+
+- `QtHost` (a `gui/hosts.py` host) makes a `Pane`: a `QWidget` holding a `QGraphicsView`
+  of the `QtCanvas`'s scene, one pixel per unit from the top-left corner, no frame. The
+  pane has no parent until `MainWindow.place_hosts` puts it in the tree, so a host never
+  opens a window of its own.
+- The policy table above is what was built, for every panel. Letterboxing uses Tk's ratio
+  (w+2):(h+2), the one make-resizable gives `wm aspect`. The scrolling panes always show
+  their scroll bar (as `TkHost` packs it), so `scrollbar-present?` is always true, as
+  under Tk. Qt's `PM_ScrollBarExtent` is fonts.ss's scroll bar size.
+- Configures go through a feeder: each pane's latest size waits until
+  general-graphics.ss's resize queue is empty, so the single queue drops no panel's
+  redraw. A pane that changed size and came back still gets a configure.
+- Scroll regions, scrolling (`set_vertical_view`) and showing/hiding are recorded by
+  any thread and applied by `QtHost.sync()` on the GUI thread, after the canvas's own
+  sync. `MainWindow.sync` runs every host's on a 50 ms timer; item 05 owns the batching.
+- The hidden canvas (`qt/canvas.py` `HiddenCanvas`) keeps one display list per thread,
+  because the engine and the resize listener measure text at the same time (anomalies:
+  "Two threads measuring text on the one hidden canvas").
+- `python3 -m metacat.qt` runs `app.setup(window)`, which installs the Qt fonts and hosts,
+  attaches every window as `views.attach_views` does, places the panes and runs
+  enable-resizing. There is no run yet (item 05).
+- Driving the engine from a worker thread while Qt paints is slow, because every painted
+  item is a Python call that waits for the GIL (anomalies: "Qt paints the panes slowly
+  while the engine runs in another thread"). Item 05 must solve this.
+- **Measured:** each panel's own `resize` takes 1 to 26 ms at its 1080p pane size after
+  run7 (Workspace 22, Coderack 14, Commentary 9, Slipnet 6, Trace 6, Memory 4,
+  Temperature 1, EEG 26). Live dragging is fine with the original's protocol, so no panel
+  uses the `fitInView` fallback. At start the ten panels redraw in about 3 s, one per
+  250 ms listener pause.
+- `default_sizes(width, height)` is 2.2's computation, and it applies until the user
+  drags a handle. At 1920×1010 it gives rows 601/311/90; top row 115, 801, 232, 164
+  and 592 (Commentary); middle row 652, 651 and 609 (Memory).
+- Run7's pictures at 300 and 800 codelets and at the answer were inspected next to
+  `python/tests/snapshots/views/`. They are the same pictures at the panes' sizes. Text
+  is antialiased (item 03), and the Commentary's paragraphs are wider, so they fill
+  less of the pane. Black, the text colour, is the only main colour whose share differs.
+
 ### 2.5 The threading bridge
 
 The threads are those of the tkinter GUI, with Qt's GUI thread in place of Tk's main thread:

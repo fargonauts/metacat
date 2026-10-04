@@ -97,7 +97,28 @@ class QtCanvas:
 class HiddenCanvas(QtCanvas):
     """port: fonts.ss's *hidden-canvas*, a canvas never shown that measures text
     by creating it and asking its bbox.  No scene follows it, so the changes
-    are dropped at each delete instead of piling up for a sync."""
+    are dropped at each delete instead of piling up for a sync.
+
+    fonts.ss's get-pixel-size creates a text, asks its bbox and deletes all, in
+    three commands: two threads measuring at once (the engine and the resize
+    listener) delete each other's items, as they could in the original.  So
+    each thread has a display list of its own; the answers are the same."""
+
+    def __init__(self, background=None, measure=None):
+        self._local = threading.local()
+        self._measure = measure or fonts.metrics()
+        super().__init__(background, self._measure)
+
+    @property
+    def display_list(self):
+        d = getattr(self._local, "display_list", None)
+        if d is None:
+            d = self._local.display_list = DisplayList(self._measure)
+        return d
+
+    @display_list.setter
+    def display_list(self, value):
+        self._local.display_list = value
 
     def tcl(self, *args):
         answer = super().tcl(*args)

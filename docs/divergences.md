@@ -136,3 +136,25 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   differ, by 5 pixels at most. The SGL fixture drawn on the Qt canvas passes
   `render_sgl_fixture.py`'s pixel checks, and 97.7% of its pixels match the tkinter
   picture.
+
+## Python Qt GUI: windows as panes (loop0003 item 04)
+- **What:** in the Qt GUI each graphics window is a pane of one main window
+  (`python/metacat/qt/hosts.py`, `mainwindow.py`), in the fixed splitter tree of
+  `docs/qt-gui-plan.md` 2.2. So:
+  - a pane has no title bar: window titles are kept but not shown;
+  - Tk's `wm aspect` has no pane equivalent. An unscrollable window's view is the
+    largest rectangle of Tk's ratio, (w+2):(h+2), inside its pane, centred (the
+    Temperature at the top), and the margins are painted in the panel's background
+    colour (letterboxing);
+  - the scrolling windows (Trace, EEG, Commentary, Memory) always show their scroll bar,
+    as `TkHost` packs it. The scroll bar extent comes from Qt's style
+    (`PM_ScrollBarExtent`) and goes to fonts.ss's `*scrollbar-width*`/`-height*`;
+  - a pane's size reaches the panel through the original's own protocol
+    (`viewport.configure(w+2, h+2)`, make-resizable's handler, the resize listener), but
+    the configures of several panes are sent one at a time, so that general-graphics.ss's
+    single resize queue drops none (anomalies: "One resize queue for every window");
+  - the EEG pane is hidden at start, as the EEG window is.
+- **Why:** one window for everything, with fixed splitters (the owner's decision).
+- **Tests:** `python/tests/test_qt_panes.py`: the layout, letterboxing, scroll bars,
+  feeding, and golden runs (run7 at 300 and 800 codelets and at the answer, `a b z`
+  seed 1, and run7 with 14 window resizes) giving their golden traces in the panes.

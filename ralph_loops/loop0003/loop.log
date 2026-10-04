@@ -25,3 +25,9 @@
 [2026-10-04 16:49:57] claude session it04 (cap 3.00 h) -> session_it04.log
 [2026-10-04 17:09:09] session it04: ok (exit 0, 77 tool calls)
 [2026-10-04 17:16:47] tests passed: GATE PASSED
+[2026-10-04 17:16:47] committed 2a865a7: 03 Fonts and colours. Map Tk font specs (family lists, negative pixel 
+[2026-10-04 17:16:50] pushed 2a865a7 to origin
+[2026-10-04 17:16:50] === iteration 5: 04 Panels in panes. `qt/hosts.py`: a host maker that puts each graphics window in a
+[2026-10-04 17:16:50] claude session it05 (cap 3.00 h) -> session_it05.log
+[2026-10-04 18:03:42] session it05: ok (exit 0, 104 tool calls)
+[2026-10-04 18:11:49] tests passed: GATE PASSED

@@ -66,7 +66,7 @@
     - measurement consistency (a text item's `bbox` equals the measured width);
     - colour names against `colors.py`.
 
-- [ ] **04 Panels in panes.** `qt/hosts.py`: a host maker that puts each graphics window in a
+- [x] **04 Panels in panes.** `qt/hosts.py`: a host maker that puts each graphics window in a
     pane of the main window (`QGraphicsView` over the Qt canvas), and the main window that
     holds all the panes in the default layout from item 00. Apply the resize policy per
     panel. Tests:

@@ -1001,6 +1001,36 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** not a bug: two rasterisers. Recorded in `docs/divergences.md` (Python Qt
   GUI).
 
+### Qt paints the panes slowly while the engine runs in another thread (the GIL)
+- **Seen:** 2026-10-04, loop0003 item 04, run7 with the window resized from the GUI thread
+  while `headless.run_problem` ran in a worker thread.
+- **What:** one `QApplication.processEvents()` took about 4 seconds, and only one of the
+  planned resizes (one every 300 ms) happened in a 7-second run. The GUI thread was
+  inside Qt's C++ code, painting the scenes: each `TkItem.paint` and `boundingRect` is a
+  Python call, and each has to wait for the engine thread to give up the GIL (every 5 ms by
+  default). With `sys.setswitchinterval(0.0002)` the GUI ran, but the run took 68 s instead
+  of 7 s.
+- **Evidence:** `render_qt_panes.py`'s first `--resize` version (engine in a thread);
+  stacks taken with `sys._current_frames()` showed the main thread in `processEvents`.
+- **Status:** open, for item 05 (the engine thread). Item 04 drives the engine in the GUI
+  thread and resizes at the run's `update-everything`, so the test doesn't depend on it.
+  Item 05 has to keep the GUI thread's Python work per refresh small (fewer Python calls
+  per painted item, or painting cached pictures) and measure it.
+
+### A pane that comes back to its size kept a clamped scroll position (port bug, fixed)
+- **Seen:** 2026-10-04, loop0003 item 04, the run7 picture after 14 window resizes.
+- **What:** the Commentary pane wasn't scrolled to its last line: scroll value 6992 of
+  7106. Between two turns of the hosts' configure feeder the pane grew (Qt clamped the
+  scroll bar to the smaller range) and shrank back to the size it had last told the panel.
+  The host, copying `TkHost._configure`, skips a configure whose size equals the last
+  one, so the panel never ran `reposition-vertical-scrollbar`. Tk would have sent both
+  configures.
+- **Evidence:** `python/tests/test_qt_panes.py::test_a_pane_that_comes_back_to_its_size_still_gets_a_configure`
+  (it fails with the old size test) and
+  `test_resizing_the_window_during_run7_changes_nothing`.
+- **Status:** fixed: a host sends a configure when its pane changed size since the last
+  one, even if it came back to the same size.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
@@ -1305,6 +1335,12 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around: scrollbars are shown before the windows become resizable,
   so the frames grow around them and the windows keep their sizes. The original's
   queue is unchanged.
+- **Update (loop0003 item 04, the Qt GUI):** in one window every pane gets a new size at
+  once: at start, and whenever the window or a splitter changes. `python/metacat/qt/hosts.py`
+  keeps each pane's latest size and sends the configures one at a time, each only when
+  the resize queue is empty. Every panel redraws (`test_every_window_resized_at_once_redraws`).
+  At start this takes about 3 seconds, one panel per 250 ms pause of the listener. The
+  original's queue is still unchanged.
 
 ### Verbose mode reached an unregistered `format-slipnode` (port bug, fixed)
 - **Seen:** iteration 18 (item 17), auditing porting-notes.md against the code.
@@ -1334,6 +1370,23 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Evidence:** racket/tests/no-gui-test.rkt (it exempts that one module).
 - **Status:** not a bug. The engine and the headless driver reach neither racket/gui nor
   racket/draw; the views modules reach racket/draw and, through it, only that module.
+
+### Two threads measuring text on the one hidden canvas
+- **Seen:** 2026-10-04, loop0003 item 04: one run in six of
+  `test_resizing_the_window_during_run7_changes_nothing` crashed with `IndexError: string
+  index out of range` in `gui/fonts.py`'s `get_pixel_size` (the Themes' garbage-collect
+  redrawing a panel).
+- **What:** fonts.ss's `get-pixel-size` measures a string in three canvas commands on the
+  single `*hidden-canvas*`: `create text`, `bbox` of the new item, `delete all`. When the
+  engine and the resize listener measure at once, one thread's `delete all` can come
+  between the other's `create` and `bbox`. The `bbox` of a deleted item is empty. The
+  original has the same three commands, and SWL's threads are preemptive, so a resize
+  during a run could in principle do the same there. The tkinter GUI shares it too.
+- **Evidence:** `python/tests/test_qt_panes.py::test_fonts_measure_from_several_threads_at_once`
+  (four threads, a 1 µs switch interval) fails every time without the workaround.
+- **Status:** worked around in the Qt GUI: `metacat/qt/canvas.py`'s `HiddenCanvas` keeps
+  one display list per thread, so each thread's items are its own. The measurements are
+  the same. fonts.ss's code and the tkinter GUI are unchanged.
 
 ## 🛸 UFO sightings
 

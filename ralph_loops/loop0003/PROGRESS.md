@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 3/12 SOLVED
+- **Current**: 4/12 SOLVED
 
 ---
 
@@ -251,3 +251,101 @@ Item **03 Fonts and colours**: SOLVED.
   panels select their fonts), call `QtCanvas.sync()` on a timer, and set `set_origin`
   from each view's scroll position. The Logo's scrollbar sizes still need Qt values
   (`QStyle.PM_ScrollBarExtent`).
+
+---
+
+## Iteration 5 — 2026-10-04 18:03:30
+Item **04 Panels in panes**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** I wrote `python/tests/test_qt_panes.py` and its
+  scene script `python/tests/render_qt_panes.py` before any code. First run: `18 failed`
+  (no `metacat.qt.hosts`, no `default_sizes`, no splitter tree). Then two of my own
+  expectations were wrong and I corrected them: the Temperature test used a pane too
+  narrow for its ratio, and the colour comparison counted black, the text colour (Tk's
+  1-bit core fonts against Qt's antialiased text). Three tests came from bugs found while
+  looking at the results, and each failed before its fix:
+  - `test_a_pane_that_comes_back_to_its_size_still_gets_a_configure`, from a screenshot;
+  - `test_fonts_measure_from_several_threads_at_once`, from a crash in one run in six;
+  - the `--screenshot` timer order of `test_the_program_opens_every_pane`, a flake in the
+    fast tier.
+- **`python/metacat/qt/hosts.py`**:
+  - `QtHost`, a `gui/hosts.py` host, makes a `Pane` (a `QWidget` with a `QGraphicsView` of
+    the `QtCanvas` scene). It has no parent until it is placed, so it never opens a
+    window of its own;
+  - the resize policy of `docs/qt-gui-plan.md` 2.4, the same for every panel.
+    Unscrollable windows are letterboxed at Tk's ratio (w+2):(h+2), centred (the
+    Temperature at the top), with the margins in the panel's background. Scrolling ones
+    fill the pane beside an always-shown scroll bar, whose size is Qt's
+    `PM_ScrollBarExtent` (given to fonts.ss). A pane's size reaches the panel through the
+    original's own protocol (`viewport.configure(w+2, h+2)`, make-resizable's handler,
+    the resize listener), and only once the window is resizable;
+  - a configure feeder: each pane's latest size waits until the single resize queue is
+    empty, so every panel redraws (anomalies: "One resize queue for every window",
+    updated);
+  - scroll regions, `set_vertical_view` and show/hide from any thread are applied by
+    `sync()` on the GUI thread. `canvasx` follows the scroll bars. `settle_resizes()` and
+    `install()` (Qt fonts, scroll bar sizes, host maker).
+- **`python/metacat/qt/mainwindow.py`**: the splitter tree of 2.2 (rows / top / middle /
+  themes / bottom), not collapsible, with stretch on the Commentary, the Memory and the
+  Trace, the EEG hidden, and minimum pane sizes. `default_sizes(w, h)` computes 2.2's
+  proportions; they follow the window until the user drags a handle. A 50 ms sync timer.
+  `DEFAULT_SIZE` is now 1920×1010 (1080p is the minimum).
+- **`python/metacat/qt/app.py`**: `setup(window)` attaches every window on Qt hosts,
+  places them and runs enable-resizing. `python3 -m metacat.qt` now shows every panel
+  (no run yet), and `--screenshot PNG` grabs it before `--quit-after` quits.
+- **`HiddenCanvas` has one display list per thread** (`qt/canvas.py`). fonts.ss's
+  `get-pixel-size` is `create`/`bbox`/`delete all` on the one hidden canvas, and the
+  engine and the resize listener measuring at once deleted each other's items. The
+  original and the tkinter GUI share this race. Logged in anomalies.
+- **Results:**
+  - offscreen, run7 driven directly with every window in one window gives exactly its
+    golden at the answer. At 300 and 800 codelets the trace is the golden's prefix;
+  - `a b z` seed 1 (fast tier) also gives its golden;
+  - every pane has items: at the answer Workspace 486, Slipnet 112, Coderack 156,
+    Themes 25/12, Memory 46, Commentary 14, Trace 98, Temperature 24, EEG 297. The
+    Bottom Themes are empty outside justify runs, as in the tkinter snapshots;
+  - run7 with the window resized 14 times during the run gives its golden. Each panel
+    redraws on the resize listener while the run goes on, and ends at its pane's size,
+    with the Commentary at its last line.
+- **Pictures, inspected**: I grabbed the window at codelets 300 and 800 and at the answer
+  and compared each pane with `python/tests/snapshots/views/`, side by side for the
+  Vertical and Top Themes, Commentary, Memory, Temperature and Trace. They are the same
+  pictures at the panes' sizes, with antialiased text and wider Commentary paragraphs.
+  The slow test checks that each pane keeps the snapshot's main colours (backgrounds and
+  fills exact, black excluded). I also looked at the start screen of `python3 -m
+  metacat.qt`.
+- **Measured:**
+  - run7 to the answer with every pane takes 6.8 s (engine in the GUI thread, offscreen;
+    7.3 s for the whole process);
+  - each panel's `resize` takes 1–26 ms at its 1080p pane size, so live dragging keeps
+    the original protocol and no panel needs the `fitInView` fallback;
+  - the startup redraw takes about 3 s (one panel per 250 ms listener pause).
+- **Found, for item 05** (logged in anomalies, open): with the engine in a worker thread,
+  Qt painting stalls for seconds. Each `TkItem.paint` and `boundingRect` is a Python call
+  that waits for the GIL. The resize test therefore resizes at the run's
+  `update-everything`, the seam run.py leaves to drivers.
+- **Docs**:
+  - `docs/divergences.md`: a new section, Python Qt GUI: windows as panes;
+  - `docs/anomalies_and_quirks.md`: the GIL entry, the clamped-scroll bug (fixed), the
+    hidden-canvas race, and the resize-queue update;
+  - `docs/qt-gui-plan.md` 2.4: "As built (item 04)";
+  - `python/tests/README.md`: rows for `test_qt_panes.py` and `render_qt_panes.py`, and
+    new totals (1547: 1112 fast, 435 slow; fast tier about 20 s).
+- Gate: `python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1547 passed in 8:02; racket/
+  unchanged).
+
+### Blockers
+- None for item 04. Item 00 is still `[!]` from session 1 (its deliverables exist and
+  pass; see iteration 2).
+
+### Next
+- Item 05 (the engine thread):
+  - solve the GIL stall first. Measure the GUI thread's Python calls per refresh while a
+    worker runs, and paint with fewer Python calls (for example a `QPicture` or
+    `QPainterPath` per item made at sync, or a scene index that doesn't ask Python for
+    bounding rectangles), then time run 7 against the tkinter GUI;
+  - `MainWindow.sync` already runs on a 50 ms timer, and `QtHost.sync` applies the
+    deferred scroll and visibility changes;
+  - mouse presses aren't wired to `viewport.mouse_press` yet (item 07).
+
