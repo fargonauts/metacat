@@ -235,7 +235,8 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   - Run 8: qeeeq at 1013, where the dissertation never answers and a Jootser ends the run
     at 5933;
   - fig5.5-bottom: qxeeq, where the figure shows qeeq;
-  - the eqe-qeeeq demo: it answers qcccb;
+  - the eqe-qeeeq demo: it answers qcccb (Metacat itself calls it "really terrible"; see
+    `docs/screenshots/racket-eqe-abbbc.png`);
   - fig5.11: xyd, where the dissertation shows yyz. The dissertation says that run
     continues the one in Fig. 4.12, so a seed alone can't reproduce it.
 
@@ -865,6 +866,25 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   (fails on the old `translated_modules`).
 - **Status:** fixed. `translated_modules()` skips packages.
 
+### `racket/metacat.rkt`'s header names `tests/make-dist.sh`, which doesn't exist (port doc bug)
+- **Seen:** 2026-10-04, while writing the folder READMEs.
+- **What:** the header comment of `racket/metacat.rkt` (line 22) says the standalone
+  executable is built by `tests/make-dist.sh`. The script is `make-dist.sh` at the
+  repository root.
+- **Evidence:** `grep -n make-dist racket/metacat.rkt`; `ls make-dist.sh tests/make-dist.sh`.
+- **Status:** open. It's a one-line comment fix. It was left alone because loop0002's gate
+  freezes `racket/` (apart from README files). The READMEs give the correct path.
+
+### Python's fast test tier still needs Chez for two freshness checks
+- **Seen:** 2026-10-04, while writing `python/tests/README.md`.
+- **What:** the fast tier is meant to run from the committed fixtures alone. But the
+  `SOURCES` freshness tests in `test_extra_seeds.py` and `test_sgl.py` go through
+  `python/oracle/capture.py`, which runs `scheme --version` (capture.py:99) to record the Chez
+  version. Without Chez installed, those two tests fail.
+- **Evidence:** run the fast tier with `scheme` off the `PATH`.
+- **Status:** open. Documented in `python/tests/README.md`. A fix would skip these two
+  tests, or read the version from the fixtures, when Chez is missing.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols
@@ -1201,4 +1221,20 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 
 ## 🛸 UFO sightings
 
-(none yet)
+### The Python port's Coderack labels lose their `i`s and `l`s under Xvfb
+- **Seen:** 2026-10-03/04, in every Python screenshot taken under Xvfb (loop0002 items
+  14–16, and the README screenshots of 2026-10-04).
+- **What:** the Coderack window's small codelet-type labels drop thin letters. "Bond
+  builders" shows as "Bond bu ders", "Bond evaluators" as "Bond eva uators", "Whole-string"
+  as "Who e-str ng", "Description" as "Descr pt on". The Racket port's screenshots of the same
+  run show every letter. The font request is a faithful copy of the original's:
+  `(make-mfont sans-serif (- desired-type-height) '(normal))` (coderack-graphics.ss:31),
+  a sans-serif font only a few pixels tall, given as a negative (pixel) size.
+- **Evidence:** `docs/screenshots/panels/coderack-run7-answer.png`,
+  `docs/screenshots/python-run7-wyz.png` and `python-ijk-clamp.png`, against
+  `docs/screenshots/run7-wyz.png` (Racket).
+- **Status:** open. Not yet checked on a real screen. A guess, not verified: at a few pixels
+  per glyph, Tk's font rendering in this Xvfb setup (no antialiasing, or a fallback face)
+  gives the narrow glyphs `i` and `l` no pixels at all. If it also happens on a real
+  screen, the port could set a minimum pixel size for this font, which would be a
+  divergence to record in `docs/divergences.md`.
