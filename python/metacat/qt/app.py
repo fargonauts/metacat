@@ -17,11 +17,19 @@ import os
 import sys
 
 SETTINGS_ENV = "METACAT_QT_SETTINGS"     # an INI file instead of the user's settings
+# port: the problem the command line starts with (Run 7 of the dissertation), so that
+# Enter starts a run at once.  The original's box starts empty; see docs/divergences.md.
+DEFAULT_PROBLEM = "abc abd xyz 3852097033"
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(prog="python3 -m metacat.qt",
                                      description="Metacat in one window (Qt).")
+    parser.add_argument("problem", nargs="*", metavar="WORD",
+                        help="the problem to put in the command line, e.g. abc abd ijk 7 "
+                        "(default: %s)" % DEFAULT_PROBLEM)
+    parser.add_argument("--empty", action="store_true",
+                        help="start with an empty command line, as the original does")
     parser.add_argument("--quit-after", type=int, metavar="MS", default=None,
                         help="close the window and quit after MS milliseconds")
     parser.add_argument("--screenshot", metavar="PNG", default=None,
@@ -85,6 +93,17 @@ def open_settings(path=None):
     return QSettings("fargonauts", "metacat-qt")
 
 
+def prefill_command_line(text):
+    """port: put text in the control strip's command line, with the cursor at its end
+    and the focus on it, so that Enter starts the run"""
+    from metacat import setup as S
+    line = S.g_control_panel.command_line
+    if text and line.isEnabled():
+        line.setText(text)
+        line.setCursorPosition(len(text))
+        line.setFocus()
+
+
 def open_window(settings):
     """the main window, set up and shown: at its saved geometry, or else
     maximised on a screen larger than the 1080p default size (the default
@@ -119,6 +138,8 @@ def main(argv=None):
     from PySide6.QtCore import QTimer
     app = make_application()
     window = open_window(open_settings(args.settings))
+    if not args.empty:
+        prefill_command_line(" ".join(args.problem) or DEFAULT_PROBLEM)
     print(window.windowTitle(), flush=True)
     print("Panes: " + " ".join(name for name, pane in window.panes.items()
                                if pane.isVisibleTo(window)), flush=True)

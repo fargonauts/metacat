@@ -36,6 +36,10 @@ metacat-qt                    # or, from python/ in a checkout: python3 -m metac
 Without PySide6, `metacat-qt` prints `The Qt GUI needs PySide6: pip install -e
 'python[qt]'` and exits with status 1.
 
+The command line starts with Run 7, `abc abd xyz 3852097033`, so pressing **Enter** starts
+it at once. `metacat-qt abc abd ijk 7` starts with another problem, and `metacat-qt
+--empty` with an empty box, as the original does.
+
 Type a problem into the command line and press Enter (`abc abd xyz`, `abc abd xyz 7` with
 a seed, `abc abd xyz wyz` to justify an answer), then **Go**, **Step**, **Stop** or
 **Reset**, as in the original. A click on the Workspace continues a run after an answer;

@@ -320,3 +320,16 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   scrolling, aspect ratios, resize methods, press handlers, backgrounds, the slider's
   settings, the Input dialogs' places and rules, the buttons' actions and the close all
   equal the inventory's.
+
+## Python Qt GUI: the command line starts with Run 7 (2026-10-05, owner's request)
+- **What:** `python3 -m metacat.qt` (and `metacat-qt`) starts with `abc abd xyz 3852097033`
+  (`metacat.qt.app.DEFAULT_PROBLEM`, Run 7 of the dissertation) in the control strip's
+  command line, with the focus on it, so that Enter starts the run. Words on the command
+  line replace it (`python3 -m metacat.qt abc abd ijk 7`). `--empty` starts with an empty
+  box, as the original's control panel does.
+- **Why:** the owner asked for it, so the program shows something at once.
+- **Scope:** only the launcher (`app.main`) fills the box. `app.setup` and `open_window`,
+  which the parity tests and drivers use, leave it empty, so those tests still compare
+  with the original's initial state. The engine and the tkinter GUI are unchanged.
+  Tests: `python/tests/test_qt_launcher.py`.
+
