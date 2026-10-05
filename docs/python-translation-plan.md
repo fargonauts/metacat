@@ -931,11 +931,11 @@ enclosing function, not line.
 
 <!-- quirk-sites:begin (python/tests/quirk_sites.py --write) -->
 
-242 sites: 167 `# chez:` (Chez's semantics that Python must reproduce) and 75 `# 1.2:` (Metacat 1.2's own quirks, kept).
+243 sites: 168 `# chez:` (Chez's semantics that Python must reproduce) and 75 `# 1.2:` (Metacat 1.2's own quirks, kept).
 
 | `# chez:` kind | Sites |
 |---|---|
-| map's order | 80 |
+| map's order | 81 |
 | stochastic-if* coin first | 33 |
 | evaluation order | 17 |
 | recursion and sequence order | 10 |
@@ -973,6 +973,7 @@ enclosing function, not line.
 | `metacat.justify` | 4 | 4 |
 | `metacat.memory` | 1 | 0 |
 | `metacat.objects` | 2 | 1 |
+| `metacat.qt.controls` | 1 | 0 |
 | `metacat.rule_graphics` | 1 | 0 |
 | `metacat.rules` | 31 | 2 |
 | `metacat.run` | 3 | 0 |
@@ -1147,6 +1148,7 @@ enclosing function, not line.
 - `metacat.memory`, `_check_reals`: comparing with #f (a bounding box never set) is an error; Python's bool is an int and would compare quietly
 - `metacat.objects`, `tell_all`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
 - `metacat.objects`, `delegate_to_all`: map's order of application (anomalies: "Chez's map applies its procedure in a strange order")
+- `metacat.qt.controls`, `QtControlPanel.theme_edit_mode_off`: map's order (the patterns only read)
 - `metacat.rule_graphics`, `_rule_layout`: map's order of application (the window answers each width)
 - `metacat.rules`, `Rule.set_abstracted_rule_information`: map's order of application (the procedure only reads)
 - `metacat.rules`, `Rule.set_translated_rule_information`: map's order of application (the procedure only builds lists)

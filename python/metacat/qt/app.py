@@ -5,9 +5,8 @@ Metacat is copyright (c) 1999, 2003 by James B. Marshall; this translation is fr
 software under the GNU General Public License, version 2 or later, like Metacat
 itself.  Translated to Python (2026).  Item 01 of loop0003 made the window;
 item 04 put the panels in it (`setup`, setup.ss's window part on Qt hosts);
-item 05 the engine thread and the run controls (the control strip and the
-Options menu's run items); the rest of the menus come in item 06
-(docs/qt-gui-plan.md).
+item 05 the engine thread and the run controls (the control strip); item 06
+the menus and dialogs (docs/qt-gui-plan.md).
 """
 from __future__ import annotations
 

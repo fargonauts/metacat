@@ -1447,6 +1447,60 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   one display list per thread, so each thread's items are its own. The measurements are
   the same. fonts.ss's code and the tkinter GUI are unchanged.
 
+### Two errors within 700 ms leave the first one on the control panel (port bug)
+- **Seen:** 2026-10-04, loop0003 item 06: `drive_qt_menus.py` chose Clamp theme pattern
+  and then a codelet clamp with no current problem; the info label kept "No current
+  problem!" for good.
+- **What:** gui.ss's `display-error` saves the label's text, shows the error, `(pause
+  700)` in the GUI thread, and puts the saved text back. The pause blocks the GUI, so a
+  second error can't come before the first is gone. gui.py (tkinter) and the Qt panel
+  replace the pause with a 700 ms timer, so that the GUI keeps answering. Then a second
+  error within 700 ms saves the first error's text as "the message", and puts it back
+  after the first timer has restored the right one.
+- **Evidence:** the `theme-edit` scenario of `python/tests/drive_qt_menus.py` (it failed
+  at "the message comes back" before the fix).
+- **Status:** fixed in the Qt GUI: `metacat/qt/controls.py`'s `display-error` restores the
+  panel's last `display`ed message (`info_text`), not the label's text. The tkinter GUI
+  (`metacat/gui/gui.py`) still has the bug; it is not this loop's to change.
+
+### A Qt dialog collected by Python in the engine thread crashes the process
+- **Seen:** 2026-10-04, loop0003 item 06: `drive_qt_menus.py` died with a segmentation
+  fault in the engine thread (`trace.py`'s `initialize`, during a new problem's
+  `init-mcat`) after the Help window had been closed. With `WA_DeleteOnClose`, Qt
+  instead printed "shared QObject was deleted directly" and glibc "corrupted
+  double-linked list".
+- **What:** the Help window and the Confirm dialogs hold closures that refer back to
+  them (signal connections), so when the dialog closes and its holder drops it, it is
+  cyclic garbage. Python's cycle collector runs in whichever thread allocates at the
+  time, here the engine thread, and deleting a `QWidget` off the GUI thread is fatal.
+  Dropping the last reference inside the dialog's own `closeEvent` deletes it in the
+  middle of its event, which is the other message.
+- **Evidence:** `python3 -X faulthandler python/tests/drive_qt_menus.py OUT` before the
+  fix (the engine thread's stack at the crash).
+- **Status:** worked around: `controls.SwlDialog.closeEvent` calls `deleteLater()` (the
+  GUI thread's event loop deletes the C++ object, so the collector later finds an empty
+  wrapper) and keeps the dialog in a list until the loop's next turn.
+
+### Qt widgets freed by the cycle collector in a worker thread (test hang)
+- **Seen:** 2026-10-05, loop0003 item 06, fix attempt 3: the gate timed out after 30
+  min in `test_qt_panes.py::test_fonts_measure_from_several_threads_at_once` when the
+  whole Python suite ran (the file alone, or menus + panes, passed).
+- **What:** the in-process `MainWindow` tests of `test_qt_panes.py` close their windows
+  but leave the fake hosts as cyclic garbage (`QtHost` <-> `Pane`, with 11 `PaneView`s
+  and `QGraphicsScene`s). Whether the cycle collector runs before the threaded test
+  depends on how much the earlier tests allocated. When it ran inside one of that test's
+  four measuring threads, while that thread held the canvas paint gate, it destroyed the
+  widgets off the GUI thread and blocked in a futex; the three other threads waited on
+  the paint gate and the main thread in `join`. faulthandler showed "Garbage-collecting"
+  and no thread running.
+- **Evidence:** a probe plugin (`gc.set_debug(gc.DEBUG_SAVEALL); gc.collect()` before
+  that test) listed the garbage; `bash python/run-tests.sh --qt -o faulthandler_timeout=150`
+  hung there before the fix.
+- **Status:** worked around in the tests: an autouse fixture in `python/tests/conftest.py`
+  processes events and runs `gc.collect()` on the GUI thread after every `test_qt_*` test,
+  so no Qt garbage is left for another thread's collector. The program itself keeps its
+  hosts for its whole life, and its dialogs use `deleteLater` (previous entry).
+
 ## 🛸 UFO sightings
 
 ### The Python port's Coderack labels lose their `i`s and `l`s under Xvfb

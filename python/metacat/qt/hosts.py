@@ -228,7 +228,8 @@ class QtHost(ghosts.OffscreenHost):
         return False
 
     def sync(self):
-        """bring the scene and the view up to date (GUI thread only)"""
+        """bring the scene and the view up to date (GUI thread only); true when
+        the pane was shown or hidden"""
         self.canvas.sync()
         self.pane.set_background()
         with self._lock:
@@ -243,6 +244,8 @@ class QtHost(ghosts.OffscreenHost):
             view.verticalScrollBar().setValue(round(vview * view.sceneRect().height()))
         if visibility is not None and self.pane.parent() is not None:
             self.pane.setVisible(visibility)
+            return True     # the main window updates its splitters
+        return False
 
 
 class _Feeder(QObject):

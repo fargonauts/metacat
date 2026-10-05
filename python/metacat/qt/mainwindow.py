@@ -159,8 +159,43 @@ class MainWindow(QMainWindow):
         bar.toggleViewAction().setEnabled(False)
         bar.addWidget(widgets["frame"])
         self.addToolBar(Qt.TopToolBarArea, bar)
-        self.menuBar().addMenu(widgets["options-menu"])
+        control_panel.attach_windows(self)
+        from metacat.qt import controls
+        bar = self.menuBar()
+        bar.setFont(controls.qfont(controls.p_gui_menubar_font))
+        bar.setProperty("swl-font", list(controls.swl.tcl_word(controls.p_gui_menubar_font)))
+        for menu in widgets["menu-bar"]:
+            bar.addMenu(menu)
         control_panel.parked_hook = self.sync
+
+    def hidden_at_start(self):
+        return HIDDEN_AT_START
+
+    def set_pane_visible(self, name, on):
+        """show or hide a pane (the View menu's window controllers; GUI
+        thread): its host as SWL's show/hide, the pane, and the splitters that
+        hold it, so that an empty splitter leaves no gap"""
+        host = self.hosts[name]
+        if on:
+            host.show_window()
+        else:
+            host.hide_window()
+        self.panes[name].setVisible(on)
+        self.update_splitters()
+
+    def update_splitters(self):
+        """a nested splitter is shown when one of its children is"""
+        for name in ("themes", "top", "middle", "bottom"):
+            sp = self.splitters[name]
+            on = any(not sp.widget(i).isHidden() for i in range(sp.count()))
+            if sp.isHidden() == on:
+                sp.setVisible(on)
+
+    def reset_layout(self):
+        """View > Reset layout: the default sizes of docs/qt-gui-plan.md 2.2,
+        following the window again"""
+        self.default_layout = True
+        self.apply_default_layout()
 
     def apply_default_layout(self):
         c = self.centralWidget()
@@ -184,5 +219,8 @@ class MainWindow(QMainWindow):
         the canvas commands held at the paint gate meanwhile"""
         from metacat.qt.canvas import PAINT_GATE
         with PAINT_GATE:
+            shown = False
             for host in self.hosts.values():
-                host.sync()
+                shown = host.sync() or shown
+        if shown:
+            self.update_splitters()

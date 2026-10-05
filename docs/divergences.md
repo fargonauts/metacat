@@ -185,3 +185,40 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   the dialogs, painting while another thread runs, and `drive_qt_gui.py` (a full run,
   step mode, a demo stopped and restarted, a breakpoint, Reset, a justify run, 50 Go/Stop
   toggles, each trace equal to its golden).
+
+## Python Qt GUI: the menus and dialogs (loop0003 item 06)
+- **What:** gui.ss's menus are in the main window's menu bar, in the order Help, Demos,
+  View, Options, Memory (`python/metacat/qt/controls.py`). Each item has the original's
+  label, font, kind and action, and the same enabled and disabled states in every run
+  state. The differences:
+  - **View replaces Windows.** One checkable action per pane, in the Windows menu's
+    order. A check mark replaces the "Hide X" / "Show X" titles and their on/off colours.
+    "Show all windows" and "Hide all windows" are "Show all panes" and "Hide all panes".
+    There is a new **Reset layout** item, which shows the default panes and restores the
+    default splitter sizes. There is no Logo item, because the Logo is not a pane.
+    Hiding both Themes panes also hides their splitter, so no gap is left;
+  - **Help and Clear Memory are menus**, "Help > Metacat help" and "Memory > Clear
+    Memory", rather than commands on the menu bar. There is no blank spacer between
+    Options and Clear Memory. Clear Memory is not drawn red when active;
+  - **highlighted items are checked.** The current demo (until the next problem) and the
+    current commentary face and size have a check mark. The original gave them a white
+    background, which a QMenu can't give one item;
+  - the commentary font items use the faces the Qt GUI picked (item 03), Liberation Serif
+    and P052 rather than Tk's Times and Palatino;
+  - disabling Demos, Options or Memory (run and disabled modes) disables the menu bar's
+    item only, as gui.ss's `set-enabled!` did. The items inside keep their own states;
+  - the dialogs are Qt dialogs with the original's titles, texts, fonts, colours, buttons
+    and offsets from the control strip: Help (help.txt, read-only, word-wrapped, Courier
+    on bisque), Confirm (Clear Memory; the yellow theme-edit dialog), Input, and Qt's
+    file dialog for "Save Commentary to File". Escape closes a dialog as the window
+    manager's close does, which runs its destroy handler (Cancel);
+  - the clamp-codelets items look their pattern up when chosen, not when the menu is
+    made, so that the panel can be made before the engine is loaded;
+  - `display-error` puts back the last displayed message, not the label's text (anomalies:
+    "Two errors within 700 ms leave the first one on the control panel");
+  - the breakpoint message and the self-watching warning sit one above the other at the
+    end of the strip, so that the strip fits a 1920-pixel window with both showing.
+- **Why:** one window (TASK.md), with Qt's menu conventions where Tk's look can't be had.
+- **Tests:** `python/tests/test_qt_menus.py` compares the Qt menu bar and control panel
+  with `python/tests/data/tk-gui-inventory.json` in its five states, and
+  `drive_qt_menus.py` drives every item and dialog.

@@ -41,6 +41,26 @@ def qapp():
     app.quit()
 
 
+@pytest.fixture(autouse=True)
+def collect_qt_garbage_on_the_gui_thread(request):
+    """After each Qt test, collect the cycles it left (closed MainWindows,
+    fake hosts: QtHost <-> Pane, with their PaneViews and QGraphicsScenes) on
+    the GUI thread.  Otherwise Python's cycle collector frees them whenever an
+    allocation triggers it, in whichever thread: a later test's worker thread
+    then destroyed QWidgets off the GUI thread and hung, holding the paint
+    gate (test_fonts_measure_from_several_threads_at_once; anomalies: "Qt
+    widgets freed by the cycle collector in a worker thread")."""
+    yield
+    if not request.node.path.name.startswith("test_qt_") or "PySide6.QtWidgets" not in sys.modules:
+        return
+    import gc
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents()
+        gc.collect()
+
+
 @pytest.fixture
 def grab(qapp, request):
     """grab(widget, name) -> the path of a PNG of the widget, in

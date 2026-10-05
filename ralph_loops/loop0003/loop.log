@@ -43,3 +43,30 @@
 [2026-10-04 19:12:59] claude session it07 (cap 3.00 h) -> session_it07.log
 [2026-10-04 21:04:04] session it07: error (exit 1, 123 tool calls)
 [2026-10-04 21:04:04] item not marked by the agent (error); marking - [!] so the loop advances
+[2026-10-04 22:42:28] --resume-wip: starting on top of uncommitted work:
+M docs/anomalies_and_quirks.md
+ M docs/divergences.md
+ M docs/python-translation-plan.md
+ M docs/qt-gui-plan.md
+ M python/metacat/qt/app.py
+ M python/metacat/qt/controls.py
+ M python/metacat/qt/hosts.py
+ M python/metacat/qt/mainwindow.py
+ M python/tests/README.md
+ M python/tests/test_qt_engine.py
+?? python/tests/drive_qt_menus.py
+?? python/tests/test_qt_menus.py
+[2026-10-04 22:42:28] loop start: up to 30 iterations, cap 3.0 h each, model default
+[2026-10-04 22:42:28] === iteration 9: 06 Control strip and menus. Translate the control panel and every menu from the
+[2026-10-04 22:42:28] claude session it09 (cap 3.00 h) -> session_it09.log
+[2026-10-04 23:22:50] session it09: error (exit 1, 17 tool calls)
+[2026-10-04 23:22:50] item not marked by the agent (error); marking - [!] so the loop advances
+[2026-10-04 23:52:50] tests FAILED: GATE TIMED OUT after 30 min: a test hung (a deadlock?). Find it: count the finished tests in the pytest progress line, and map the count onto `pytest --collect-only -q`.
+[2026-10-04 23:52:50] claude session it09_fix1 (cap 0.50 h) -> session_it09_fix1.log
+[2026-10-05 00:23:18] session it09_fix1 hit the 0.5 h cap; killing it
+[2026-10-05 00:23:18] session it09_fix1: timeout (exit 143, 33 tool calls)
+[2026-10-05 00:53:19] tests FAILED: GATE TIMED OUT after 30 min: a test hung (a deadlock?). Find it: count the finished tests in the pytest progress line, and map the count onto `pytest --collect-only -q`.
+[2026-10-05 00:53:19] claude session it09_fix2 (cap 0.50 h) -> session_it09_fix2.log
+[2026-10-05 01:23:30] session it09_fix2 hit the 0.5 h cap; killing it
+[2026-10-05 01:23:31] session it09_fix2: timeout (exit 143, 46 tool calls)
+[2026-10-05 01:32:13] tests passed: GATE PASSED

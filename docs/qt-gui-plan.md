@@ -348,6 +348,22 @@ can't collapse a pane to zero by accident. Hiding a pane is a View-menu action.
   panes (all except the EEG, and except the Themes panes when self-watching is off) and
   recomputes the default sizes of 2.2 for the current window size.
 
+**As built (item 06).** `metacat/qt/controls.py` makes every menu of 1.3 and every
+dialog of 1.4; `MainWindow.place_control_panel` puts the menus in the menu bar (Help,
+Demos, View, Options, Memory) and calls `attach_windows`, which makes the View menu's
+window controllers (gui.ss's `window-controller`, one per pane, its QAction checked when
+the pane is shown). `MainWindow.set_pane_visible` shows or hides a pane, and
+`update_splitters` hides a nested splitter whose children are all hidden.
+View > Reset layout shows the default panes and calls `reset_layout` (the default sizes,
+following the window again). Saving the sizes with `QSettings` is item 08's. Highlighted
+items (the current demo, the commentary face and size) are checked actions. The
+breakpoint message and the self-watching warning are stacked at the end of the strip:
+side by side they made the strip wider than 1920 pixels once the warning showed.
+`python/tests/test_qt_menus.py` compares the menu bar and the five control-panel states
+with `tk-gui-inventory.json` (offscreen, on a 1920×1200 screen like the inventory's, so
+that `select-control-panel-fonts` picks the same fonts). The divergences are in
+`docs/divergences.md`, "Python Qt GUI: the menus and dialogs".
+
 ### 2.4 Resize policy per panel
 
 In one window, panes change size all the time. Each Qt pane keeps the original's resize

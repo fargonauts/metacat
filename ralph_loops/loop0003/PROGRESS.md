@@ -571,3 +571,13 @@ Item **06 Control strip and menus**: SOLVED.
   counts as a failure. Sessions are told to run the gate under `timeout 1800`.
 
 ---
+
+## Iteration 9 — 2026-10-04 23:22:50
+### Completed
+- (driver) session ended with outcome `error` without marking the item
+### Blockers
+- see session_it09.log
+### Next
+- revisit or re-open this item
+
+---

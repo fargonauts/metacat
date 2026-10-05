@@ -135,7 +135,8 @@ def enabled(cp):
     from metacat.objects import tell
     W = tell(cp, "get-widgets")
     return tuple(W[n].isEnabled() for n in ("command-line", "step-button", "go-button",
-                                             "stop-button", "reset-button", "options-menu"))
+                                             "stop-button", "reset-button")) + (
+        W["options-menu"].menuAction().isEnabled(),)
 
 
 def test_the_panel_starts_disabled_with_its_prompt(panel):

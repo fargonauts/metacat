@@ -90,7 +90,7 @@
     - no deadlock across 50 rapid Go/Stop toggles;
     - record run 7's wall-clock time in the Qt GUI and in the tkinter GUI.
 
-- [ ] **06 Control strip and menus.** Translate the control panel and every menu from the
+- [!] **06 Control strip and menus.** Translate the control panel and every menu from the
     item 00 inventory into the main window:
     - a control strip with the command line, Go, Step, Stop, Reset and speed, showing
       the problem and seed;
