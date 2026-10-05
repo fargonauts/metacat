@@ -20,6 +20,8 @@ onto the GUI thread, as a user's events would arrive.  Scenarios:
   run       View > Show all panes, then `abc abd ijk abd 1` (a justify run,
             so the Bottom Themes draw too) typed into the command line, Go,
             to the answer; every pane grabbed
+  run7      the same in the default layout with Run 7, `abc abd xyz
+            3852097033` (the README's screenshots, loop0003 item 09)
 
 The last line of stdout is a JSON object with the measurements; screenshots go
 to OUTDIR.  The script exits by itself (a watchdog ends it after 5 minutes).
@@ -285,13 +287,21 @@ def golden_end(name):
 
 
 def scenario_run():
-    common()
     view("Show all panes")
+    run_to_answer("abc abd ijk abd 1", "abc-abd-ijk-abd_1.jsonl", "run")
+
+
+def scenario_run7():
+    run_to_answer("abc abd xyz 3852097033", "abc-abd-xyz_3852097033.jsonl", "run7")
+
+
+def run_to_answer(problem, golden, name):
+    common()
     on_main(lambda: W["speed-slider"].setValue(100))      # the slider's fast end
 
     def enter():
         e = W["command-line"]
-        e.setText("abc abd ijk abd 1")
+        e.setText(problem)
         QTest.keyClick(e, Qt.Key_Return)
     on_main(enter)
     wait_for(lambda: on_main(lambda: W["go-button"].isEnabled()), "input mode")
@@ -304,11 +314,11 @@ def scenario_run():
         "the run ends", secs=240)
     RESULT["run_seconds"] = round(time.time() - t, 2)
     RESULT["end"] = [setup.g_codelet_count, chez.random_seed()]
-    RESULT["golden_end"] = golden_end("abc-abd-ijk-abd_1.jsonl")
+    RESULT["golden_end"] = golden_end(golden)
     from metacat.qt import hosts
     on_main(lambda: hosts.settle_resizes(QAPP.processEvents, timeout=30))
     settle()
-    tag = "run-%dx%d" % (SW, SH)
+    tag = "%s-%dx%d" % (name, SW, SH)
     on_main(lambda: grab_png(WINDOW, OUT / ("window-%s.png" % tag)))
     RESULT["panes"] = pane_report(tag)
 
@@ -333,7 +343,12 @@ def watchdog():
 
 if __name__ == "__main__":
     threading.Thread(target=watchdog, daemon=True).start()
-    threading.Thread(target=driver, daemon=True).start()
+    DRIVER = threading.Thread(target=driver, daemon=True)
+    DRIVER.start()
     QAPP.exec()
+    # closing the window ends the event loop (the last window closed) while the
+    # driver may still be finishing its scenario: let it print and set the status
+    # (it ends the process itself; the watchdog bounds the wait)
+    DRIVER.join()
     sys.stdout.flush()
     os._exit(STATUS[0])

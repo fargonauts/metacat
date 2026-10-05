@@ -3,7 +3,8 @@
 Two faithful ports of **Metacat 1.2**, James B. Marshall's model of analogy-making and
 self-watching perception. One is in [Racket](https://racket-lang.org), with a native
 `racket/gui` interface. The other is in Python 3, using only the standard library, with a
-tkinter interface. Both reproduce the original program's runs **event for event**, checked
+tkinter interface, plus an optional Qt interface that shows every window at once in a
+single window. Both reproduce the original program's runs **event for event**, checked
 against the original itself running headless under Chez Scheme 10.
 
 **Metacat home page:** <https://science.slc.edu/~jmarshall/metacat/>
@@ -60,12 +61,26 @@ was a VirtualBox image.
 |---|---|---|
 | Needs | Racket 8.x CS with `racket/gui` (`sudo apt install racket`) | Python 3.12, standard library + tkinter |
 | GUI | `racket racket/main.rkt` | `cd python && python3 -m metacat.gui` |
+| One-window GUI | | `cd python && python3 -m metacat.qt` (needs PySide6) |
 | Headless | `racket racket/cli.rkt abc abd xyz --seed 3852097033` | `cd python && python3 -m metacat abc abd xyz --seed 3852097033` |
-| Install | `bash make-dist.sh` builds a standalone program in `build/metacat/` | `pip install -e python` installs `metacat` and `metacat-gui` |
+| Install | `bash make-dist.sh` builds a standalone program in `build/metacat/` | `pip install -e python` installs `metacat` and `metacat-gui`; `pip install -e 'python[qt]'` adds PySide6 and `metacat-qt` |
 | More | [`racket/README.md`](racket/README.md) | [`python/README.md`](python/README.md) |
 
 Chez Scheme 10 (`sudo apt install chezscheme`) is needed only to run the original and the
 equivalence tests.
+
+**Everything in one window.** The original, and both ports' main GUIs, open about ten
+windows. The Python port's Qt GUI ([`python/metacat/qt/`](python/metacat/qt/README.md))
+puts them all in one window, for a screen of 1920×1080 or larger, with the same pictures,
+controls and menus. The panes can be resized, hidden and shown, and the layout is
+remembered:
+
+```bash
+pip install -e 'python[qt]'
+metacat-qt                     # then type abc abd xyz 3852097033 and press Enter, then Go
+```
+
+![The Python port's Qt GUI after answering wyz to Run 7: every panel in one 1920×1080 window](docs/screenshots/qt-run7-wyz.png)
 
 **Using the GUI.** Type a problem into the control panel's box and press **Enter**. Enter
 starts the run; **Go** stays greyed out until a run is under way. Then:

@@ -44,7 +44,14 @@ def pyproject():
 def test_commands_declared():
     scripts = pyproject()["project"]["scripts"]
     assert scripts == {"metacat": "metacat.__main__:main",
-                       "metacat-gui": "metacat.gui.app:main"}
+                       "metacat-gui": "metacat.gui.app:main",
+                       "metacat-qt": "metacat.qt.app:main"}
+
+
+def test_qt_extra_declared():
+    extras = pyproject()["project"]["optional-dependencies"]
+    assert [d for d in extras["qt"] if d.startswith("PySide6")] == extras["qt"]
+    assert pyproject()["project"]["dependencies"] == []
 
 
 def test_entry_points_take_no_arguments():
@@ -52,7 +59,8 @@ def test_entry_points_take_no_arguments():
     import inspect
     from metacat import __main__ as cli
     from metacat.gui import app
-    for f in (cli.main, app.main):
+    from metacat.qt import app as qt_app
+    for f in (cli.main, app.main, qt_app.main):
         assert all(p.default is not inspect.Parameter.empty
                    for p in inspect.signature(f).parameters.values())
 
@@ -203,3 +211,77 @@ def test_regular_install(tmp_path, oracle_stdout):
         (ROOT / "chez_scheme" / "original" / "help.txt").read_bytes()
     check_run([str(venv / "bin" / "metacat")], elsewhere, tmp_path, oracle_stdout)
     check_gui_opens([str(venv / "bin" / "metacat-gui")], elsewhere)
+
+
+# ------------------------------------------------------------------
+# slow: the Qt GUI's extra (loop0003 item 09)
+
+def check_qt_opens(cmd, cwd, tmp):
+    """the Qt GUI opens its window headlessly (offscreen), prints its title and
+    panes, grabs the window and quits by itself (--quit-after)"""
+    env = clean_env()
+    env.pop("WAYLAND_DISPLAY", None)
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    png = tmp / "window.png"
+    p = subprocess.run([*cmd, "--quit-after", "2500", "--settings", str(tmp / "qt.ini"),
+                        "--screenshot", str(png)],
+                       cwd=cwd, env=env, capture_output=True, text=True,
+                       stdin=subprocess.DEVNULL, timeout=300)
+    assert p.returncode == 0, p.stderr
+    lines = p.stdout.splitlines()
+    assert lines[0] == "Metacat", p.stdout
+    assert lines[1].split()[:4] == ["Panes:", "workspace", "slipnet", "coderack"], p.stdout
+    assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    assert (tmp / "qt.ini").is_file()            # the layout was saved at close
+
+
+@pytest.mark.slow
+def test_editable_install_with_qt_extra(tmp_path):
+    """`pip install -e 'python[qt]'`: the extra resolves (PySide6, already in the
+    system site-packages, satisfies it offline) and `metacat-qt` opens the window"""
+    pytest.importorskip("PySide6.QtWidgets")
+    py = clean_copy(tmp_path / "checkout")
+    venv = tmp_path / "venv"
+    subprocess.run([sys.executable, "-m", "venv", "--system-site-packages", str(venv)],
+                   check=True, env=clean_env())
+    p = subprocess.run([str(venv / "bin" / "pip"), "install", "--no-build-isolation",
+                        "--no-index", "-e", "%s[qt]" % py],
+                       env=clean_env(), cwd=tmp_path, capture_output=True, text=True)
+    assert p.returncode == 0, p.stdout + p.stderr
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    assert where_is_metacat(venv, elsewhere) == (py / "metacat" / "__init__.py").resolve()
+    assert (venv / "bin" / "metacat-qt").is_file()
+    check_qt_opens([str(venv / "bin" / "metacat-qt")], elsewhere, tmp_path)
+
+
+@pytest.mark.slow
+def test_install_without_qt_extra(tmp_path, oracle_stdout):
+    """without the extra, in a venv that can't see PySide6 (no system
+    site-packages; the wheel is built by this Python's setuptools), the engine
+    and the tkinter GUI install and run, and `metacat-qt` says what it needs"""
+    py = clean_copy(tmp_path / "checkout")
+    dist = tmp_path / "dist"
+    subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-build-isolation",
+                    "--no-index", "--no-deps", "-q", "-w", str(dist), str(py)],
+                   check=True, env=clean_env(), cwd=tmp_path, capture_output=True)
+    wheel, = dist.glob("metacat-*.whl")
+    venv = tmp_path / "venv"
+    subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True, env=clean_env())
+    p = subprocess.run([str(venv / "bin" / "pip"), "install", "--no-index", "-q",
+                        str(wheel)],
+                       env=clean_env(), cwd=tmp_path, capture_output=True, text=True)
+    assert p.returncode == 0, p.stdout + p.stderr
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    vpy = str(venv / "bin" / "python")
+    p = subprocess.run([vpy, "-c", "import PySide6"], cwd=elsewhere, env=clean_env(),
+                       capture_output=True, text=True)
+    assert p.returncode != 0 and "No module named 'PySide6'" in p.stderr
+    assert where_is_metacat(venv, elsewhere).is_relative_to(venv)
+    check_run([str(venv / "bin" / "metacat")], elsewhere, tmp_path, oracle_stdout)
+    check_gui_opens([str(venv / "bin" / "metacat-gui")], elsewhere)
+    p = subprocess.run([str(venv / "bin" / "metacat-qt")], cwd=elsewhere, env=clean_env(),
+                       capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+    assert p.returncode == 1
+    assert p.stderr == "The Qt GUI needs PySide6: pip install -e 'python[qt]'\n"

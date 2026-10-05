@@ -4,7 +4,7 @@
   "max_fix_attempts": 4,
   "max_iterations": 30,
   "model": null,
-  "pause": true,
+  "pause": false,
   "stop": false,
   "sleep_between_s": 0,
   "run_tests": true,

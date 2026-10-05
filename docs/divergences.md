@@ -260,3 +260,18 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   `python/tests/test_qt_layout.py` runs `abc abd ijk abd 1` in the window at 1920×1080 and
   2560×1440 and checks the codelet count and random state against the golden.
 
+
+## Python Qt GUI: packaging and a third command (loop0003 item 09)
+- **What:** the original had one program, started from Chez Scheme's REPL. The Python port
+  installs three commands: `metacat` (headless), `metacat-gui` (the tkinter GUI, the
+  original's windows) and, with the optional `qt` extra (`pip install -e 'python[qt]'`,
+  which adds PySide6), `metacat-qt` (every window as a pane of one Qt window). Without
+  PySide6, `metacat-qt` prints `The Qt GUI needs PySide6: pip install -e 'python[qt]'`
+  and exits with status 1; the engine and the tkinter GUI never import the Qt package.
+  `metacat-qt` also takes `--settings INI` (where the layout is saved; or
+  `$METACAT_QT_SETTINGS`), and `--quit-after MS` and `--screenshot PNG` for scripts.
+- **Why:** PySide6 is large, and the engine and the tkinter GUI need only the standard
+  library (TASK.md), so the Qt GUI is opt-in. `python/tests/test_install.py` installs
+  both ways into fresh venvs: with the extra, `metacat-qt` opens and closes headlessly;
+  without it (a venv that can't see PySide6), Run 7 still gives its golden trace and
+  `metacat-gui` opens.

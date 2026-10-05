@@ -85,3 +85,11 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 03:07:44] committed 90add2e: 08 Layout polish.
 [2026-10-05 03:07:46] pushed 90add2e to origin
 [2026-10-05 03:07:46] paused by knobs.json; polling every 60 s
+[2026-10-05 03:19:46] unpaused
+[2026-10-05 03:19:46] === iteration 12: 09 Packaging and docs.
+[2026-10-05 03:19:46] claude session it12 (cap 3.00 h) -> session_it12.log
+[2026-10-05 03:36:54] session it12: ok (exit 0, 45 tool calls)
+[2026-10-05 03:46:21] tests FAILED: GATE FAILED
+[2026-10-05 03:46:21] claude session it12_fix1 (cap 1.50 h) -> session_it12_fix1.log
+[2026-10-05 03:47:35] session it12_fix1: ok (exit 0, 15 tool calls)
+[2026-10-05 03:58:00] tests passed: GATE PASSED

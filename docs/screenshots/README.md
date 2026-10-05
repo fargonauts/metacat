@@ -1,14 +1,14 @@
 # Screenshots
 
 This gallery shows the Racket port (`racket/`, drawn with racket/draw in racket/gui windows)
-and the Python port (`python/`, drawn on tkinter canvases) running real problems. The
-images are full screens of each port's GUI, crops of the Workspace, the Python port's
+and the Python port (`python/`, drawn on tkinter canvases, or in one Qt window) running
+real problems. The images are full screens of each port's GUI, crops of the Workspace, the Python port's
 windows one by one, and the SGL drawing-language test fixture as each port draws it. Every
 run shown is a seeded run from [`tests/problems.txt`](../../tests/problems.txt), so its
 golden trace in `tests/golden/` shows codelet by codelet what happened. Both ports
 reproduce those traces exactly, so the same run looks the same in both ports, apart from
-fonts and widgets. All images were taken on a virtual X display (Xvfb), never on a real
-screen.
+fonts and widgets. All images were taken on a virtual X display (Xvfb), or for the Qt GUI
+with Qt's offscreen platform, never on a real screen.
 
 To compare these with Marshall's own 1999 screenshots, see
 [`../reference/`](../reference/README.md).
@@ -21,6 +21,7 @@ To compare these with Marshall's own 1999 screenshots, see
 | `run7-workspace.png`, `mrrjjj-513-workspace.png` (800×600) | Racket | Crops of the Workspace window from screenshots taken with `tests/gui-screenshot.rkt` (loop0001 item 16; see `docs/porting-notes.md`, "README and screenshots"). |
 | `python-run7-wyz.png`, `python-ijk-clamp.png` | Python | Screens of the GUI that [`python/tests/drive_gui.py`](../../python/tests/drive_gui.py) drives under Xvfb. It builds the GUI as `python3 -m metacat.gui` does, then a driver thread presses buttons, types commands, opens menus and clicks on canvases. Each GUI run's trace is checked against its golden, and the screen is grabbed with Xlib's `XGetImage` through ctypes. The script's own grabs are 2560×1600 (`python/tests/snapshots/gui-run7.png`, `gui-final.png`). `python-run7-wyz.png` was cropped from `gui-run7.png` to the windows (loop0002 item 16). |
 | `panels/*-run7-*.png`, `panels/EEG-run7-800.png` | Python | [`python/tests/render_views.py`](../../python/tests/render_views.py) (slow test tier, under `xvfb-run`). It replays a golden run with every window attached on real Tk canvases, then raises each window and grabs it with `XGetImage` into `WINDOW-SCENE.png`. These files are the same bytes as `python/tests/snapshots/views/`. |
+| `qt-run7-wyz.png` (1920×1080), `qt-run7-wyz-1440p.png` (2560×1440) | Python (Qt) | [`python/tests/drive_qt_layout.py`](../../python/tests/drive_qt_layout.py) `OUTDIR run7 --screen 1920x1080` (and `2560x1440`), offscreen with no X server (loop0003 item 09). It opens the window as `python3 -m metacat.qt` does, on an offscreen screen of that size (the window maximised, default layout, with a throw-away settings file), types `abc abd xyz 3852097033` into the command line, presses Enter and Go with the slider at Fast, waits for the answer, checks the codelet count and random state against the golden (2170, 4089168737), and grabs the window with `QWidget.grab()` as `window-run7-WxH.png`. |
 | `panels/sgl-fixture-racket.png` | Racket | `racket/tests/sgl-test.rkt`'s pixel snapshot of `racket/tests/sgl-fixture.rkt` (the same file as `racket/tests/snapshots/sgl-fixture.png`). |
 | `panels/sgl-fixture-python.png` | Python | [`python/tests/render_sgl_fixture.py`](../../python/tests/render_sgl_fixture.py). It draws `python/oracle/sgl-fixture.scm` on a 640×480 tkinter Canvas at a fixed 96 dpi and grabs it from the X server (the same file as `python/tests/snapshots/sgl-fixture.png`). |
 | `panels/sgl-fixture-qt.png` | Python (Qt) | `python/tests/test_qt_canvas.py::test_sgl_fixture_renders_like_tk` (offscreen, no X server). It draws the same fixture through `metacat/gui/sgl.py` onto the Qt canvas (`metacat/qt/canvas.py`), with text measured on a Qt hidden canvas, and renders the `QGraphicsScene` into a 640×480 image (also written to `python/tests/screenshots-qt/`, which is not committed). |
@@ -33,8 +34,9 @@ real screen. See "GTK ignores Xvfb when `WAYLAND_DISPLAY` is set" in
 > **Known rendering issue in the Python screenshots.** In the Python screens taken under
 > Xvfb, the Coderack window's tiny codelet-type labels drop letters: "Bond bu ders",
 > "Answer f nders", "Groupeva uators", "Rue scouts". The model is not affected (the runs
-> match their goldens). This has **not yet been checked on a real screen**, so it may be a
-> font problem of the Xvfb setup rather than of the port.
+> match their goldens). Loop0003 item 03 found the cause: the tkinter GUI's Tk has no Xft
+> and draws X core fonts as 1-bit bitmaps, which lose the thin letters at 8–10 pixels (see
+> "Small text" below). The Qt GUI's screenshots keep them.
 
 ---
 
@@ -73,6 +75,28 @@ so the concept-mapping list (`predgrp=>succgrp` …) touches the top rule's box.
 panel has Tk's widgets and a "Clear Memory" entry in its menubar. The Coderack labels show
 the dropped letters noted above. The image was cropped from the 2560×1600 grab, so it is
 1850×1232.
+
+### Run 7 in one window: the Python port's Qt GUI
+
+![Python port's Qt GUI, Run 7, answer wyz, 1920×1080](qt-run7-wyz.png)
+
+**Python port, Qt GUI** (`python3 -m metacat.qt`), the same run at the same moment, in a
+1920×1080 window. Every window of the pictures above is a pane here: the Temperature,
+Workspace, Coderack, Vertical Themes and Commentary in the top row; the Slipnet, the Top
+and Bottom Themes and the Episodic Memory in the middle; the Temporal Trace at the bottom
+(the EEG is hidden by default, as its window was). The control panel is the strip under
+the menu bar. The panels are drawn by the same code as the tkinter ones, through a Qt
+canvas that executes their Tk commands, so the content is the same item for item; the
+differences are in rendering. The text is antialiased, and the Coderack's labels keep
+their `i`s and `l`s ("Bond builders", "Answer finders"). Panes that don't scroll keep their
+window's aspect ratio and are redrawn at their pane's size (at 1080p the Workspace's pane is
+790×593, against its own window's 800×600), and the Commentary's paragraphs are wider.
+
+![Python port's Qt GUI, Run 7, answer wyz, 2560×1440](qt-run7-wyz-1440p.png)
+
+The same at **2560×1440**: the window opens maximised and every pane grows in the same
+proportions. The Temporal Trace is scrolled to its latest events, so its first icon,
+Identity, is cut at the left edge, as in a Trace window scrolled to the end.
 
 ### `abc → abd; mrrjjj → ?` → `mrrjjk` (Racket)
 

@@ -1,7 +1,8 @@
 # Metacat 1.2 in Python
 
 A translation of James B. Marshall's **Metacat 1.2** from Chez Scheme to Python 3.12. It
-uses the standard library only, with a tkinter GUI. It was translated test-first, and every
+uses the standard library only, with a tkinter GUI. An optional second GUI puts every
+window in one Qt window ([`metacat/qt/`](metacat/qt/README.md), needs PySide6). It was translated test-first, and every
 expected value in its tests came from the original running under Chez Scheme 10. Given the
 same seed, it makes the same run as the original, event for event: all 109 golden traces in
 [`tests/golden/`](../tests/golden/) match byte for byte (also with every window attached),
@@ -17,9 +18,10 @@ dissertation)](../docs/screenshots/python-run7-wyz.png)
 under Xvfb at the answer `wyz`. Top row: the control panel and the Temperature, the
 Workspace (both rules and the crossed bridges that map `a`–`z` and `c`–`x`), the Coderack
 and the Commentary. Below: the Slipnet, the Top, Bottom and Vertical Themes, the Episodic
-Memory (a snag and the answer) and the Temporal Trace. Known flaw: in screenshots taken
-under Xvfb, the Coderack's tiny labels drop letters ("Bond bu ders" for "Bond builders").
-This hasn't been checked on a real screen yet.*
+Memory (a snag and the answer) and the Temporal Trace. Known flaw: the Coderack's tiny
+labels drop letters ("Bond bu ders" for "Bond builders"). This Tk draws X core fonts as
+1-bit bitmaps, which lose the `i`s and `l`s at 8–10 px; the Qt GUI keeps them (see
+[`docs/anomalies_and_quirks.md`](../docs/anomalies_and_quirks.md)).*
 
 ## Contents
 
@@ -51,6 +53,13 @@ Or install it, which gives you two commands:
 pip install -e python          # editable; or: pip install python  (a regular install)
 metacat abc abd xyz --seed 7
 metacat-gui
+```
+
+With the `qt` extra it also installs PySide6 and a third command, the one-window GUI:
+
+```bash
+pip install -e 'python[qt]'
+metacat-qt                     # or, from python/: python3 -m metacat.qt
 ```
 
 ### Headless
@@ -118,6 +127,20 @@ The menus:
 
 How the windows are drawn is in [`metacat/gui/`](metacat/gui/README.md).
 
+### The one-window GUI (Qt)
+
+`python3 -m metacat.qt` (or `metacat-qt`) shows the same panels, drawn by the same code,
+as panes of one window: a control strip and a menu bar at the top (View replaces Windows),
+and every panel below, in splitters you can drag. The panes can be hidden and shown from
+View, the layout is saved between sessions, and View > Reset layout restores the default.
+A run in it gives exactly its golden trace. It needs PySide6 (`pip install -e
+'python[qt]'`) and a screen of at least 1920×1080. See
+[`metacat/qt/README.md`](metacat/qt/README.md).
+
+![The Qt GUI after answering wyz to Run 7, at 1920×1080](../docs/screenshots/qt-run7-wyz.png)
+
+*Run 7 at its answer `wyz` in the Qt GUI, at 1920×1080 (grabbed offscreen).*
+
 ![abc → abd; ijk → ? with a user clamp](../docs/screenshots/python-ijk-clamp.png)
 
 *`abc abd ijk`, seed 1, after the answer `ijd`. A pattern was clamped by hand from the
@@ -131,11 +154,12 @@ bottom plots the average Workspace activity (yellow) and the temperature (red).*
 |---|---|
 | [`metacat/`](metacat/README.md) | The package: one module per original `.ss` file (the model), plus `chez.py` (Chez semantics), `objects.py`, `headless.py`, `trace_writer.py` and the CLI in `__main__.py` |
 | [`metacat/gui/`](metacat/gui/README.md) | The views: the SGL interpreter on a tkinter Canvas, the panels, the control panel and the GUI program. The engine never imports this package |
+| [`metacat/qt/`](metacat/qt/README.md) | The one-window GUI on PySide6 (optional): the Tk canvas commands executed on a `QGraphicsScene`, the panes, the control strip and menus. It reuses `metacat/gui/`'s panels; neither the engine nor the tkinter GUI imports it |
 | [`oracle/`](oracle/README.md) | Scripts that run the unedited original under Chez and freeze its output into `fixtures/`, the port's own Chez batteries (`oracle/batteries/`) and the benchmarks |
 | [`fixtures/`](fixtures/README.md) | The frozen Chez outputs every test compares against (171 MB, committed) |
-| [`tests/`](tests/README.md) | pytest: 25 test files, their helpers, and `snapshots/` (renderings to inspect) |
-| `pyproject.toml` | Package `metacat` 1.2.0. It ships the packages `metacat` and `metacat.gui` and the help text, declares the commands `metacat` (`metacat.__main__:main`) and `metacat-gui` (`metacat.gui.app:main`), and sets up pytest (`slow` marker) |
-| `run-tests.sh` | The single test entry point (full tier, or `--fast`) |
+| [`tests/`](tests/README.md) | pytest: 35 test files, their helpers, and `snapshots/` (renderings to inspect) |
+| `pyproject.toml` | Package `metacat` 1.2.0. It ships the packages `metacat`, `metacat.gui` and `metacat.qt` and the help text, declares the commands `metacat` (`metacat.__main__:main`), `metacat-gui` (`metacat.gui.app:main`) and `metacat-qt` (`metacat.qt.app:main`), the extras `test` (pytest) and `qt` (PySide6), and sets up pytest (`slow` marker) |
+| `run-tests.sh` | The single test entry point (full tier, `--fast`, or `--qt` for the Qt tests only) |
 
 The package reads nothing outside itself: `test_install.py` runs a clean copy of `python/`
 without the fixtures and tests. Of the
@@ -191,9 +215,12 @@ built" section, and item 17 added an audit.
 | The SGL interpreter's Tcl command stream | Command for command with the original's `swl:tcl-eval` | `tests/test_sgl.py` |
 | The GUI driven through its own widgets under Xvfb | Each run's trace equals its golden | `tests/test_gui.py` (`drive_gui.py`) |
 | Installs (clean copy, `pip install -e`, regular install into fresh venvs) | Run 7's stdout and golden trace | `tests/test_install.py` |
+| The Qt GUI, offscreen (loop0003): its canvas, fonts, panes, run controls, menus, clicks and layout | Display lists equal to tkinter's; every GUI run's trace equals its golden; menus, states and clicks equal to the tkinter GUI's | `tests/test_qt_*.py` |
+| Installs with and without the `qt` extra (fresh venvs) | `metacat-qt` opens and closes headlessly; without PySide6 the engine and the tkinter GUI still run | `tests/test_install.py` |
 
-In all there are **1412 tests**: 990 in the fast tier and 422 marked `slow`. The final
-audit (item 17) ran the gate green in 6 min 57 s on 32 cores.
+In all there were **1412 tests** at the end of loop0002: 990 in the fast tier and 422
+marked `slow`. Its final audit (item 17) ran the gate green in 6 min 57 s on 32 cores.
+With the Qt GUI's tests (loop0003) there are 1618: 1176 fast and 442 slow, about 10 min.
 
 ## Speed
 
@@ -218,7 +245,7 @@ idle (listed in [`docs/follow-ups.md`](../docs/follow-ups.md)).
 ## Tests
 
 ```bash
-bash python/run-tests.sh          # full tier, what the gate runs: about 7 min on 32 idle cores
+bash python/run-tests.sh          # full tier, what the gate runs: about 10 min on 32 idle cores
 bash python/run-tests.sh --fast   # fast tier: skips tests marked slow (about 10 s)
 bash python/run-tests.sh -k golden   # any other arguments go to pytest
 ```

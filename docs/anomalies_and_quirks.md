@@ -1608,3 +1608,16 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   (`python/tests/render_small_text.py`), and
   `python/tests/test_qt_fonts.py::test_tiny_coderack_labels_keep_their_thin_letters`
   (5 to 11 pixels). The tkinter GUI is left as it is.
+
+### `drive_qt_layout.py save` exits 1 with no output, now and then
+- **Seen:** 2026-10-05, in the loop0003 gate after item 09 (`test_qt_layout.py`, the
+  `saved` fixture: `save failed:` with empty stdout and stderr). It did not happen in 18
+  runs of the scenario on its own, 12 of them in parallel.
+- **What:** the `save` and `restore` scenarios end with `on_main(WINDOW.close)`. Closing
+  the last window ends `QAPP.exec()` (Qt's quit-on-last-window-closed), and the main thread
+  then called `os._exit(STATUS[0])` right away. When it got there before the driver thread
+  had finished (setting `STATUS[0] = 0` and printing the JSON line), the process exited
+  with the initial status 1 and printed nothing.
+- **Status:** fixed in the test driver. After `QAPP.exec()` returns, the main thread now
+  joins the driver thread, which ends the process itself; the watchdog still bounds the
+  wait. The GUI itself is not affected.

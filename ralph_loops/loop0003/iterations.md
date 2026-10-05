@@ -129,7 +129,7 @@
     Tests: splitter-size save and restore round-trips; reset layout restores the default; every pane is visible and non-empty at
     1920×1080 and 2560×1440 after a run. Inspect screenshots at both sizes.
 
-- [ ] **09 Packaging and docs.**
+- [x] **09 Packaging and docs.**
     - `pip install -e 'python[qt]'` installs a `metacat-qt` command;
     - write `python/metacat/qt/README.md` with screenshots;
     - add the Qt GUI to `python/README.md`, to the top-level `README.md` (quick start and

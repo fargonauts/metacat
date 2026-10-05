@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 9/12 SOLVED
+- **Current**: 10/12 SOLVED
 
 ---
 
@@ -796,3 +796,73 @@ Item **08 Layout polish**: SOLVED.
   in `.gitignore`.
 
 ---
+
+## Iteration 12 — 2026-10-05 03:36:45
+Item **09 Packaging and docs**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** In `python/tests/test_install.py` I first
+  changed `test_commands_declared` (now expects `metacat-qt = metacat.qt.app:main`),
+  added `test_qt_extra_declared` and `metacat.qt.app.main` to the no-argument entry
+  point test, and wrote two slow tests. Before the code: the fast tier gave
+  `1 failed, 5 passed`, and the two new slow tests both failed (no `metacat-qt` in the
+  venv's `bin/`).
+  - `test_editable_install_with_qt_extra`: a fresh venv (system site-packages visible,
+    so PySide6 resolves offline), `pip install --no-build-isolation --no-index -e
+    'COPY[qt]'` *without* `--no-deps`, so the extra really resolves. Then
+    `venv/bin/metacat-qt --quit-after 2500 --settings INI --screenshot PNG` from another
+    directory with `QT_QPA_PLATFORM=offscreen`: exit 0, prints `Metacat` and its panes,
+    writes a PNG, and saves the layout at close;
+  - `test_install_without_qt_extra`: a wheel built by this Python's setuptools,
+    installed into a venv **without** system site-packages (`import PySide6` fails
+    there). Run 7 through `metacat` gives the live oracle's stdout and the golden trace,
+    `metacat-gui` opens under xvfb-run, and `metacat-qt` exits 1 with `The Qt GUI needs
+    PySide6: pip install -e 'python[qt]'`.
+
+  Both pass in about 20 s together.
+- **`python/pyproject.toml`**: `metacat-qt = "metacat.qt.app:main"` in
+  `[project.scripts]` (the `qt` extra and the `metacat.qt` package were already there
+  from item 01).
+- **Screenshots**: `drive_qt_layout.py` has a new `run7` scenario (Run 7 in the default
+  layout; `run` and `run7` now share `run_to_answer`). At 1920×1080 and 2560×1440 it
+  ends at the golden's codelet count and random state (2170, 4089168737), in 6.2–6.4 s.
+  I inspected both grabs. They show the same picture as the Racket and tkinter Run 7
+  screenshots: the crossed bridges, both rules, three snags and `wyz`, Temperature 15, and
+  the Coderack labels with their `i`s and `l`s. They are committed as
+  `docs/screenshots/qt-run7-wyz.png` and `qt-run7-wyz-1440p.png`. At 1440p the Trace is
+  scrolled to its end, so its first icon is cut at the left edge; that is the Trace's own
+  scrolling.
+- **Docs**:
+  - new `python/metacat/qt/README.md`: running and installing, the options
+    (`--settings`, `$METACAT_QT_SETTINGS`, `--quit-after`, `--screenshot`), the
+    layout, a table of the modules, how the canvas, threads, speed and fonts work, the
+    tests, and both screenshots. I checked the threading paragraph against `canvas.py`
+    (canvas commands wait for `PAINT_GATE`, never for a call into the GUI thread);
+  - `python/README.md`: the Qt GUI in the intro, in the install commands and in a new
+    section "The one-window GUI (Qt)" with the screenshot. The layout table has a
+    `metacat/qt/` row; the pyproject row lists the third command and both extras. The
+    verification table has two Qt rows. `--qt` is noted, and the test counts are updated
+    (35 files, 1618 tests). The Xvfb label-flaw caption now gives item 03's explanation;
+  - top-level `README.md`: the intro, a quick-start row and the install cell, and a
+    paragraph "Everything in one window" with the commands and the screenshot;
+  - `docs/screenshots/README.md`: how the Qt images were made (a table row), a section
+    "Run 7 in one window" for both images, the intro (Qt offscreen as well as Xvfb), and the
+    Known rendering issue note updated with item 03's finding;
+  - `docs/divergences.md`: "Python Qt GUI: packaging and a third command";
+  - `python/tests/README.md`: the `test_install.py` row (6 + 6), the `run7` scenario,
+    and the totals: **1618 tests, 1176 fast and 442 slow** (HEAD had 1615, with the owner's
+    GC test).
+- Gate: `timeout 1800 python3 ralph_loops/loop0003/gate.py`: **GATE PASSED** (1618
+  passed in 10:25; racket/ unchanged). After it, only Markdown changed (test counts and
+  wording); `run-tests.sh --fast` was green again (1176 passed).
+
+### Blockers
+- None.
+
+### Next
+- Item 10 (optional, Racket single window) or item 11 (final audit).
+- For the audit: the top-level README's "Using the GUI" says "Enter starts the run; Go
+  stays greyed out until a run is under way". In the code (gui.ss's
+  `go-button-action` → `init-new-problem`), Enter sets up the problem and parks it in
+  input mode with Go enabled, and Go runs it, as `drive_qt_layout.py` does. This wording
+  predates loop0003, and I left it alone.
