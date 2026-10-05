@@ -581,6 +581,87 @@ def write_rgb_png(path, w, h, rgb, r):
                      + chunk(b"IEND", b""))
 
 
+def clicks():
+    """the mouse and keyboard scenario of click_scenario.py (loop0003 item 07), for
+    the Qt GUI's comparison: writes OUT/clicks.json.  Only when named."""
+    import click_scenario
+    result = click_scenario.run(TkClicks())
+    click_scenario.write(result, OUT / "clicks.json")
+    print("ok clicks", len(result["steps"]), flush=True)
+
+
+class TkClicks:
+    """click_scenario's adapter: Tk's own events on the widgets"""
+    on_main = staticmethod(on_main)
+    wait_idle = staticmethod(wait_idle)
+    enter = staticmethod(enter)
+    click = staticmethod(click)
+    answer_input_dialog = staticmethod(answer_input_dialog)
+    grab = staticmethod(grab_png)
+    press_dialog = staticmethod(press_dialog_button)
+
+    # the presses a user makes, as Tk's event patterns (hosts.TkHost binds
+    # <ButtonPress-1>, <Shift-ButtonPress-1> and <ButtonPress-3>)
+    PATTERNS = {"left": ["<ButtonPress-1>", "<ButtonRelease-1>"],
+                "shift": ["<Shift-ButtonPress-1>", "<Shift-ButtonRelease-1>"],
+                "control": ["<Control-ButtonPress-1>", "<Control-ButtonRelease-1>"],
+                "right": ["<ButtonPress-3>", "<ButtonRelease-3>"],
+                "shift-right": ["<Shift-ButtonPress-3>", "<Shift-ButtonRelease-3>"],
+                "middle": ["<ButtonPress-2>", "<ButtonRelease-2>"],
+                "double": ["<ButtonPress-1>", "<ButtonRelease-1>",
+                           "<ButtonPress-1>", "<ButtonRelease-1>"]}
+
+    @staticmethod
+    def answers():
+        return ANSWERS
+
+    info = staticmethod(info)
+
+    @staticmethod
+    def key_line(text, key):
+        """text on the command line, then a key, as the user types them"""
+        keysym = {"return": "<Return>", "kp-enter": "<KP_Enter>",
+                  "shift-return": "<Shift-Return>"}[key]
+
+        def do():
+            e = W["command-line"]
+            e.delete(0, "end")
+            e.insert(0, text)
+            e.focus_force()
+            e.update()
+            e.event_generate(keysym)
+        on_main(do)
+
+    @staticmethod
+    def wait_engine(secs=300):
+        wait_for(lambda: not app.engine_busy_p(), "the engine stops", secs)
+
+    @staticmethod
+    def set_speed_fast():
+        on_main(lambda: W["speed-slider"].set(100))
+        time.sleep(0.3)
+        on_main(lambda: root.update_idletasks())
+
+    @staticmethod
+    def invoke_option(label):
+        invoke_menu(W["options-menu"], label)
+        time.sleep(0.2)
+
+    @staticmethod
+    def visible_size(win):
+        widget = tell(win, "get-toplevel").widget
+        return widget.winfo_width(), widget.winfo_height()
+
+    @staticmethod
+    def press(win, x, y, kind):
+        widget = tell(win, "get-toplevel").widget
+
+        def do():
+            for pattern in TkClicks.PATTERNS[kind]:
+                widget.event_generate(pattern, x=x, y=y)
+        on_main(do)
+
+
 def timing():
     """run 7 from Go to its answer (the speed slider as invalid_input leaves it:
     Fast), for the Qt GUI's comparison (drive_qt_gui.py's timing; loop0003
@@ -600,7 +681,7 @@ def timing():
 
 SCENARIOS = [windows, invalid_input, full_run, step_mode, demo_stop_go, breakpoint_click,
              reset, menus, save_commentary, resize, screenshot]
-ON_REQUEST = [timing]
+ON_REQUEST = [timing, clicks]
 
 
 def driver():

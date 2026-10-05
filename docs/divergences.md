@@ -222,3 +222,21 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
 - **Tests:** `python/tests/test_qt_menus.py` compares the Qt menu bar and control panel
   with `python/tests/data/tk-gui-inventory.json` in its five states, and
   `drive_qt_menus.py` drives every item and dialog.
+
+## Python Qt GUI: the mouse and the keys (loop0003 item 07)
+- **What:** the panes take the bindings of `gui/hosts.py`'s `TkHost`: a left press gives
+  the viewport `(left-button)`, a left press with Shift `(shift left-button)`, a right
+  press `(right-button)`, whatever other modifiers are held, as Tk's binding rules give
+  them. The handler runs on the GUI thread, as it ran on Tk's. A double click is two
+  presses, as in Tk. The command line and the input dialog take Return with any
+  modifiers and not the keypad's Enter, as Tk's `<Key-Return>` does
+  (`metacat/qt/controls.py`'s `bind_return`; QLineEdit's `returnPressed` would also take
+  the keypad's Enter). The differences:
+  - a press in a pane's letterbox margin does nothing: it is outside the canvas, and Tk's
+    windows, sized by `wm aspect`, had no margin;
+  - the wheel over a pane's canvas does nothing (Tk's canvas has no wheel binding); over a
+    pane's scrollbar it scrolls, as it does over Tk's.
+- **Why:** parity. `python/tests/test_qt_clicks.py` drives the same mouse and key
+  scenario through QTest's events in the Qt GUI and Tk's events in the tkinter GUI and
+  finds the same model states and traces.
+

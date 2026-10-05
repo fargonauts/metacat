@@ -72,6 +72,48 @@ class PaneView(QGraphicsView):
         with PAINT_GATE:
             super().paintEvent(event)
 
+    # --- the mouse: TkHost's three bindings --------------------------------------
+
+    def mousePressEvent(self, event):
+        mods = press_modifiers(event.button(), event.modifiers())
+        if mods is not None:
+            p = event.position()
+            # the pane, not an attribute: a Python cycle between the two
+            # widgets crashed the cycle collector
+            self.parentWidget().host.press(int(p.x()), int(p.y()), mods)
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        # Qt sends a double click in place of the second press; Tk sends the
+        # second <ButtonPress> (TkHost binds no <Double-...>)
+        self.mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        event.accept()          # no rubber band, no scene dragging
+
+    def mouseReleaseEvent(self, event):
+        event.accept()
+
+    def wheelEvent(self, event):
+        # Tk's canvas doesn't scroll on the wheel (TkHost binds none); the
+        # scrollbars do, as Tk's do
+        event.ignore()
+
+
+def press_modifiers(button, modifiers):
+    """the modifiers that TkHost's bindings give Viewport.mouse_press for a
+    press: Tk picks the most specific binding that matches, and a binding
+    ignores the modifiers it doesn't name, so <Shift-ButtonPress-1> takes any
+    left press with Shift, <ButtonPress-1> any other left press (Control too),
+    <ButtonPress-3> every right press; other buttons have no binding (None)"""
+    if button == Qt.LeftButton:
+        if modifiers & Qt.ShiftModifier:
+            return ("shift", "left-button")
+        return ("left-button",)
+    if button == Qt.RightButton:
+        return ("right-button",)
+    return None
+
 
 class Pane(QWidget):
     """port: SWL's <toplevel> and its frame, as a pane: the view of a host's
@@ -191,6 +233,16 @@ class QtHost(ghosts.OffscreenHost):
             self.viewport.configure(w + 2, h + 2)
             return True
         return False
+
+    def press(self, x, y, mods):
+        """a mouse press on the view (GUI thread), as TkHost._press: the
+        viewport's handler runs here, on the GUI thread, as Tk ran it on Tk's"""
+        if self.viewport is not None:
+            try:
+                self.viewport.mouse_press(x, y, mods)
+            except Exception:   # noqa: BLE001 - SWL reported handler errors and went on
+                import traceback
+                traceback.print_exc()
 
     # --- SWL's toplevel and frame ----------------------------------------------
 

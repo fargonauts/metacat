@@ -34,7 +34,7 @@ once; no caller uses the value.  Queries answer from Python attributes.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMenu,
                                QPushButton, QSlider, QTextEdit, QVBoxLayout, QWidget)
@@ -49,6 +49,27 @@ from metacat.qt import fonts
 from metacat.qt.canvas import _qcolor
 from metacat.qt.engine_bridge import GuiInvoker
 from metacat.utilities import base_object, exists_p
+
+
+class _ReturnKey(QObject):
+    """Tk's <Key-Return> binding on an entry: the Return key with any modifiers,
+    not the keypad's Enter (KP_Enter, another keysym), which QLineEdit's
+    returnPressed would also take"""
+
+    def __init__(self, widget, action):
+        super().__init__(widget)
+        self.action = action
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Return:
+            self.action()
+            return True
+        return False
+
+
+def bind_return(line_edit, action):
+    """port: (bind entry <Key-Return> action), as gui.ss binds its entries"""
+    line_edit.installEventFilter(_ReturnKey(line_edit, action))
 
 
 def qfont(font):
@@ -169,7 +190,7 @@ def input_dialog(x, y, default, message_, input_action, destroy_action):
         else:
             input_action(value)
             dialog.close()
-    input_field.returnPressed.connect(action)
+    bind_return(input_field, action)
     if exists_p(default):
         input_field.setText(default)
         input_field.selectAll()
@@ -680,7 +701,7 @@ class QtControlPanel(SchemeObject):
         command_line = QLineEdit()
         command_line.setMinimumWidth(380)
         this.command_line_action = gui.go_button_action
-        command_line.returnPressed.connect(lambda: this.command_line_action(command_line))
+        bind_return(command_line, lambda: this.command_line_action(command_line))
         speed_controls = QWidget()
         speed_controls.setObjectName("speed-controls")
         speed_controls.setStyleSheet("QWidget#speed-controls { background: %s; }"

@@ -103,7 +103,7 @@
     driven offscreen. Enabled and disabled states match the tkinter GUI's in each run
     state.
 
-- [ ] **07 Mouse and keyboard parity.** Every binding from the inventory:
+- [x] **07 Mouse and keyboard parity.** Every binding from the inventory:
     - a click on the Workspace continues a run;
     - clamp clicks on the Slipnet, Coderack, Themes, Trace and Memory panes;
     - right clicks;

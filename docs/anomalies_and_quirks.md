@@ -1501,6 +1501,32 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   so no Qt garbage is left for another thread's collector. The program itself keeps its
   hosts for its whole life, and its dialogs use `deleteLater` (previous entry).
 
+### Collecting fake `QtHost`s one after another crashes the cycle collector
+- **Seen:** 2026-10-05, loop0003 item 07, while writing `python/tests/test_qt_clicks.py`:
+  a segfault ("Garbage-collecting") in the conftest's `gc.collect()` after the fourth
+  test, each of which made, showed and dropped a fake `QtHost`.
+- **What:** a standalone script that makes a `QtHost` with a fake viewport, shows its pane,
+  drops it, processes events and calls `gc.collect()`, three times in a row, segfaults in
+  the collector in its second or third round (one round is fine). It happens with the
+  committed `hosts.py` too, so it is not the mouse code. Not explained; the resize feeder
+  holds a host until its timer runs, so the order in which the collector frees a pane, its
+  `PaneView` and the canvas's `QGraphicsScene` may differ between rounds.
+- **Evidence:** the steps above, with `QT_QPA_PLATFORM=offscreen`; `test_qt_panes.py`
+  keeps its hosts alive by accident (they live until the end of the session).
+- **Status:** worked around in the tests: `test_qt_clicks.py` keeps one host per
+  scrolling kind for the whole session. The program never drops a host.
+
+### `QTest.mouseDClick` on a widget sends no press, only the double click
+- **Seen:** 2026-10-05, loop0003 item 07.
+- **What:** on a `QWidget`, `QTest.mouseDClick` delivers one `MouseButtonDblClick` and
+  nothing else, and two `QTest.mouseClick`s in a row never make a double click. On the
+  widget's `QWindow` it delivers what a real mouse does: press, release, double click,
+  release. Tk delivers a second `<ButtonPress>` for the second click of a double click.
+- **Evidence:** `test_a_double_click_is_two_presses_as_in_tk`; with widget-level events,
+  the clicks scenario's double click on the Memory selected the answer once, not twice.
+- **Status:** explained. The panes treat `mouseDoubleClickEvent` as a press, and the
+  tests send their clicks through the window.
+
 ## 🛸 UFO sightings
 
 ### The Python port's Coderack labels lose their `i`s and `l`s under Xvfb

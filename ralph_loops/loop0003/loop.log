@@ -70,3 +70,9 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 01:23:30] session it09_fix2 hit the 0.5 h cap; killing it
 [2026-10-05 01:23:31] session it09_fix2: timeout (exit 143, 46 tool calls)
 [2026-10-05 01:32:13] tests passed: GATE PASSED
+[2026-10-05 01:32:13] committed be3c001: 06 Control strip and menus. Translate the control panel and every menu
+[2026-10-05 01:32:16] pushed be3c001 to origin
+[2026-10-05 01:32:16] === iteration 10: 07 Mouse and keyboard parity. Every binding from the inventory:
+[2026-10-05 01:32:16] claude session it10 (cap 3.00 h) -> session_it10.log
+[2026-10-05 02:09:23] session it10: ok (exit 0, 97 tool calls)
+[2026-10-05 02:19:18] tests passed: GATE PASSED

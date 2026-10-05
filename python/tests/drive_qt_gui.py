@@ -39,9 +39,9 @@ GOLDEN = ROOT / "tests" / "golden"
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/drive-qt-gui")
 OUT.mkdir(parents=True, exist_ok=True)
 
-from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLineEdit  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton  # noqa: E402
 
 from metacat import chez, demos, engine, objects, run, setup, trace_writer, view_globals  # noqa: E402
 from metacat.objects import tell  # noqa: E402
@@ -439,16 +439,109 @@ def timing():
     print("ok timing run7 %.2f s" % RESULTS["run7_s"], flush=True)
 
 
+def clicks():
+    """the mouse and keyboard scenario of click_scenario.py (loop0003 item 07): the
+    same as drive_gui.py's clicks, through QTest's events; writes OUT/clicks.json,
+    which test_qt_clicks.py compares with the tkinter GUI's"""
+    import click_scenario
+    result = click_scenario.run(QtClicks())
+    click_scenario.write(result, OUT / "clicks.json")
+    print("ok clicks", len(result["steps"]), flush=True)
+
+
+class QtClicks:
+    """click_scenario's adapter: QTest's mouse and key events on the widgets"""
+    on_main = staticmethod(on_main)
+    wait_idle = staticmethod(wait_idle)
+    enter = staticmethod(enter)
+    click = staticmethod(click)
+    info = staticmethod(info)
+    answer_input_dialog = staticmethod(answer_input_dialog)
+    grab = staticmethod(grab)
+
+    BUTTONS = {"left": (Qt.LeftButton, Qt.NoModifier),
+               "shift": (Qt.LeftButton, Qt.ShiftModifier),
+               "control": (Qt.LeftButton, Qt.ControlModifier),
+               "right": (Qt.RightButton, Qt.NoModifier),
+               "shift-right": (Qt.RightButton, Qt.ShiftModifier),
+               "middle": (Qt.MiddleButton, Qt.NoModifier),
+               "double": (Qt.LeftButton, Qt.NoModifier)}
+    KEYS = {"return": (Qt.Key_Return, Qt.NoModifier),
+            "kp-enter": (Qt.Key_Enter, Qt.KeypadModifier),
+            "shift-return": (Qt.Key_Return, Qt.ShiftModifier)}
+
+    @staticmethod
+    def answers():
+        return ANSWERS
+
+    @staticmethod
+    def wait_engine(secs=300):
+        wait_for(lambda: not BRIDGE.busy(), "the engine stops", secs)
+
+    @staticmethod
+    def set_speed_fast():
+        on_main(lambda: W["speed-slider"].setValue(100))
+
+    @staticmethod
+    def invoke_option(label):
+        invoke_menu(W["options-menu"], label)
+
+    @staticmethod
+    def press_dialog(title, label):
+        def do():
+            (dialog,) = [w for w in QApplication.topLevelWidgets()
+                         if w.isVisible() and w.windowTitle() == title]
+            (b,) = [b for b in dialog.findChildren(QPushButton) if b.text() == label]
+            b.click()
+        on_main(do)
+
+    @staticmethod
+    def key_line(text, key):
+        def do():
+            e = W["command-line"]
+            e.setText(text)
+            QTest.keyClick(e, *QtClicks.KEYS[key])
+        on_main(do)
+
+    @staticmethod
+    def visible_size(win):
+        viewport = tell(win, "get-toplevel").pane.view.viewport()
+        return viewport.width(), viewport.height()
+
+    @staticmethod
+    def press(win, x, y, kind):
+        """the press as the platform delivers it, through the window (a double
+        click: press, release, double click, release), so that Qt routes it to
+        the widget under the pointer; a hidden pane gets it directly"""
+        viewport = tell(win, "get-toplevel").pane.view.viewport()
+        button, modifiers = QtClicks.BUTTONS[kind]
+
+        def do():
+            if viewport.isVisible():
+                target = viewport.window().windowHandle()
+                at = viewport.mapTo(viewport.window(), QPoint(x, y))
+            else:
+                target, at = viewport, QPoint(x, y)
+            if kind == "double":
+                QTest.mouseDClick(target, button, modifiers, at)
+            else:
+                QTest.mouseClick(target, button, modifiers, at)
+        on_main(do)
+
+
 SCENARIOS = [start, full_run, step_mode, demo_stop_go, breakpoint_run, reset, justify,
              toggles, timing]
+ON_REQUEST = [clicks]
 
 
 def driver():
     try:
         time.sleep(0.3)
         names = sys.argv[2:]
-        for scenario in SCENARIOS:
+        for scenario in SCENARIOS + ON_REQUEST:
             if names and scenario.__name__ not in names and scenario is not start:
+                continue
+            if not names and scenario in ON_REQUEST:
                 continue
             scenario()
         STATUS[0] = 0

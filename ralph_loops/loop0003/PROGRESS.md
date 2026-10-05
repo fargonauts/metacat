@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 6/12 SOLVED
+- **Current**: 7/12 SOLVED
 
 ---
 
@@ -524,7 +524,8 @@ Item **06 Control strip and menus**: SOLVED.
   `docs/qt-gui-plan.md` has "As built (item 06)"; `python/tests/README.md` has rows for
   `test_qt_menus.py` and `drive_qt_menus.py`, and the new totals (1585: 1149 fast, 436
   slow). `test_qt_engine.py`'s `enabled()` now reads the Options cascade's action.
-- Gate: GATE_PLACEHOLDER
+- Gate: GATE_PLACEHOLDER (filled in by iteration 10: the driver's gate passed on this work
+  after fix session it09_fix2, and committed it as be3c001)
 
 ### Blockers
 - None for item 06. Item 00 is still `[!]` from session 1 (its deliverables exist and
@@ -581,3 +582,93 @@ Item **06 Control strip and menus**: SOLVED.
 - revisit or re-open this item
 
 ---
+
+---
+
+## Iteration 10 — 2026-10-05 02:20:00
+Item **07 Mouse and keyboard parity**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** I wrote `python/tests/test_qt_clicks.py`, the
+  shared scenario `python/tests/click_scenario.py` and the two adapters (a `clicks`
+  scenario in `drive_gui.py` and in `drive_qt_gui.py`, both run only when named) before
+  the code was in place. With `metacat/qt/hosts.py` and `controls.py` reverted to HEAD,
+  the file gave `10 failed, 2 passed`. The two that passed check the inventory. The Qt
+  driver stopped at "the resumed run differs from its golden": the Workspace click did
+  nothing.
+- **The bindings, from `tk-gui-inventory.json`:** on every canvas, `<Button-1>`,
+  `<Shift-Button-1>` and `<Button-3>`; press handlers on the Workspace, Temporal Trace,
+  Episodic Memory and the three Themes windows. The Slipnet and Coderack have none, so
+  clicks there do nothing in both GUIs. `<Key-Return>` on the command line and the input
+  dialog. There are no other key bindings.
+- **`metacat/qt/hosts.py`**: `PaneView.mousePressEvent` and `mouseDoubleClickEvent` call
+  `QtHost.press`, which calls `viewport.mouse_press(x, y, mods)` on the GUI thread, as
+  `TkHost._press` does, and prints a handler's error and goes on. `press_modifiers` applies
+  Tk's binding rules: Shift-left gives `(shift left-button)`, any other left
+  `(left-button)` (Control too), any right `(right-button)`, other buttons nothing. A
+  double click is a second press, as in Tk. Move, release and wheel events on the canvas
+  do nothing; the scrollbars still take the wheel.
+- **`metacat/qt/controls.py`**: `bind_return`, an event filter for Tk's `<Key-Return>`
+  (Return with any modifiers, not the keypad's Enter). It replaces `returnPressed` on the
+  command line and the input dialog.
+- **The scenario** (27 steps, the same code in both GUIs):
+  - keypad Enter (nothing happens), Return, Shift-Return;
+  - a breakpoint at 100 through the dialog's Enter;
+  - right, shift, middle and shift-right clicks on the Workspace (nothing happens);
+  - a left click that resumes the run, whose trace equals the golden `abc-abd-ijk_1`;
+  - a second run, then Trace selections (left, again to unselect, Control-left; right and
+    shift do nothing) and the Workspace click that restores the state;
+  - Memory selections: one answer, then a second, which compares them (the commentary
+    runs); a double click; right and shift do nothing;
+  - a Workspace click outside display mode continues the run;
+  - left, shift and right clicks on the five panes with no press handler;
+  - theme edit mode: Workspace, Trace and Memory clicks raise the dialog. The first click
+    on the Top and Vertical Themes edits their type (not the Bottom's outside justify
+    mode). Then left, right and shift clicks select themes, and second clicks unselect
+    them;
+  - Clamp Themes, and the run for 150 codelets with the clamp.
+
+  Each click aims at a model object through the model's own hit test, on the visible
+  pixels as `mouse_press` converts them, so the different pane sizes don't matter.
+- **Results:** the Qt GUI (QTest's events, sent through the window as a real mouse sends
+  them) and the tkinter GUI (Tk's `event_generate`, under xvfb-run) give **identical**
+  model snapshots in all 27 steps: codelet count, RNG state, modes, highlighted events and
+  answers, every theme's activation, and the clamp's pattern. They also give identical
+  traces, 504 + 911 + 721 + 176 lines, including the answer comparison's commentary and the
+  run after the manual clamp. The tkinter result is committed as
+  `python/tests/data/tk-clicks.json` (the steps, and each trace's length, SHA-256 and last
+  line). The slow test regenerates it and compares. The Qt scenario takes about 26 s and
+  the tkinter one about 30 s.
+- **Pictures, inspected:** the scenario grabs the window after the Trace selection (event
+  1's Workspace, Slipnet and Temperature redrawn as they were then), after the answer
+  comparison (the answer description with the highlighted answer and the comparison
+  commentary) and in theme edit mode. I compared the theme edit grab with the tkinter
+  screen grab of the same step: the same two −100 themes are marked red (Top: Object Type
+  iden; Vertical: Bond Facet diff), and the Bottom Themes pane is blank in both.
+- **Found and logged** in `docs/anomalies_and_quirks.md`:
+  - collecting fake `QtHost`s one after another crashes the cycle collector. This happens
+    with HEAD's `hosts.py` too. The tests keep one host per kind;
+  - `QTest.mouseDClick` on a widget sends only the double click; on the window it sends
+    press, release, double click, release. That's why the panes treat a double click as a
+    press and the tests send clicks through the window.
+- **Docs**:
+  - `docs/divergences.md` has a new section, "Python Qt GUI: the mouse and the keys": a
+    margin press does nothing, and the wheel doesn't scroll the canvas;
+  - `docs/qt-gui-plan.md` has "As built (item 07)";
+  - `python/tests/README.md` has rows for `test_qt_clicks.py` and `click_scenario.py`, and
+    new totals (1597: 1159 fast, 438 slow).
+- Item 06's "Gate: GATE_PLACEHOLDER" line is annotated: the driver's gate passed on that
+  work and committed it as be3c001.
+- Gate: `timeout 1800 python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1597 passed in
+  10:25; racket/ unchanged).
+
+### Blockers
+- None for item 07.
+- Item 06 is still marked `[!]` in iterations.md: the driver marked it because session 9
+  died, but its work passed the gate and is committed (be3c001). The owner can mark it `[x]`.
+
+### Next
+- Item 08 (layout polish): save the splitter sizes and hidden panes with `QSettings`, and
+  add the About/logo item. The panes are still blank for the first seconds after start
+  (one panel per 250 ms listener pause).
+

@@ -364,6 +364,17 @@ with `tk-gui-inventory.json` (offscreen, on a 1920×1200 screen like the invento
 that `select-control-panel-fonts` picks the same fonts). The divergences are in
 `docs/divergences.md`, "Python Qt GUI: the menus and dialogs".
 
+**As built (item 07).** `PaneView` passes its mouse presses to `QtHost.press`, which calls
+`viewport.mouse_press(x, y, mods)` on the GUI thread, as `TkHost._press` does on Tk's;
+`press_modifiers` applies Tk's binding rules (Shift-left, any other left, any right; other
+buttons nothing), and a double click counts as a second press. The entries bind Return
+with `bind_return`, an event filter that ignores the keypad's Enter. The scenario in
+`python/tests/click_scenario.py` runs in both GUIs (`drive_gui.py OUT invalid_input
+clicks` under xvfb-run, `drive_qt_gui.py OUT clicks` offscreen). It aims each click at a
+model object through the model's own hit test, so the pane sizes don't matter, and
+`test_qt_clicks.py` compares the 27 model snapshots and 4 traces with the tkinter result
+in `python/tests/data/tk-clicks.json`.
+
 ### 2.4 Resize policy per panel
 
 In one window, panes change size all the time. Each Qt pane keeps the original's resize
