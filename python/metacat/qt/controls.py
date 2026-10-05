@@ -713,7 +713,8 @@ class QtControlPanel(SchemeObject):
             b = QPushButton(title)
             b.setFont(qfont(p_gui_speed_controls_font))
             b.setEnabled(False)
-            b.clicked.connect(lambda: action(b))
+            b.action = action           # for the tests (drive_qt_audit.py)
+            b.clicked.connect(lambda: b.action(b))
             return b
         step_button = button("Step", gui.step_button_action)
         go_button = button("Go", gui.go_button_action)

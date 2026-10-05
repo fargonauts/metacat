@@ -83,8 +83,8 @@ metacat-qt                     # then type abc abd xyz 3852097033 and press Ente
 ![The Python port's Qt GUI after answering wyz to Run 7: every panel in one 1920×1080 window](docs/screenshots/qt-run7-wyz.png)
 
 **Using the GUI.** Type a problem into the control panel's box and press **Enter**. Enter
-starts the run; **Go** stays greyed out until a run is under way. Then:
-- **Go** continues the run;
+sets the problem up and waits; **Go** starts the run. Then:
+- **Go** continues the run after a stop or a breakpoint;
 - **Step** runs one step at a time (the step interval is under Options);
 - **Stop** interrupts the run;
 - **Reset** starts the problem again;

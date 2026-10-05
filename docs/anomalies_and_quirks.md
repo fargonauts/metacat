@@ -1064,8 +1064,9 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   of 7 s.
 - **Evidence:** `render_qt_panes.py`'s first `--resize` version (engine in a thread);
   stacks taken with `sys._current_frames()` showed the main thread in `processEvents`.
-- **Status:** open, for item 05 (the engine thread). Item 04 drives the engine in the GUI
-  thread and resizes at the run's `update-everything`, so the test doesn't depend on it.
+- **Status:** fixed in loop0003 item 05 (the update below). It was open after item 04,
+  which drove the engine in the GUI thread and resized at the run's `update-everything`,
+  so that its test didn't depend on it.
   Item 05 has to keep the GUI thread's Python work per refresh small (fewer Python calls
   per painted item, or painting cached pictures) and measure it.
 - **Update (loop0003 item 05): fixed.** What costs is a Python function that Qt calls from
@@ -1159,6 +1160,24 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** worked around. The layout gives hidden children `(0 0 0 0)`; a pane's host
   calls `container-flow-modified` on the panel after showing or hiding its canvas; the
   strip restores the warning's shown state after `reparent`.
+
+### racket/gui: a text field's `set-value` from another thread can find its editor locked
+- **Seen:** 2026-10-05, loop0003 item 11's gate (fix 1): control-panel-test.rkt's "Stop in
+  the middle of a run, then Go" check failed once in many runs.
+- **What:** run.rktl's `go`, `break` and `quiet-break` run in the engine thread and send
+  the control panel `switch-to-run-mode` / `switch-to-input-mode`, which set the command
+  line's text. When the GUI thread held the text field's editor at that moment, the engine
+  thread got `sequence-contract-violation: negative: method insert cannot be called, except
+  in states (unlocked), args "running..." 0 0`; the engine-error handler's own
+  `switch-to-input-mode` failed the same way, and the resumed run stopped at codelet 723
+  instead of finishing (`'(723 1487051997)` for the expected `'(2170 4089168737)`).
+- **Evidence:** the gate log of loop0003 iteration 15; the stack went through
+  gui.rktl's control panel object from gui.rkt's engine thread.
+- **Status:** fixed. The mode switches (and `update-current-problem`'s clearing of the
+  command line, which `run-new-problem` reaches from the engine thread) now run on the
+  control panel's eventspace thread, and the engine thread waits for them
+  (`call-on-gui-thread`, gui.rkt). The GUI thread never waits for the engine, so this
+  cannot deadlock; the order of the engine's work is unchanged, and no RNG draws move.
 
 ## 🔗 Hidden couplings
 
@@ -1570,6 +1589,11 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   processes events and runs `gc.collect()` on the GUI thread after every `test_qt_*` test,
   so no Qt garbage is left for another thread's collector. The program itself keeps its
   hosts for its whole life, and its dialogs use `deleteLater` (previous entry).
+- **Update (loop0003 item 11, the final audit):** the root cause was found later and fixed
+  in the program, not only in the tests: see "Python's cyclic garbage collector freed a Qt
+  widget on a worker thread: a deadlock" above (`hosts.collect_on_gui_thread()`). The
+  conftest fixture stays as a second line of defence; with the automatic collector off it
+  is the only place where the tests' Qt garbage is collected between tests.
 
 ### Collecting fake `QtHost`s one after another crashes the cycle collector
 - **Seen:** 2026-10-05, loop0003 item 07, while writing `python/tests/test_qt_clicks.py`:
@@ -1596,6 +1620,24 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   the clicks scenario's double click on the Memory selected the answer once, not twice.
 - **Status:** explained. The panes treat `mouseDoubleClickEvent` as a press, and the
   tests send their clicks through the window.
+
+### A hidden pane still gets a configure (Qt GUI)
+- **Seen:** 2026-10-05, loop0003 item 11 (the final audit): `drive_qt_audit.py` read the
+  hidden EEG's size as 640×26, where the tkinter inventory has 900×120.
+- **What:** the EEG pane is hidden from the start, but the splitter lays it out once
+  before it is hidden, and `QtHost.pane_resized` queues a configure like any other pane's.
+  When the window becomes resizable, the feeder delivers it, and the EEG panel redraws at
+  that size while nobody sees it. In the tkinter GUI the hidden EEG window keeps its
+  default size until it is shown. Showing the pane resizes it and sends a new configure,
+  so the EEG draws at its real size (`test_qt_layout.py::test_the_eeg_doubles_the_bottom_row`
+  and the run test with every pane shown).
+- **Evidence:** a probe that wraps `QtHost.deliver_configure` in `drive_qt_menus.py`'s
+  window: one delivery to the EEG, `((640, 26), visible False)`, with the pane then at
+  1920×40.
+- **Status:** not a bug: views never change a run (the goldens pass with the EEG hidden
+  and shown), and the cost is one redraw of a hidden panel at start. A
+  `deliver_configure` that skipped hidden panes would have to deliver the size when the
+  pane is shown; it was not worth the change at the end of the loop.
 
 ## 🛸 UFO sightings
 

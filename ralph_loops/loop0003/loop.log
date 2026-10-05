@@ -105,3 +105,12 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 05:13:48] claude session it13_fix2 (cap 1.50 h) -> session_it13_fix2.log
 [2026-10-05 05:32:20] session it13_fix2: ok (exit 0, 16 tool calls)
 [2026-10-05 05:50:07] tests passed: GATE PASSED
+[2026-10-05 05:50:07] committed d7bb9ce: 10 (Optional) A single window for the Racket port too. In `racket/gui/
+[2026-10-05 05:50:09] pushed d7bb9ce to origin
+[2026-10-05 05:50:09] === iteration 15: 11 Final audit. Re-run everything in the foreground: the Python suite and the Qt
+[2026-10-05 05:50:09] claude session it15 (cap 3.00 h) -> session_it15.log
+[2026-10-05 06:19:08] session it15: ok (exit 0, 110 tool calls)
+[2026-10-05 06:35:59] tests FAILED: GATE FAILED
+[2026-10-05 06:35:59] claude session it15_fix1 (cap 1.50 h) -> session_it15_fix1.log
+[2026-10-05 06:44:24] session it15_fix1: ok (exit 0, 31 tool calls)
+[2026-10-05 07:02:07] tests passed: GATE PASSED

@@ -304,3 +304,19 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   both ways into fresh venvs: with the extra, `metacat-qt` opens and closes headlessly;
   without it (a venv that can't see PySide6), Run 7 still gives its golden trace and
   `metacat-gui` opens.
+
+## Python Qt GUI: found by the final audit (loop0003 item 11)
+- **What:** `python/tests/test_qt_audit.py` compares the Qt GUI with every entry of the
+  tkinter inventory. Two differences remain, both in how things look, never in what they do:
+  - the Step, Go, Stop and Reset buttons are plain `QPushButton`s. gui.ss gives them an
+    active (mouse-over) background, green for Step, Go and Reset and red for Stop, which
+    the Qt strip doesn't reproduce;
+  - a pane's panel is told the pane's size, so the windows' sizes differ from the
+    inventory's default sizes (already in "windows as panes" above). The hidden EEG is
+    told its pane's size once at start too, where the tkinter GUI's hidden EEG keeps its
+    default size (`docs/anomalies_and_quirks.md`, "A hidden pane still gets a configure").
+- **Why:** the button colours are a hover effect of Tk's, and Qt's style draws its own; the
+  audit found it at the end of the loop and recorded it (`docs/follow-ups.md`). The panels,
+  scrolling, aspect ratios, resize methods, press handlers, backgrounds, the slider's
+  settings, the Input dialogs' places and rules, the buttons' actions and the close all
+  equal the inventory's.

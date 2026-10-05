@@ -157,7 +157,7 @@ bottom plots the average Workspace activity (yellow) and the temperature (red).*
 | [`metacat/qt/`](metacat/qt/README.md) | The one-window GUI on PySide6 (optional): the Tk canvas commands executed on a `QGraphicsScene`, the panes, the control strip and menus. It reuses `metacat/gui/`'s panels; neither the engine nor the tkinter GUI imports it |
 | [`oracle/`](oracle/README.md) | Scripts that run the unedited original under Chez and freeze its output into `fixtures/`, the port's own Chez batteries (`oracle/batteries/`) and the benchmarks |
 | [`fixtures/`](fixtures/README.md) | The frozen Chez outputs every test compares against (171 MB, committed) |
-| [`tests/`](tests/README.md) | pytest: 35 test files, their helpers, and `snapshots/` (renderings to inspect) |
+| [`tests/`](tests/README.md) | pytest: 36 test files, their helpers, and `snapshots/` (renderings to inspect) |
 | `pyproject.toml` | Package `metacat` 1.2.0. It ships the packages `metacat`, `metacat.gui` and `metacat.qt` and the help text, declares the commands `metacat` (`metacat.__main__:main`), `metacat-gui` (`metacat.gui.app:main`) and `metacat-qt` (`metacat.qt.app:main`), the extras `test` (pytest) and `qt` (PySide6), and sets up pytest (`slow` marker) |
 | `run-tests.sh` | The single test entry point (full tier, `--fast`, or `--qt` for the Qt tests only) |
 
@@ -220,7 +220,7 @@ built" section, and item 17 added an audit.
 
 In all there were **1412 tests** at the end of loop0002: 990 in the fast tier and 422
 marked `slow`. Its final audit (item 17) ran the gate green in 6 min 57 s on 32 cores.
-With the Qt GUI's tests (loop0003) there are 1618: 1176 fast and 442 slow, about 10 min.
+With the Qt GUI's tests (loop0003) there are 1640: 1198 fast and 442 slow, about 10 min.
 
 ## Speed
 

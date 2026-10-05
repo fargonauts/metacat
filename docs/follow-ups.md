@@ -178,3 +178,70 @@ the goldens and extra seeds identical, or else become a divergence in docs/diver
   On a model error, a GUI run goes to input mode with an "Error: ..." line. The original
   dropped into the REPL.
 - Only Linux with Tk 8.6 under Xvfb is tested; macOS and Windows Tk are untried.
+
+## Python Qt GUI (loop0003)
+
+Written by the final audit of loop0003 (item 11, 2026-10-05). `python3 -m metacat.qt`
+(`metacat-qt`) shows every panel of the original in one window, with the control strip,
+the menus, the dialogs, the mouse and the keys of the tkinter GUI. Each element of the
+tkinter inventory (`python/tests/data/tk-gui-inventory.json`) is mapped to the Qt tests
+that check it (`python/tests/test_qt_audit.py`'s `COVERAGE`), and the GUI runs give their
+goldens' traces. Watching must keep never changing a run: the engine is frozen, and every
+item below must keep the goldens and the GUI scenarios' traces identical.
+
+### Safety net
+
+- The Qt tests are about 3 minutes (209 tests) of the gate's 10-minute Python tier (`bash
+  python/run-tests.sh --qt` runs only them). They need `QT_QPA_PLATFORM=offscreen`, and
+  `conftest.py` runs them last because the offscreen `QApplication` starts a thread and
+  other tests fork. Keep both.
+- The rule from the deadlock (docs/anomalies_and_quirks.md, "Python's cyclic garbage
+  collector freed a Qt widget on a worker thread"): a Python-owned Qt object must never be
+  freed off the GUI thread. Keep `hosts.collect_on_gui_thread()` installed, never call
+  `gc.collect()` from a worker, and give a new dialog `deleteLater` in its `closeEvent`
+  as `SwlDialog` does.
+- The tkinter references (`tk-display-lists.json`, `tk-fonts-colors.json`,
+  `tk-clicks.json`, `tk-gui-inventory.json`) were taken with Anaconda's Tk 8.6 under
+  Xvfb. Their slow tests regenerate them; a different Tk (with Xft, say) would change
+  the font metrics and need a new reference, not a looser test.
+
+### Idiomatic clean-up
+
+- `QtControlPanel` (`controls.py`, about 1,300 lines) copies gui.py's control panel
+  message by message, with its own copies of the menu helpers. Both GUIs could share the
+  model side (`gui.py`'s actions already are shared) and keep only the widgets apart.
+- `drive_qt_*.py` share a pattern (a driver thread, `on_main`, a watchdog, a JSON report)
+  with duplicated helpers; `drive_qt_audit.py` already imports `drive_qt_menus.py`'s. A
+  small driver module would remove the copies.
+- `HiddenCanvas` keeps one display list per thread to dodge the original's race on its
+  one hidden canvas (anomalies, "Two threads measuring text on the one hidden canvas").
+  A measuring API that doesn't draw would be simpler, but fonts.ss's `get-pixel-size` is
+  the original's protocol.
+
+### Performance and polish
+
+- Run 7 at the slider's fast end: 6.5–7.1 s in the Qt GUI against 6.2–6.6 s in the
+  tkinter GUI (item 05, on a loaded machine). The paint gate costs most of the
+  difference; it buys a GUI that answers within 0.1 s. Not tried: drawing each pane into
+  a `QPixmap` cache, and replacing the per-item recorded painter calls with one
+  `QPicture` per pane.
+- At start the panels draw at their original sizes inside their panes, then redraw at
+  the pane sizes over about two seconds, one panel per 250 ms pause of the original's
+  resize listener. A first layout that told each panel its pane size before its first
+  draw would avoid the visible jump.
+- A hidden pane still gets configures (anomalies, "A hidden pane still gets a
+  configure"); the EEG redraws once at start while hidden.
+- The mouse wheel doesn't scroll the canvases (only the scroll bars), as in the tkinter
+  GUI. A press in a letterbox margin does nothing (divergences.md).
+- Only Qt's offscreen platform is tested. The window has never been opened on a real X11
+  or Wayland screen by the loop (the owner's rule), nor on macOS or Windows.
+- The tkinter GUI still has the port bug in which two errors within 700 ms leave the
+  first on the control panel (anomalies); the Qt GUI has the fix, which gui.py could
+  copy.
+
+### Racket's one window
+
+- `racket racket/one-window.rkt` (loop0003 item 10) places the panes by fixed
+  proportions. It has no draggable borders (racket/gui has no splitter) and no saved
+  layout. A hand-made splitter on `layout-panel%` and a preferences file would bring it
+  level with the Qt GUI.

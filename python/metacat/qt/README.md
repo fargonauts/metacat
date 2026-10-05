@@ -147,6 +147,7 @@ server. `bash python/run-tests.sh --qt` runs only them.
 | `test_qt_menus.py` | Every menu item and control of the tkinter GUI's inventory, in each run state |
 | `test_qt_clicks.py` | Clicks and keys give the same model states and traces as in the tkinter GUI |
 | `test_qt_layout.py` | Saving and restoring the layout, Reset layout, the minimum size, high DPI, every pane after a run at 1920×1080 and 2560×1440 |
+| `test_qt_audit.py` | The final audit: every entry of the tkinter inventory mapped to its Qt test; the windows as panes, the slider, the Input dialogs, the buttons; no GUI toolkit in a headless run |
 | `test_install.py` | A fresh venv with `pip install -e 'python[qt]'` opens and closes `metacat-qt` headlessly; a venv without PySide6 still runs the engine and the tkinter GUI |
 
 The screenshots above were made by `python3 python/tests/drive_qt_layout.py OUTDIR run7

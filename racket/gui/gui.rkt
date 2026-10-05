@@ -81,6 +81,27 @@
 
 (define (enable-widget w on?) (send w enable on?))
 
+;; run thunk in the thread of w's eventspace and wait for it.  run.rktl's
+;; break, quiet-break and go switch the control panel's mode from the engine
+;; thread; a text field's set-value there raised "insert cannot be called"
+;; when the GUI thread held the field's editor lock (an intermittent failure
+;; in control-panel-test.rkt).  The GUI thread never waits for the engine,
+;; so waiting here cannot deadlock.
+(define (call-on-gui-thread w thunk)
+  (let ((es (send w get-eventspace)))
+    (if (eq? (current-thread) (g:eventspace-handler-thread es))
+        (thunk)
+        (let ((done (make-semaphore 0)) (result #f))
+          (parameterize ((g:current-eventspace es))
+            (g:queue-callback
+              (lambda ()
+                (dynamic-wind void
+                              (lambda () (set! result (with-handlers ((exn:fail? values)) (thunk))))
+                              (lambda () (semaphore-post done))))
+              #t))
+          (semaphore-wait done)
+          (if (exn:fail? result) (raise result) result)))))
+
 ;; an swl-font% (fonts.rkt) as a racket/draw font for widgets
 (define (widget-font f) (if f (send f get-font) g:normal-control-font))
 

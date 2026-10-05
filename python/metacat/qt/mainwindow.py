@@ -33,7 +33,7 @@ TITLE = "Metacat"
 DEFAULT_SIZE = (1920, 1010)     # a maximised window on a 1920x1080 screen (the minimum)
 HANDLE = 4                      # the splitter handles' width
 SYNC_INTERVAL = 50              # ms between scene updates (racket/gui's refresh)
-MINIMUM_SIZE = (1600, 800)      # the control strip is 1600 wide; rows of 430/220/65 or more
+MINIMUM_SIZE = (1600, 800)      # widened to the control strip (1684 px at 1080p); rows of 430/220/65 or more
 SETTINGS_VERSION = 1            # bump whenever TREE changes: an older saved layout is ignored
 SAVE_DELAY = 500                # ms after the last handle drag
 

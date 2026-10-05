@@ -742,7 +742,8 @@
 		  (format " ~a -> ~a; ~a -> ~a       seed:  ~a "
 		    (1st problem) (2nd problem) (3rd problem)
 		    (if %justify-mode% (4th problem) '?) (5th problem)))
-		(send command-line set-value "")
+		(call-on-gui-thread control-panel
+		  (lambda () (send command-line set-value "")))
 		(unhighlight-menu-items demos-menu))
 	      (init-new-problem (tokens step-mode?)
 		(tell self 'update-current-problem tokens)
@@ -782,8 +783,13 @@
 		(set! %verbose% (or value verbose-mode?))
 		'done)
 	      ;; port: racket/gui text fields have one font and no foreground
-	      ;; colour; the run-mode look is the background and the text
+	      ;; colour; the run-mode look is the background and the text.
+	      ;; port: run.rktl switches modes from the engine thread; the
+	      ;; widgets change on the GUI thread (call-on-gui-thread, gui.rkt)
 	      (switch-to-run-mode ()
+		(call-on-gui-thread control-panel
+		  (lambda () (tell self 'switch-to-run-mode*))))
+	      (switch-to-run-mode* ()
 		(send command-line set-value "running...")
 		(send command-line set-field-background %gui-run-mode-foreground-color%)
 		(set! command-line-action nop-event-handler)
@@ -796,6 +802,9 @@
 		(enable-widget options-button #f)
 		(enable-widget clearmem-button #f))
 	      (switch-to-input-mode ()
+		(call-on-gui-thread control-panel
+		  (lambda () (tell self 'switch-to-input-mode*))))
+	      (switch-to-input-mode* ()
 		(enable-widget command-line #t)
 		(set! command-line-action go-button-action)
 		(send command-line set-value "")

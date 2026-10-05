@@ -149,7 +149,7 @@
     This item is a plus, not a requirement. If it doesn't fit the 3-hour cap, do a
     coherent part, mark it blocked and say exactly what remains.
 
-- [ ] **11 Final audit.** Re-run everything in the foreground: the Python suite and the Qt
+- [x] **11 Final audit.** Re-run everything in the foreground: the Python suite and the Qt
     tests, plus the Racket suite if `racket/` changed. Then:
     - check the Qt GUI against the item 00 inventory, entry by entry;
     - confirm that no engine module imports PySide6 or tkinter;

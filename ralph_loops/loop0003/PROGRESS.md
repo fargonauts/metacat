@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 11/12 SOLVED
+- **Current**: 12/12 SOLVED
 
 ---
 
@@ -969,3 +969,108 @@ Item **10 (Optional) A single window for the Racket port too**: SOLVED.
   `racket/tests/rule-diff-test.rkt` was running, which this run reached at 13 min.
 - Cause: knobs.json had `gate_timeout_min` at 15, below the gate's real length whenever
   racket/ changes. Fix: put it back to 30, the driver's default. No test was changed.
+
+---
+
+## Iteration 15 — 2026-10-05 06:10
+Item **11 Final audit**: SOLVED.
+
+### Completed
+- **Everything re-run in the foreground of the gate:** the Python suite (**1640 passed** in
+  10:21, Qt tests included) and, because `racket/` differs from the freeze point (item 10),
+  the Racket suite: `raco test racket/` (2640 tests), the gui-tests under xvfb-run (1317
+  checks) and the Chez oracle checks. The Qt tier alone (`run-tests.sh --qt`) gave 209
+  passed in 2:58.
+- **The Qt GUI against the item 00 inventory, entry by entry.** The menus, the five
+  control-panel states, the Help, Clear Memory and theme-edit dialogs, Save commentary and
+  the bindings were already compared by `test_qt_menus.py` and `test_qt_clicks.py`. The
+  rest had no entry-by-entry check, so I wrote `python/tests/test_qt_audit.py` (22 tests,
+  fast tier, about 6 s) and its driver `python/tests/drive_qt_audit.py` (it imports
+  `drive_qt_menus.py`'s window and helpers). It checks:
+  - every graphics window is a pane in a splitter with a View item, and has the
+    inventory's title, global, panel class, drawing module, scrolling, scroll bars,
+    resize method, visibility at start, left/right/shift press handlers and background;
+    the unscrollable ones keep Tk's aspect ratio;
+  - the Logo is the window icon (16–256 px);
+  - the speed slider's range, initial value, labels, and the five speed settings at each
+    of the inventory's seven recorded values;
+  - both Input dialogs: their offset from the control panel ([20, 80] and [80, 80]), a
+    second trigger raises the open dialog, "x", "0" and "-3" give the red "Invalid
+    input!" and it goes back after 700 ms, an empty field closes without a change, "123"
+    sets the value and closes (and the breakpoint label says so);
+  - Step, Go, Stop and Reset run gui.py's four actions, Enter is Go in input mode, and
+    closing the window quits (the control panel's close was `gui._exit`);
+  - `COVERAGE`: every top-level inventory key and every dialog maps to the tests that
+    check it, and each named test exists. A new inventory key fails this test.
+
+  **Honest order:** the audit compares the existing GUI with the inventory, so most of
+  these tests passed at their first run. The one code change, `b.action = action` on the
+  strip's buttons in `controls.py` (so a test can read which action a button runs), was
+  made for the buttons test, and with `controls.py` reverted that file gives `3 failed, 19
+  passed` (the driver stops at the buttons step).
+  **Result:** every compared entry is equal. Two differences remain, both visual, now in
+  `docs/divergences.md` ("Python Qt GUI: found by the final audit"): the buttons lack Tk's
+  green/red active colours, and panes tell their panels the pane's size (already
+  recorded), including the hidden EEG once at start.
+- **No engine module imports PySide6 or tkinter.** A static grep of `python/metacat/*.py`
+  finds no such import (the existing `test_no_engine_module_imports_qt` and
+  `test_engine_never_imports_gui` check this). The new runtime test
+  `test_a_run_imports_neither_pyside6_nor_tkinter` imports all 42 engine modules, runs
+  `abc abd xyz` seed 7 for 200 codelets through `metacat.__main__.main`, and finds no
+  PySide6, shiboken6, tkinter, `metacat.gui` or `metacat.qt` in `sys.modules`.
+- **`docs/qt-gui-plan.md` re-read against the code.** A read-only agent listed 24
+  discrepancies; I checked the important ones in the code and corrected the doc:
+  - the 1080p wireframe: the strip as built (info label, command line, slider over its
+    labels, the buttons, the stacked messages), and aspect ratios in place of the old
+    estimated sizes (the measured table stays);
+  - the QSettings keys (`layout/custom`, splitter states only when custom, `view/hidden`
+    space-separated, saved after a drag *or* a View change), and what Reset removes (it
+    keeps `layout/version` and `window/geometry`);
+  - 2.5: no journal (dirty ids synced every 50 ms under `PAINT_GATE`), no blocking
+    measurement fallback, the deadlock rules as built (the paint gate, `os._exit` at quit),
+    `parked_hook` for the final picture, `horizontalAdvance`, the 4-thread test;
+  - 2.6: one `TkItem` class with recorded painter calls; butt caps and round joins;
+    antialiasing on text only, with no option; `install()`/`qt_host_maker()`; panes placed
+    by name; `HiddenCanvas`;
+  - 2.7: the strip order, plain buttons, the menu order Help, Demos, View, Options, Memory,
+    "Metacat help" in a `QTextEdit`, "Clear Memory";
+  - 2.8: the module plan rewritten as built (app, displaylist, fontspec, icon, grab; the
+    drivers);
+  - "There is no run yet" and "Item 05 must solve this" marked as resolved;
+    `get-relative-position` noted as replaced; the strip font rule as followed.
+  The stale `MINIMUM_SIZE` comment in `mainwindow.py` ("the control strip is 1600 wide")
+  now gives the strip's real 1684 px.
+- **Startup, inspected:** grabs of `python3 -m metacat.qt` at 0.7 s and 2.5 s. The panels
+  aren't blank (an earlier note said so): they draw at once at their original sizes inside
+  their panes, and reach their pane sizes within about 2.5 s. Recorded in the plan and in
+  follow-ups.
+- **`docs/anomalies_and_quirks.md`:** the GIL entry's Status now says fixed (item 05); the
+  conftest-GC entry points to the later program fix (`collect_on_gui_thread`); a new entry,
+  "A hidden pane still gets a configure (Qt GUI)", from the audit (a probe showed one
+  delivery of 640×26 to the hidden EEG); status not a bug.
+- **`docs/follow-ups.md`:** a new section, "Python Qt GUI (loop0003)": safety net (the Qt
+  tier, the GC rule, the tkinter references), clean-up (the duplicated control panel,
+  the driver helpers, `HiddenCanvas`), performance and polish (run 7's times, the startup
+  jump, the hidden pane, the wheel, real screens untested, the tkinter 700 ms bug), and the
+  Racket one window (no splitters, no saved layout).
+- **Also fixed:** the top-level README's "Enter starts the run; Go stays greyed out" (the
+  note from iteration 12). Enter sets the problem up and waits, and Go starts the run
+  (gui.py's `go_button_action` → `init-new-problem` → `quiet_break`).
+- **Test docs:** rows for `test_qt_audit.py` and `drive_qt_audit.py` in
+  `python/tests/README.md` and `python/metacat/qt/README.md`; totals 1640 (1198 fast, 442
+  slow; checked with `--collect-only`) and 36 test files in `python/README.md`.
+- Gate: `timeout 1800 python3 ralph_loops/loop0003/gate.py`: **GATE PASSED** (Python 1640
+  passed in 10:21; the Racket suite ran because racket/ changed and passed). The 10-minute
+  tool limit moved the gate command into the background; I waited for it in the
+  foreground with a polling loop and read its log.
+
+### Blockers
+- None.
+
+### Next
+- Every item of loop0003 is done. What a later loop could take up is in
+  `docs/follow-ups.md`, "Python Qt GUI (loop0003)": the button active colours, a first
+  layout without the startup jump, skipping configures for hidden panes, and opening the
+  window on a real screen (never done by the loop, by the owner's rule).
+
+LOOP_COMPLETE

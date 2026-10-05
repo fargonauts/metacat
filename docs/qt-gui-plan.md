@@ -220,7 +220,9 @@ answer the same messages:
   `run-new-problem` (demos.ss and `sugar.py` call it too), `resume-current-problem`,
   `reset-current-problem`, `display`, `display-error`, `theme-edit-mode-on`,
   `theme-edit-mode-off`, `edit-theme-type`, `raise-theme-edit-dialog`, `clear-memory`,
-  `hide-window`, `raise`, `get-relative-position`, `get-widgets`.
+  `hide-window`, `raise`, `get-relative-position`, `get-widgets`. (As built, the Qt panel
+  has no `get-relative-position`: its dialogs are placed by `controls._place` and
+  `input_dialog`, relative to the strip.)
 
 ---
 
@@ -236,26 +238,29 @@ the Episodic Memory in the middle row). The Vertical Themes goes in the top row:
 and narrow (160×590), like the Coderack, so a tall row gives it the scale of the other
 panels. Its two siblings stay together in the middle row.
 
-**1920×1080** (a maximised window, about 1920×1010 of client area; panes 1920×≈930):
+**1920×1080** (a maximised window, about 1920×1010 of client area on a desktop; offscreen,
+with no window frame, the panes get 1920×996). The diagram shows the arrangement; the
+measured pane sizes are in the table below it (the numbers first drawn here were estimates
+and are gone):
 
 ```
 +--------------------------------------------------------------------------------------------------+
-| Help  Demos  View  Options  Memory                                                                |
-| Problem: [abc abd xyz 3852097033_________] [Step][Go][Stop][Reset]  Slow [====|====] Fast         |
-|  abc -> abd; xyz -> ?   seed: 3852097033      Breakpoint set for time step 500   (warning)        |
+| Help  Demos  View  Options  Memory                                                               |
+| abc->abd; xyz->? seed: 3852097033 [abc abd xyz 3852097033] [=|=] [Step][Go][Stop][Reset] Breakpt.|
+|                                                            Slow Fast                    (warning)|
 +------+-------------------------------------------+------------+--------+-------------------------+
 | Temp |                                           |            |        |                         |
-| 110  |              Workspace                    |  Coderack  | Vert.  |      Commentary         |
-|      |              746 x 560 (4:3)              |  216 x 560 | Themes |      ~670 x 560         |
-|      |                                           |            | 153    |                         |
+|      |              Workspace                    |  Coderack  | Vert.  |      Commentary         |
+|      |              (401:301)                    |  (29:75)   | Themes |      (the rest)         |
+|      |                                           |            |        |                         |
 |      |                                           |            |        |                         |
 |      |                                           |            |        |                         |
 +------+------------------+------------------------+--------+---+--------+-------------------------+
-|                         |        Top Themes  602 x 142        |                                  |
-|   Slipnet  608 x 290    +-------------------------------------+     Episodic Memory              |
-|                         |       Bottom Themes  602 x 142      |       ~700 x 290                 |
+|                         |        Top Themes  (301:71)         |                                  |
+|   Slipnet  (652:311)    +-------------------------------------+     Episodic Memory              |
+|                         |       Bottom Themes  (301:71)       |       (the rest)                 |
 +-------------------------+-------------------------------------+----------------------------------+
-|  Temporal Trace  1920 x 78  (horizontal scroll)                                                   |
+|  Temporal Trace  (9 % of the height, horizontal scroll)                                           |
 +--------------------------------------------------------------------------------------------------+
    (EEG: below the Trace when shown from the View menu; hidden by default, as today)
 ```
@@ -303,8 +308,8 @@ central: QSplitter(Vertical)                      "rows"      default 60% / 31% 
    Commentary, the Memory and the Trace. When the window grows, the text-like panes take the
    extra space, and the user can drag it elsewhere.
 
-The minimum window size is 1600×800, or wider if the control strip needs it (1692 px
-with the 1080p fonts): a `QToolBar` would otherwise hide the end of the strip behind an
+The minimum window size is 1600×800 (`MINIMUM_SIZE`), or wider if the control strip
+needs it (1692 px with the 1080p fonts, for a strip of 1684 px): a `QToolBar` would otherwise hide the end of the strip behind an
 extension button. Minimum pane sizes: 40×40 for each graphics pane and
 120 px wide for the Commentary and the Memory. `setChildrenCollapsible(False)` means a drag
 can't collapse a pane to zero by accident. Hiding a pane is a View-menu action.
@@ -329,16 +334,19 @@ can't collapse a pane to zero by accident. Hiding a pane is a View-menu action.
 - **Saving.** `QSettings("fargonauts", "metacat-qt")` stores:
   - `layout/version` (an integer, bumped whenever the tree changes, so that an old state
     is ignored);
-  - `layout/rows`, `layout/top`, `layout/middle`, `layout/themes` and `layout/bottom`:
-    each splitter's `saveState()`;
   - `window/geometry` (`saveGeometry()`);
-  - `view/hidden`, the list of hidden pane names.
+  - `view/hidden`, the hidden pane names separated by spaces;
+  - `layout/custom`, 1 once a handle has been dragged (0 for a layout that follows the
+    window);
+  - only when custom, `layout/rows`, `layout/top`, `layout/middle`, `layout/themes` and
+    `layout/bottom`: each splitter's `saveState()`.
 
-  The settings are saved on close and 500 ms after the last `splitterMoved` (a single-shot
-  timer). They are restored at start-up if the version matches, otherwise the defaults of
+  The settings are saved on close and 500 ms after the last handle drag or View change (a
+  single-shot timer). They are restored at start-up if the version matches, otherwise the defaults of
   2.2 are used. Tests point `QSettings` at a temporary INI file (`QSettings(path,
   QSettings.IniFormat)`), so they never touch the owner's configuration.
-- **View > Reset layout** removes the `layout/*` and `view/hidden` keys, shows the default
+- **View > Reset layout** removes `layout/custom`, the five splitter states and
+  `view/hidden` (`layout/version` and `window/geometry` stay), shows the default
   panes (all except the EEG, and except the Themes panes when self-watching is off) and
   recomputes the default sizes of 2.2 for the current window size.
 
@@ -381,7 +389,7 @@ size. They are saved 500 ms after the last handle drag or View change, and at cl
 `app.open_window` restores the geometry before showing the window (or shows it maximised on
 a screen larger than 1920×1010, or at 1920×1010 otherwise), then the hidden panes through
 the View menu's window controllers (so the checkmarks follow) and the splitter states.
-Reset layout removes every key but the version. **High DPI:** Qt 6 always scales;
+Reset layout removes every key but `layout/version` and `window/geometry`. **High DPI:** Qt 6 always scales;
 `app.make_application` sets the rounding policy to `PassThrough`, so 125 % and 150 % are
 exact. Every size in the GUI (panes, canvases, Tk pixel fonts) is in logical pixels, so a
 200 % screen shows 1080p's layout with text and lines at twice the resolution (inspected:
@@ -447,17 +455,19 @@ interleaved.
   "Two threads measuring text on the one hidden canvas").
 - `python3 -m metacat.qt` runs `app.setup(window)`, which installs the Qt fonts and hosts,
   attaches every window as `views.attach_views` does, places the panes and runs
-  enable-resizing. There is no run yet (item 05).
+  enable-resizing. There was no run yet (item 05 added the engine thread and the strip).
 - Driving the engine from a worker thread while Qt paints is slow, because every painted
   item is a Python call that waits for the GIL (anomalies: "Qt paints the panes slowly
-  while the engine runs in another thread"). Item 05 must solve this.
+  while the engine runs in another thread"). Item 05 solved this (the paint gate and the
+  recorded painter calls, 2.5).
 - **Measured:** each panel's own `resize` takes 1 to 26 ms at its 1080p pane size after
   run7 (Workspace 22, Coderack 14, Commentary 9, Slipnet 6, Trace 6, Memory 4,
   Temperature 1, EEG 26). Live dragging is fine with the original's protocol, so no panel
   uses the `fitInView` fallback. At start the ten panels redraw in about 3 s, one per
-  250 ms listener pause.
-- `default_sizes(width, height)` is 2.2's computation, and it applies until the user
-  drags a handle. At 1920×1010 it gives rows 601/311/90; top row 115, 801, 232, 164
+  250 ms listener pause. (Final audit: they show at once at their original sizes inside
+  their panes, and reach the pane sizes within about 2.5 s; `docs/follow-ups.md`.)
+- `default_sizes(width, height)` is 2.2's computation, for the central area (below the
+  strip), and it applies until the user drags a handle. For an area of 1920×1010 it gives rows 601/311/90; top row 115, 801, 232, 164
   and 592 (Commentary); middle row 652, 651 and 609 (Memory).
 - Run7's pictures at 300 and 800 codelets and at the answer were inspected next to
   `python/tests/snapshots/views/`. They are the same pictures at the panes' sizes. Text
@@ -480,13 +490,13 @@ The threads are those of the tkinter GUI, with Qt's GUI thread in place of Tk's 
 **Canvas commands.** The engine and the resize listener draw by calling `canvas.tcl(*args)`.
 The Qt canvas (2.6) keeps a pure-Python display list, guarded by a lock, and updates it
 synchronously in the calling thread: it allocates item ids as Tk does, and applies tags,
-`move`, `delete`, `raise`, `itemconfigure` and `scale`. It also appends the operation to a
-journal. The GUI thread drains the journals of all canvases on a **50 ms `QTimer`** (as
-racket/gui does) and applies them to the `QGraphicsScene`s in one batch per refresh. If a
-journal holds more operations than the scene has items (at the slider's fast end, where
-whole panels are redrawn between refreshes), the GUI thread rebuilds that scene from the
-display list instead of replaying the journal. So a fast run costs at most one scene
-rebuild per panel per 50 ms.
+`move`, `delete`, `raise`, `itemconfigure` and `scale`. *As built* (items 02 and 05), there
+is no journal: the display list records the ids it changed (`_dirty`) and whether the
+stacking order changed. Every **50 ms** (`SYNC_INTERVAL`, as racket/gui does) the GUI
+thread, holding the paint gate (`canvas.PAINT_GATE`), calls each host's `sync()`, which
+takes the changes and updates one `TkItem` per changed id (an item made and deleted
+between two syncs never reaches the scene). Canvas commands wait at the gate meanwhile,
+so a fast run costs at most one update per changed item per 50 ms.
 
 **Queries.** Some calls need an answer: `bbox` (text measurement on fonts.ss's hidden
 canvas, used for layout by the Workspace, the Commentary and others), `canvasx` and
@@ -494,16 +504,16 @@ canvas, used for layout by the Workspace, the Commentary and others), `canvasx` 
 answered **from the display list and font metrics in the calling thread**, without a round
 trip:
 
-- text extents come from `QFontMetricsF` on the mapped `QFont` (item 03). Qt 6 dropped
+- text extents come from `QFontMetrics.horizontalAdvance` on the mapped `QFont` (item 03). Qt 6 dropped
   `QFontDatabase.supportsThreadedFontRendering` (PySide6 6.11 has no such attribute). A
   check on 2026-10-04 with `QT_QPA_PLATFORM=offscreen` gave the same
   `horizontalAdvance("Bond builders")` (85.578125 px for 14 px Helvetica) in the GUI thread
-  and in eight worker threads. Item 03 repeats that check as a test, also under xcb.
+  and in eight worker threads. `test_qt_panes.py::test_fonts_measure_from_several_threads_at_once`
+  repeats that check with four threads (offscreen only; xcb is never used by the tests).
   Results are cached per (font, string);
-- if the platform can't measure off the GUI thread, measurement falls back to a blocking
-  call: the engine thread posts a request with a queued signal and waits on a
-  `threading.Event` that the GUI thread sets. A blocking call is never made from the GUI
-  thread itself: the canvas checks `threading.get_ident()` and answers directly there;
+- the planned fallback, a blocking call into the GUI thread when the platform can't
+  measure off it, was not needed and was not built: no canvas query ever waits for the
+  GUI thread;
 - `canvasx` and `canvasy` read the view's scroll offset, which the GUI thread copies into
   the canvas whenever the view scrolls. Both are only called from the press handlers, which
   run on the GUI thread anyway.
@@ -514,13 +524,15 @@ their value. Queries answer from Python attributes, which the GUI thread updates
 presses and menu actions run their handlers on the GUI thread, as Tk ran them on its main
 thread. Those handlers only send thunks to the engine thread (`thread_break`) or act while
 the run is parked (`*running?*` false). For example, the Memory press handler draws a
-remembered answer. Their drawing goes straight to the display list and the journal.
+remembered answer. Their drawing goes straight to the display list (its changed ids).
 
 **Deadlock rules.** The GUI thread never waits for the engine thread or the resize
-listener. It never joins them and never takes a lock that is held across a wait. The
-display-list lock is held only for one operation, and never while waiting. A worker blocks
-only on the GUI thread, which always runs its event loop. At quit, a flag makes any
-pending blocking query return at once, and the engine thread is a daemon. Item 05 tests 50
+listener and never joins them. *As built*, the one lock it takes is the paint gate, which a
+worker holds for a single canvas command that never waits for the GUI thread; the
+display-list lock is held only for one operation, and never while waiting. Only drivers
+and tests block a worker on the GUI thread (`GuiInvoker.call`, with a timeout). At quit,
+if the engine is in the middle of a run, `app.main` leaves with `os._exit` (the engine
+thread is a daemon); there are no blocking queries to release. Item 05 tests 50
 rapid Go/Stop toggles. Python's automatic garbage collector runs on whichever thread
 allocates, even inside a canvas command, and Qt objects in reference cycles (a discarded
 host's top-level pane, its scene) must not be destroyed there: ~QWidget waits for the GUI
@@ -529,8 +541,9 @@ thread. So the Qt GUI turns it off and collects on a GUI-thread timer instead
 
 **Display pauses.** The engine's flashes and pauses (`p_flash_pause` and the others) sleep
 in the engine thread. A flash shorter than the 50 ms refresh may not show, as in the Racket
-port. When the engine parks (an answer, Stop, a breakpoint), the bridge flushes at once,
-so the final picture is always complete.
+port. When the engine parks (an answer, Stop, a breakpoint), `switch-to-input-mode` calls
+the control panel's `parked_hook`, `MainWindow.sync`, at once, so the final picture is
+always complete.
 
 **As built (item 05).** `metacat/qt/engine_bridge.py` and `controls.py`:
 
@@ -564,7 +577,8 @@ so the final picture is always complete.
 ### 2.6 The canvas backend
 
 `qt/canvas.py` has `QtCanvas`, an object with the panel canvas interface: `tcl(*args)`,
-`get_background_color()` and `set_background_color_bang(color)`. It has two layers:
+`get_background_color()` and `set_background_color_bang(color)`. It has two layers (as
+built, the first is `qt/displaylist.py` and the second `qt/canvas.py`):
 
 1. **The display list** (no Qt, testable without a display): an ordered list of items. Each
    item has an id, a kind (`line`, `rectangle`, `oval`, `arc`, `polygon` or `text`), its
@@ -580,7 +594,10 @@ so the final picture is always complete.
    layer and into a real tkinter Canvas, and compare normalised display lists and `bbox`
    answers.
 2. **The scene** (GUI thread only): one `QGraphicsItem` per display-list item, with z
-   values from a counter that follows the stacking order:
+   values from a counter that follows the stacking order. *As built* (items 02 and 05),
+   every kind is one class, `TkItem` (a `QGraphicsRectItem` with no Python
+   `boundingRect`), which paints its kind as Tk's X11 code does and records its painter
+   calls at its first paint after a change, replaying them afterwards. The plan was:
    - `QGraphicsRectItem` and `QGraphicsEllipseItem` for rectangles and ovals;
    - `QGraphicsPathItem` for arcs (pieslice, chord, arc) and for smooth lines (Tk's
      quadratic B-splines);
@@ -588,8 +605,9 @@ so the final picture is always complete.
    - a plain path or line item for lines, with arrowheads;
    - `QGraphicsSimpleTextItem` for text, offset by its anchor and justified line by line.
 
-   Pens use Tk's pixel widths, with flat caps for lines and miter joins for rectangles, and
-   no antialiasing by default (Tk's look; a View option can turn it on). Hidden items
+   Pens use Tk's pixel widths, with flat (butt) caps, round joins for lines and polygons and
+   miter joins for rectangles. There is no antialiasing except on text, which is always
+   antialiased, and no option to change it. Hidden items
    (`-state hidden`) are `setVisible(False)`. Colours come through `colors.py`'s
    `#rrggbb` words, and fonts through the mapping of item 03.
 
@@ -635,13 +653,15 @@ are read as Tk 8.6 reads them.
 **The pane** (`qt/hosts.py`): a `QtHost` stands for `hosts.TkHost`, with the same methods
 (`make_canvas`, `set_scroll_region_bang`, `get_scrollbar`, `set_vertical_view`,
 `show_window`/`hide_window`, `set_title_bang`, …). Its widget is a `QGraphicsView` over
-the canvas's scene, in the pane chosen by the window's title, with scrollbars as the
+the canvas's scene, in the pane chosen by the window's name (`MainWindow.place_hosts`),
+with scrollbars as the
 scrolling mode asks. The scene's coordinates are Tk canvas coordinates, one pixel per unit:
-the resize protocol redraws, and the view does not scale. `hosts.set_window_host_maker
-(qt_host_maker(main_window))` makes `make-graphics-window` create these panes. Mouse
+the resize protocol redraws, and the view does not scale. `hosts.install()` calls
+`set_window_host_maker(qt_host_maker())`, so `make-graphics-window` creates these panes. Mouse
 presses map to SWL's modifiers (`left-button`, `shift`+`left-button`, `right-button`) and
 go to `viewport.mouse_press`, as in `TkHost._press`. The Logo's `create_mcat_logo` and
-fonts.ss's hidden canvas get Qt versions: a `QtCanvas` without a view for measurement, and
+fonts.ss's hidden canvas get Qt versions: a `HiddenCanvas` (a `QtCanvas` without a view,
+with one display list per thread) for measurement, and
 the scrollbar sizes from `QStyle.PM_ScrollBarExtent`.
 
 **Fonts** (item 03): a Tk font word `(face size style…)` maps to a `QFont`. The family comes
@@ -673,23 +693,25 @@ names of `colors.py` exactly as Tk does (`python/tests/test_qt_fonts.py`, refere
 
 ### 2.7 The control strip and menus (item 06)
 
-- **Control strip**, left to right:
+- **Control strip**, left to right (as built):
+  - the info label (the problem and seed, or a red error for 700 ms);
   - the command line (`QLineEdit`; Enter = the current command-line action);
-  - Step, Go, Stop and Reset (`QPushButton`s, with gui.ss's colours when active);
-  - the speed slider ("Slow" `QSlider` "Fast", 0–100, starting at 50, sending
-    `gui.speed_slider_action` on every change);
-  - the info label (the problem and seed, or a red error for 700 ms), the red breakpoint
-    label, and the red self-watching warning.
+  - the speed box: the speed slider (a `QSlider`, 0–100, starting at 50, sending
+    `gui.speed_slider_action` on every change) over its "Slow", "Speed" and "Fast" labels,
+    then Step, Go, Stop and Reset (plain `QPushButton`s: Tk's green and red active
+    colours are not reproduced, `docs/divergences.md`);
+  - the red breakpoint label above the red self-watching warning.
 
   The enabled states follow table 1.2 exactly. `switch-to-run-mode` shows "running..." in
   green on black in the command line, as the original does.
-- **Menu bar**:
+- **Menu bar**, in the order Help, Demos, View, Options, Memory (the inventory's order,
+  with View in place of Windows):
   - **Demos**, built from the same `DEMO_ITEMS` and `demos.py` functions as gui.py;
   - **View** (2.3);
   - **Options**, the same items in the same order, with checkable actions;
-  - **Memory**, holding Clear Memory…, because a bare command in a Qt menu bar is unusual;
-  - **Help**, holding Metacat Help… (the same `help.txt` in a read-only `QPlainTextEdit`
-    window, Courier). (The planned About Metacat item was left out: the logo is the
+  - **Memory**, holding Clear Memory, because a bare command in a Qt menu bar is unusual;
+  - **Help**, holding Metacat help (the same `help.txt` in a read-only `QTextEdit`
+    window, Courier on bisque). (The planned About Metacat item was left out: the logo is the
     window icon, item 08, and Help keeps gui.ss's one item.)
 
   The Save commentary item stays in Options, where gui.ss has it. In run mode Demos,
@@ -706,17 +728,29 @@ names of `colors.py` exactly as Tk does (`python/tests/test_qt_fonts.py`, refere
 
 ### 2.8 Module plan
 
+As built (the final audit, item 11):
+
 ```
 python/metacat/qt/
   __init__.py        imports nothing from Qt at import time; has_pyside6()
-  __main__.py        python3 -m metacat.qt [problem…]: main()
-  canvas.py          DisplayList (pure Python) and QtCanvas (journal → QGraphicsScene)
-  fonts.py           Tk font words → QFont; measurement; the hidden canvas; families
-  hosts.py           QtHost (a pane: QGraphicsView + letterboxing + resize + mouse), qt_host_maker
-  mainwindow.py      MainWindow: the splitter tree, View menu, QSettings, reset layout
-  controls.py        QtControlPanel (the control panel's messages, 1.6), control strip, menus, dialogs
-  engine_bridge.py   the 50 ms flush timer, queued messages, blocking queries, quit
-python/tests/test_qt_*.py   skip when PySide6 is missing; QT_QPA_PLATFORM=offscreen
+  __main__.py        python3 -m metacat.qt: app.main()
+  app.py             main() (--quit-after MS, --screenshot PNG, --settings INI), make_application,
+                     open_settings, open_window, setup (engine, hosts, bridge, control panel, icon)
+  displaylist.py     DisplayList: Tk 8.6's canvas semantics in pure Python (ids, tags, bbox, dirty ids)
+  canvas.py          QtCanvas (display list → QGraphicsScene at sync), TkItem, PAINT_GATE, HiddenCanvas
+  fontspec.py        Tk font words parsed as Tk 8.6 does (no Qt)
+  fonts.py           font words → QFont; QtMetrics (widths, ink ascent/descent); families; install
+  hosts.py           QtHost and Pane/PaneView (letterboxing, resize feeder, mouse), qt_host_maker,
+                     install, collect_on_gui_thread
+  mainwindow.py      MainWindow: the splitter tree, default_sizes, the 50 ms sync timer, QSettings,
+                     reset layout, the pane visibility the View menu asks for
+  controls.py        QtControlPanel (the control panel's messages, 1.6), control strip, menu bar
+                     (the View menu: attach_windows), dialogs, bind_return
+  engine_bridge.py   GuiInvoker (post, call) and EngineBridge (the REPL thread)
+  icon.py            the window icon from create-mcat-logo
+  grab.py            grab_png (QWidget.grab to a PNG)
+python/tests/test_qt_*.py   skip when PySide6 is missing; QT_QPA_PLATFORM=offscreen; run last
+python/tests/drive_qt_*.py  fresh-process drivers (engine, menus, layout, audit); click_scenario.py
 ```
 
 ### 2.9 Notes for the later items
@@ -729,6 +763,6 @@ python/tests/test_qt_*.py   skip when PySide6 is missing; QT_QPA_PLATFORM=offscr
   (left = +100, right or shift-left = −100), and the menu clamps.
 - The Bottom Themes accept edits only in justify mode (`ready-to-edit?`).
 - The control-panel fonts depend on the screen height (taller than 1024 px or not). The Qt
-  strip should follow the same rule.
+  strip follows the same rule (`controls.select_control_panel_fonts`).
 - The inventory's slow test regenerates it under Xvfb and compares it with the committed
   JSON, ignoring the keys that hold fonts, since the faces depend on the machine.
