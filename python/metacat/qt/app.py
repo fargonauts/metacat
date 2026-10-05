@@ -6,12 +6,17 @@ software under the GNU General Public License, version 2 or later, like Metacat
 itself.  Translated to Python (2026).  Item 01 of loop0003 made the window;
 item 04 put the panels in it (`setup`, setup.ss's window part on Qt hosts);
 item 05 the engine thread and the run controls (the control strip); item 06
-the menus and dialogs (docs/qt-gui-plan.md).
+the menus and dialogs (docs/qt-gui-plan.md); item 08 the saved layout, the
+window's size on each screen, high DPI and the icon (`make_application`,
+`open_window`).
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+
+SETTINGS_ENV = "METACAT_QT_SETTINGS"     # an INI file instead of the user's settings
 
 
 def parse_args(argv):
@@ -21,6 +26,9 @@ def parse_args(argv):
                         help="close the window and quit after MS milliseconds")
     parser.add_argument("--screenshot", metavar="PNG", default=None,
                         help="with --quit-after: grab the window into PNG before quitting")
+    parser.add_argument("--settings", metavar="INI", default=None,
+                        help="save the layout in this INI file (default: $%s, or the "
+                        "user's QSettings for fargonauts/metacat-qt)" % SETTINGS_ENV)
     return parser.parse_args(argv)
 
 
@@ -45,8 +53,60 @@ def setup(window):
     bridge = EngineBridge()
     S.g_control_panel = controls.make_control_panel(bridge.invoker)
     window.place_control_panel(S.g_control_panel, bridge)
+    from metacat.qt import icon
+    window.setWindowIcon(icon.app_icon())
     gui_app.enable_resizing()
     return windows
+
+
+def make_application():
+    """the QApplication, with high-DPI scale factors used as the screen gives
+    them (Qt 6 always scales: every size in the GUI is in logical pixels)"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is None:
+        QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+        app = QApplication(["metacat"])
+    app.setApplicationName("metacat-qt")
+    app.setOrganizationName("fargonauts")
+    return app
+
+
+def open_settings(path=None):
+    """the QSettings the layout is saved in: the INI file path, $%s, or
+    the user's settings for fargonauts/metacat-qt"""
+    from PySide6.QtCore import QSettings
+    path = path or os.environ.get(SETTINGS_ENV)
+    if path:
+        return QSettings(path, QSettings.IniFormat)
+    return QSettings("fargonauts", "metacat-qt")
+
+
+def open_window(settings):
+    """the main window, set up and shown: at its saved geometry, or else
+    maximised on a screen larger than the 1080p default size (the default
+    sizes of docs/qt-gui-plan.md 2.2 follow the window), then with the saved
+    panes and splitter sizes"""
+    from PySide6.QtWidgets import QApplication
+    from metacat.qt.mainwindow import DEFAULT_SIZE, MainWindow
+    app = QApplication.instance()
+    window = MainWindow(settings)
+    setup(window)
+    app.setWindowIcon(window.windowIcon())
+    if window.restore_geometry():
+        window.show()
+    else:
+        avail = window.screen().availableGeometry()
+        if avail.width() >= DEFAULT_SIZE[0] and avail.height() > DEFAULT_SIZE[1]:
+            window.showMaximized()
+        else:
+            window.show()
+    app.processEvents()
+    window.restore_layout()
+    return window
 
 
 def main(argv=None):
@@ -57,12 +117,8 @@ def main(argv=None):
         print("The Qt GUI needs PySide6: pip install -e 'python[qt]'", file=sys.stderr)
         return 1
     from PySide6.QtCore import QTimer
-    from PySide6.QtWidgets import QApplication
-    from metacat.qt.mainwindow import MainWindow
-    app = QApplication.instance() or QApplication(["metacat"])
-    window = MainWindow()
-    setup(window)
-    window.show()
+    app = make_application()
+    window = open_window(open_settings(args.settings))
     print(window.windowTitle(), flush=True)
     print("Panes: " + " ".join(name for name, pane in window.panes.items()
                                if pane.isVisibleTo(window)), flush=True)

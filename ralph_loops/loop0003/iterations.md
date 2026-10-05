@@ -114,7 +114,7 @@
     equal those of the same action in the tkinter GUI under `xvfb-run`, and the clamp
     scenario of `drive_gui.py` gives its expected trace.
 
-- [ ] **08 Layout polish.**
+- [x] **08 Layout polish.**
     - the default layout for 1920×1080 from item 00 (1080p is the minimum screen, the
       owner's decision; remove the 1366×768 layout from `docs/qt-gui-plan.md`), and how it
       grows on 2560×1440 and 4K;

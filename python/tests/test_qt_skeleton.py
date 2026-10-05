@@ -44,9 +44,10 @@ def test_main_window_opens_and_closes(qapp):
 def test_the_screenshot_helper_writes_a_png(qapp, tmp_path):
     from PySide6.QtGui import QImage
     from metacat.qt.grab import grab_png
-    from metacat.qt.mainwindow import MainWindow
+    from metacat.qt.mainwindow import MINIMUM_SIZE, MainWindow
     window = MainWindow()
-    window.resize(400, 300)
+    w, h = MINIMUM_SIZE[0] + 100, MINIMUM_SIZE[1] + 100      # (item 08: a minimum size)
+    window.resize(w, h)
     window.show()
     qapp.processEvents()
     path = grab_png(window, tmp_path / "sub" / "window.png")
@@ -55,7 +56,7 @@ def test_the_screenshot_helper_writes_a_png(qapp, tmp_path):
     assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     image = QImage(str(path))
     ratio = window.devicePixelRatioF()
-    assert (image.width(), image.height()) == (round(400 * ratio), round(300 * ratio))
+    assert (image.width(), image.height()) == (round(w * ratio), round(h * ratio))
 
 
 def test_the_grab_fixture(grab, qapp):

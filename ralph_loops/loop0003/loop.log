@@ -76,3 +76,9 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 01:32:16] claude session it10 (cap 3.00 h) -> session_it10.log
 [2026-10-05 02:09:23] session it10: ok (exit 0, 97 tool calls)
 [2026-10-05 02:19:18] tests passed: GATE PASSED
+[2026-10-05 02:19:18] committed 09b5dcd: 07 Mouse and keyboard parity. Every binding from the inventory:
+[2026-10-05 02:19:20] pushed 09b5dcd to origin
+[2026-10-05 02:19:20] === iteration 11: 08 Layout polish.
+[2026-10-05 02:19:20] claude session it11 (cap 3.00 h) -> session_it11.log
+[2026-10-05 02:57:19] session it11: ok (exit 0, 70 tool calls)
+[2026-10-05 03:07:44] tests passed: GATE PASSED

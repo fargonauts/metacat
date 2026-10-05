@@ -51,7 +51,7 @@ SCENES = {
 }
 
 
-RESIZES = [(1600, 900), (2200, 1200), (1300, 1000)]
+RESIZES = [(1600, 900), (2200, 1200), (1650, 1000)]   # the window is at least 1600 wide
 RESIZE_EVERY = 150      # codelets
 
 

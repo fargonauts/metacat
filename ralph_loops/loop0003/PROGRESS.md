@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 7/12 SOLVED
+- **Current**: 8/12 SOLVED
 
 ---
 
@@ -672,3 +672,108 @@ Item **07 Mouse and keyboard parity**: SOLVED.
   add the About/logo item. The panes are still blank for the first seconds after start
   (one panel per 250 ms listener pause).
 
+
+---
+
+## Iteration 11 — 2026-10-05 02:57:00
+Item **08 Layout polish**: SOLVED.
+
+### Completed
+- **Tests first, and they failed first.** I wrote `python/tests/test_qt_layout.py` and its
+  driver `python/tests/drive_qt_layout.py` before any code. First run of the fast tier:
+  `5 failed, 9 errors` (no `app.make_application` or `open_window`, no `metacat.qt.icon`,
+  no `SETTINGS_VERSION`). Then three of my own expectations, or the driver, were wrong, and
+  I corrected them rather than the code:
+  - the driver's handle drag moved 300 px for 120, because each move's global position was
+    computed from the handle after it had moved;
+  - a hidden pane takes its splitter handle with it, so the middle row's visible sizes
+    gain 4 px;
+  - Reset layout keeps `layout/version`.
+
+  Three more tests came from what the screenshots and measurements showed, and each failed
+  before its change:
+  - the strip clipped at the window's minimum: the strip needs 1684 px, the tool bar
+    doesn't pass that on, and 1600 was too narrow;
+  - the high-DPI test reported a pixel ratio of 1, because the offscreen screen's `dpr` key
+    doesn't reach its windows (logged);
+  - with the EEG shown, the Trace was 40 px high. I wrote
+    `test_the_eeg_doubles_the_bottom_row` together with its change, and the run test's
+    "Trace and EEG ≥ 80 px" check failed before that change.
+- **`metacat/qt/mainwindow.py`**:
+  - `MainWindow(settings)` saves the layout in a QSettings: `layout/version` (1),
+    `window/geometry`, `view/hidden`, `layout/custom`, and each splitter's `saveState()`
+    once a handle has been dragged;
+  - it saves 500 ms after the last drag or View change (a single-shot timer), and at
+    close. `restore_geometry()` runs before the window is shown, and `restore_layout()`
+    after, through the View menu's window controllers, so the checkmarks follow. An older
+    version is ignored;
+  - Reset layout removes the saved layout. A layout that follows the window is saved as
+    not custom, so the next start lays it out for its own size;
+  - the minimum size is 1600×800, widened to the control strip's minimum (1692 px with the
+    1080p fonts);
+  - with the EEG shown in the default layout, `default_sizes(..., eeg=True)` doubles the
+    bottom row (18 %), and the other rows keep 60:31.
+- **`metacat/qt/app.py`**:
+  - `make_application()`: high DPI with the `PassThrough` rounding policy, plus the app
+    and organisation names;
+  - `open_settings()`: `--settings INI`, `$METACAT_QT_SETTINGS`, or
+    `QSettings("fargonauts", "metacat-qt")`;
+  - `open_window(settings)`: the saved geometry, or maximised on a screen larger than
+    1920×1010, then the saved panes and sizes;
+  - `setup()` sets the window icon.
+
+  `conftest.py` points `$METACAT_QT_SETTINGS` at a throw-away file, so the tests never
+  touch the owner's settings.
+- **`metacat/qt/icon.py`**: the original's Logo (fonts.ss's `create-mcat-logo`: light sky
+  blue, "Metacat" in `%logo-font%` at 55,50 anchor s). It is drawn by that Tk command on a
+  Qt canvas and rendered as vector text into square icons from 16 to 256 px, for the window
+  and the application. There is no About item: Help keeps gui.ss's one item.
+- **Results** (`drive_qt_layout.py`, fresh offscreen processes):
+  - a drag resizes the panes exactly and is saved after the delay;
+  - save and restore round-trip the geometry, the hidden panes (Slipnet hidden, EEG shown),
+    the View checkmarks and every splitter's sizes;
+  - Reset layout gives exactly `default_sizes`, the default panes and checkmarks, and the
+    sizes then follow a resized window;
+  - the window fills a 1920×1080 screen (maximised);
+  - shrunk to 1000×500, the window stops at its minimum, with the strip whole and every
+    pane at or above its own minimum;
+  - at 200 % (a 3840×2160 screen with `QT_SCALE_FACTOR=2`), the window is 1920×1080
+    logical and the grab is 3840×2160. Every pane's grab is twice its size;
+  - after `abc abd ijk abd 1` (a justify run, so the Bottom Themes draw) with every pane
+    shown, at 1920×1080 and 2560×1440, every pane is visible, has items and pixels, and is
+    at least its minimum. The run ends at its golden's codelet count and random state
+    (1835, 4230205117) and takes 5.5–5.9 s at the slider's fast end.
+- **Pictures, inspected:**
+  - the whole window after the run at 1920×1080 and at 2560×1440. At 1440p every pane is
+    larger; the Trace's labels and the EEG are readable;
+  - the start screen at 200 %, with a full-resolution crop of the Coderack: its 8-px
+    labels are sharp and keep every `i` and `l`;
+  - the window at its minimum size, after the panels redrew at their pane sizes;
+  - the 256-px icon.
+- **Docs**:
+  - `docs/qt-gui-plan.md`: the 1366×768 layout is removed. Its place has a table of the pane
+    sizes at 1920×1080 and 2560×1440, and the 4K note. The minimum size and the EEG rule
+    are in 2.2, and "As built (item 08)" is in 2.3. The About item is gone from 2.3 and 2.7;
+  - `docs/divergences.md`: a new section, "Python Qt GUI: the layout, its saving, and the
+    icon";
+  - `docs/anomalies_and_quirks.md`: the offscreen `dpr` key, and the hidden splitter
+    handle and the tool bar that hides what doesn't fit;
+  - `python/tests/README.md`: rows for `test_qt_layout.py` and `drive_qt_layout.py`, and
+    new totals (1614: 1174 fast, 440 slow).
+- **Other test files**: `test_qt_skeleton.py`'s grab test resized the window to 400×300,
+  below the new minimum, so it now uses `MINIMUM_SIZE` + 100. `render_qt_panes.py`'s third
+  resize size went from 1300 to 1650 wide.
+- Gate: `timeout 1800 python3 ralph_loops/loop0003/gate.py`: GATE PASSED (1614 passed in
+  10:13; racket/ unchanged). The first gate run failed on the skeleton grab test above;
+  the second passed.
+
+### Blockers
+- None for item 08. Item 06 is still marked `[!]` in iterations.md, but its work passed
+  the gate and is committed (be3c001); the owner can mark it `[x]`.
+
+### Next
+- Item 09 (packaging and docs): a `metacat-qt` console script; `python/metacat/qt/README.md`
+  with screenshots. `drive_qt_layout.py OUT run --screen 1920x1080` (and `2560x1440`) makes
+  good ones, in `OUT/window-run-*.png`. Mention `--settings` and `$METACAT_QT_SETTINGS`.
+- The panes are still blank for the first seconds after start (one panel per 250 ms
+  listener pause).

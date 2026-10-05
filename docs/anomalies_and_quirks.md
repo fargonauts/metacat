@@ -323,6 +323,30 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   step_mode`.
 - **Status:** harmless; ignored.
 
+### Qt's offscreen screen ignores its own `dpr` key for windows
+- **Seen:** 2026-10-05, loop0003 item 08, the high-DPI test.
+- **What:** an offscreen screen configured with `"dpr": 2` in the plugin's JSON file
+  reports `devicePixelRatio() == 2`, but its windows have `devicePixelRatioF() == 1` and
+  `grab()` gives 1x pixmaps. `QT_SCALE_FACTOR=2` on a screen twice as large in device
+  pixels gives what a 200 % desktop gives: logical sizes halved, windows and grabs at 2x.
+- **Evidence:** `QT_QPA_PLATFORM=offscreen:configfile=S.json python3 -c "..."` with
+  `dpr` 2 against `QT_SCALE_FACTOR=2` (2026-10-05, PySide6 6.11.2).
+- **Status:** worked around: `python/tests/drive_qt_layout.py` emulates `WxH@2` with a
+  screen of 2W×2H and `QT_SCALE_FACTOR=2`.
+
+### A hidden splitter child takes its handle with it, and a tool bar hides what doesn't fit
+- **Seen:** 2026-10-05, loop0003 item 08.
+- **What:** when the Slipnet is hidden, the middle row's visible sizes add up to 4 px more
+  than before: `QSplitter` hides the hidden child's handle too. And the control strip is a
+  `QToolBar`'s widget: the tool bar doesn't pass the strip's minimum width on to the
+  window, so a narrower window would put the end of the strip (Stop, Reset) behind an
+  extension button. The window's minimum width is therefore set from the strip's
+  `minimumSizeHint` (1684 px + the bar's margins with the 1080p fonts).
+- **Evidence:** `python/tests/test_qt_layout.py::test_hiding_a_pane_closes_the_gap` and
+  `test_the_window_has_a_minimum_size`.
+- **Status:** explained (Qt's documented behaviour); the minimum width works around the
+  second.
+
 ## ⚙️ Chez / Racket quirks
 
 ### Chez doesn't evaluate arguments left to right

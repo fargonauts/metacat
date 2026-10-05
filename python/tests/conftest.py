@@ -17,6 +17,13 @@ import pytest  # noqa: E402
 
 SCREENSHOTS = HERE / "screenshots-qt"     # grab()'s pictures (not committed)
 
+# `python3 -m metacat.qt` saves its layout in the user's QSettings; the tests'
+# runs of it (and their subprocesses) use a throw-away INI file instead
+import os  # noqa: E402
+import tempfile  # noqa: E402
+os.environ["METACAT_QT_SETTINGS"] = str(Path(tempfile.mkdtemp(prefix="metacat-qt-settings-"))
+                                        / "metacat-qt.ini")
+
 
 def pytest_collection_modifyitems(session, config, items):
     """the test_qt_*.py files run last: the QApplication starts a thread, and

@@ -240,3 +240,23 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   scenario through QTest's events in the Qt GUI and Tk's events in the tkinter GUI and
   finds the same model states and traces.
 
+## Python Qt GUI: the layout, its saving, and the icon (loop0003 item 08)
+- **What:** things the original's separate windows didn't have, or had differently:
+  - the layout is remembered: the splitter sizes (once a handle has been dragged), the
+    hidden panes and the window's geometry are saved in `QSettings` and restored at the next
+    start; View > Reset layout forgets them. The original's windows always opened at
+    their default places and sizes;
+  - on a screen larger than 1920×1010 the window opens maximised and every pane grows with
+    it (the default proportions of `docs/qt-gui-plan.md` 2.2 follow the window);
+  - when the EEG is shown in the default layout, the bottom row doubles in height for it
+    (the EEG was a window of its own);
+  - the window has a minimum size, 1600×800 or the control strip's width (1692 px with
+    the 1080p fonts); the original's control panel could be shrunk until it clipped;
+  - the Logo window is the window's and the application's icon, drawn by the original's own
+    Tk command (`metacat/qt/icon.py`), not a window, and there is no Show/Hide Logo item;
+  - high DPI is Qt 6's scaling: at 200 % the panels are drawn at twice the resolution in
+    the same logical sizes. Tk 8.6 under X11 doesn't scale.
+- **Why:** one window on a 1080p-or-larger screen (TASK.md). Watching still changes no run:
+  `python/tests/test_qt_layout.py` runs `abc abd ijk abd 1` in the window at 1920×1080 and
+  2560×1440 and checks the codelet count and random state against the golden.
+

@@ -260,29 +260,18 @@ panels. Its two siblings stay together in the middle row.
    (EEG: below the Trace when shown from the View menu; hidden by default, as today)
 ```
 
-**1366×768** (client area about 1366×700; panes 1366×≈620; the small control-panel fonts):
+1080p is the minimum screen (the owner's decision): there is no smaller layout. On a
+larger screen the window opens maximised and the same proportions are computed for its
+size, so every pane grows. Measured after a run, with View > Show all panes:
 
-```
-+------------------------------------------------------------------------------------+
-| Help  Demos  View  Options  Memory                                                 |
-| [abc abd xyz 3852097033____] [Step][Go][Stop][Reset] Slow[==|==]Fast  abc->abd; .. |
-+-----+------------------------------+---------+------+------------------------------+
-|Temp |                              |         |Vert. |                              |
-| 70  |    Workspace  496 x 372      |Coderack |Themes|     Commentary  ~530 x 372   |
-|     |                              |144 x 372| 102  |                              |
-|     |                              |         |      |                              |
-+-----+---------+--------------------+---------+--+---+------------------------------+
-|  Slipnet      |   Top Themes     382 x 90       |   Episodic Memory  ~580 x 186    |
-|  390 x 186    +---------------------------------+                                  |
-|               |   Bottom Themes  382 x 90       |                                  |
-+---------------+---------------------------------+----------------------------------+
-| Temporal Trace  1366 x 60                                                          |
-+------------------------------------------------------------------------------------+
-```
+| Screen | Window | Workspace | Coderack | Slipnet | Commentary | Memory | Trace / EEG |
+|---|---|---|---|---|---|---|---|
+| 1920×1080 | 1920×1080 | 711×534 | 206×534 | 579×276 | 726×534 | 756×276 | 1920×87 each |
+| 2560×1440 | 2560×1440 | 971×729 | 282×729 | 788×376 | 938×729 | 975×376 | 2560×119 each |
 
-At 1366×768 the control strip puts the problem display on the same line, after the slider,
-and elides it if needed. The breakpoint label and the self-watching warning become part of
-the status shown there: a red suffix, with the full text in the tooltip.
+A 4K screen is usually scaled by 200 %, which gives 1080p's logical layout drawn at twice the
+resolution (2.3, high DPI). At 100 % it is laid out as a 3840×2090 window by the same
+computation.
 
 ### 2.2 The splitter tree
 
@@ -307,11 +296,16 @@ central: QSplitter(Vertical)                      "rows"      default 60% / 31% 
    height (it is letterboxed; see 2.4).
 3. The Commentary and the Memory take the rest of their row, at least 200 px. If the rest
    is smaller, all fixed-aspect panes in that row shrink in proportion.
-4. The splitters' stretch factors are 0 for the fixed-aspect panes and 1 for the
+4. When the EEG is shown in the default layout, the bottom row is twice as high (18 %, at
+   least 104 px), shared equally by the Trace and the EEG, and the top and middle rows keep
+   their 60:31 proportion in the rest. (Item 08: halving a 9 % row left the Trace 40 px high.)
+5. The splitters' stretch factors are 0 for the fixed-aspect panes and 1 for the
    Commentary, the Memory and the Trace. When the window grows, the text-like panes take the
    extra space, and the user can drag it elsewhere.
 
-The minimum window size is 1024×600. Minimum pane sizes: 40×40 for each graphics pane and
+The minimum window size is 1600×800, or wider if the control strip needs it (1692 px
+with the 1080p fonts): a `QToolBar` would otherwise hide the end of the strip behind an
+extension button. Minimum pane sizes: 40×40 for each graphics pane and
 120 px wide for the Commentary and the Memory. `setChildrenCollapsible(False)` means a drag
 can't collapse a pane to zero by accident. Hiding a pane is a View-menu action.
 
@@ -321,7 +315,7 @@ can't collapse a pane to zero by accident. Hiding a pane is a View-menu action.
   order: Workspace, Slipnet, Coderack, Temperature, Temporal Trace, Commentary, Episodic
   Memory, Top Themes, Bottom Themes, Vertical Themes, EEG. Then a separator, **Show all
   panes**, **Hide all panes**, a separator, and **Reset layout**. The Logo becomes the
-  window icon and Help > About Metacat, not a pane. A checkmark replaces the original's
+  window icon, not a pane (item 08; there is no About item). A checkmark replaces the original's
   "Hide X"/"Show X" titles and on/off colours (a divergence, to be recorded in
   `docs/divergences.md`). Item 06's parity test maps "Hide X"/"Show X" to the action "X"
   and its checked state.
@@ -374,6 +368,29 @@ clicks` under xvfb-run, `drive_qt_gui.py OUT clicks` offscreen). It aims each cl
 model object through the model's own hit test, so the pane sizes don't matter, and
 `test_qt_clicks.py` compares the 27 model snapshots and 4 traces with the tkinter result
 in `python/tests/data/tk-clicks.json`.
+
+**As built (item 08).** `MainWindow(settings)` takes the `QSettings` (none: nothing is
+saved, as for the tests' windows). `python3 -m metacat.qt` uses
+`QSettings("fargonauts", "metacat-qt")`, or an INI file given by `--settings INI` or
+`$METACAT_QT_SETTINGS` (the test suite's conftest.py sets it to a throw-away file). The keys
+are `layout/version` (1), `window/geometry`, `view/hidden` (space-separated pane names),
+`layout/custom` (0 or 1) and, only when custom, `layout/rows|top|middle|themes|bottom` with
+each splitter's `saveState()`. A layout that still follows the window (no handle dragged,
+or reset since) is saved as not custom, so the next start lays it out for its own window
+size. They are saved 500 ms after the last handle drag or View change, and at close.
+`app.open_window` restores the geometry before showing the window (or shows it maximised on
+a screen larger than 1920×1010, or at 1920×1010 otherwise), then the hidden panes through
+the View menu's window controllers (so the checkmarks follow) and the splitter states.
+Reset layout removes every key but the version. **High DPI:** Qt 6 always scales;
+`app.make_application` sets the rounding policy to `PassThrough`, so 125 % and 150 % are
+exact. Every size in the GUI (panes, canvases, Tk pixel fonts) is in logical pixels, so a
+200 % screen shows 1080p's layout with text and lines at twice the resolution (inspected:
+the Coderack's 8-px labels keep every letter). **The icon** is the original's Logo
+(`metacat/qt/icon.py`): `create-mcat-logo`'s Tk command (light sky blue, "Metacat" in
+`%logo-font%` at 55,50 anchor s) on a Qt canvas, rendered as vector text into square icons
+of 16 to 256 px, for the window and the application. There is no Help > About item: Help
+keeps gui.ss's one item. `python/tests/test_qt_layout.py` drives these in fresh processes
+(`drive_qt_layout.py`) on offscreen screens of 1920×1080, 2560×1440 and 1920×1080 at 200 %.
 
 ### 2.4 Resize policy per panel
 
@@ -668,7 +685,8 @@ names of `colors.py` exactly as Tk does (`python/tests/test_qt_fonts.py`, refere
   - **Options**, the same items in the same order, with checkable actions;
   - **Memory**, holding Clear Memory…, because a bare command in a Qt menu bar is unusual;
   - **Help**, holding Metacat Help… (the same `help.txt` in a read-only `QPlainTextEdit`
-    window, Courier) and About Metacat (the logo).
+    window, Courier). (The planned About Metacat item was left out: the logo is the
+    window icon, item 08, and Help keeps gui.ss's one item.)
 
   The Save commentary item stays in Options, where gui.ss has it. In run mode Demos,
   Options and Memory are disabled, as Demos, Options and Clear Memory are today.
