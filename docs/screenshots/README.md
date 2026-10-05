@@ -22,6 +22,7 @@ To compare these with Marshall's own 1999 screenshots, see
 | `python-run7-wyz.png`, `python-ijk-clamp.png` | Python | Screens of the GUI that [`python/tests/drive_gui.py`](../../python/tests/drive_gui.py) drives under Xvfb. It builds the GUI as `python3 -m metacat.gui` does, then a driver thread presses buttons, types commands, opens menus and clicks on canvases. Each GUI run's trace is checked against its golden, and the screen is grabbed with Xlib's `XGetImage` through ctypes. The script's own grabs are 2560×1600 (`python/tests/snapshots/gui-run7.png`, `gui-final.png`). `python-run7-wyz.png` was cropped from `gui-run7.png` to the windows (loop0002 item 16). |
 | `panels/*-run7-*.png`, `panels/EEG-run7-800.png` | Python | [`python/tests/render_views.py`](../../python/tests/render_views.py) (slow test tier, under `xvfb-run`). It replays a golden run with every window attached on real Tk canvases, then raises each window and grabs it with `XGetImage` into `WINDOW-SCENE.png`. These files are the same bytes as `python/tests/snapshots/views/`. |
 | `qt-run7-wyz.png` (1920×1080), `qt-run7-wyz-1440p.png` (2560×1440) | Python (Qt) | [`python/tests/drive_qt_layout.py`](../../python/tests/drive_qt_layout.py) `OUTDIR run7 --screen 1920x1080` (and `2560x1440`), offscreen with no X server (loop0003 item 09). It opens the window as `python3 -m metacat.qt` does, on an offscreen screen of that size (the window maximised, default layout, with a throw-away settings file), types `abc abd xyz 3852097033` into the command line, presses Enter and Go with the slider at Fast, waits for the answer, checks the codelet count and random state against the golden (2170, 4089168737), and grabs the window with `QWidget.grab()` as `window-run7-WxH.png`. |
+| `racket-one-window-run7.png` (1920×1040) | Racket | [`racket/gui-tests/one-window-test.rkt`](../../racket/gui-tests/one-window-test.rkt) under `xvfb-run` with `METACAT_SCREENSHOT_DIR` set (loop0003 item 10). It opens the one-window GUI in a 1920×1040 frame, types Run 7 into the command line, presses Go, waits for the answer and grabs the screen with PIL; the image is that grab cropped to the frame. |
 | `panels/sgl-fixture-racket.png` | Racket | `racket/tests/sgl-test.rkt`'s pixel snapshot of `racket/tests/sgl-fixture.rkt` (the same file as `racket/tests/snapshots/sgl-fixture.png`). |
 | `panels/sgl-fixture-python.png` | Python | [`python/tests/render_sgl_fixture.py`](../../python/tests/render_sgl_fixture.py). It draws `python/oracle/sgl-fixture.scm` on a 640×480 tkinter Canvas at a fixed 96 dpi and grabs it from the X server (the same file as `python/tests/snapshots/sgl-fixture.png`). |
 | `panels/sgl-fixture-qt.png` | Python (Qt) | `python/tests/test_qt_canvas.py::test_sgl_fixture_renders_like_tk` (offscreen, no X server). It draws the same fixture through `metacat/gui/sgl.py` onto the Qt canvas (`metacat/qt/canvas.py`), with text measured on a Qt hidden canvas, and renders the `QGraphicsScene` into a 640×480 image (also written to `python/tests/screenshots-qt/`, which is not committed). |
@@ -97,6 +98,18 @@ window's aspect ratio and are redrawn at their pane's size (at 1080p the Workspa
 The same at **2560×1440**: the window opens maximised and every pane grows in the same
 proportions. The Temporal Trace is scrolled to its latest events, so its first icon,
 Identity, is cut at the left edge, as in a Trace window scrolled to the end.
+
+### Run 7 in one window: the Racket port's one-window GUI
+
+![Racket port's one-window GUI, Run 7, answer wyz, 1920×1040](racket-one-window-run7.png)
+
+**Racket port, one window** (`racket racket/one-window.rkt`), the same run at its answer, in
+a 1920×1040 frame on Xvfb. The panes are the multi-window GUI's windows, drawn by the same
+code, in the Qt GUI's arrangement; the control panel's widgets are the strip under the menu
+bar. The Temperature, Workspace, Coderack, Themes and Slipnet keep their windows' aspect
+ratios (the Temperature is letterboxed at the top of its pane, its margin in its
+background colour); the Commentary, Memory and Trace fill their panes. The Racket port draws
+without antialiasing, as in its other screenshots.
 
 ### `abc → abd; mrrjjj → ?` → `mrrjjk` (Racket)
 

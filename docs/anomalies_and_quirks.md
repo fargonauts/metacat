@@ -1143,6 +1143,23 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
   way whenever a canvas command on the engine thread triggered a collection. Caveat: an
   explicit `gc.collect()` on a worker still runs there; no production code calls one.
 
+### racket/gui: a custom `place-children` gets every child, and showing one doesn't re-place
+- **Seen:** 2026-10-05, loop0003 item 10 (racket/gui/one-window.rkt's pane layout).
+- **What:** three surprises with a `panel%` that overrides `place-children`:
+  - `place-children`'s `info` has one entry per child, hidden children included.
+    Returning places for the shown children only raises `container-redraw: result from
+    place-children is not a list of length 11 (matching the input list length)`;
+  - after `(send child show #f)` or `#t`, neither the show nor `reflow-container` calls
+    `place-children` again: the other panes stayed where they were, and a pane shown from
+    the Windows menu kept a 46×8 size at the panel's corner;
+  - `reparent` shows a hidden widget: the self-watching warning, hidden by
+    make-control-panel, was visible once moved into the control strip.
+- **Evidence:** one-window-test.rkt's "the Coderack moved left", "EEG has room" and
+  "self-watching is on" checks fail without the workarounds below.
+- **Status:** worked around. The layout gives hidden children `(0 0 0 0)`; a pane's host
+  calls `container-flow-modified` on the panel after showing or hiding its canvas; the
+  strip restores the warning's shown state after `reparent`.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

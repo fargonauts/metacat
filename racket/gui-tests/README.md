@@ -1,7 +1,8 @@
 # racket/gui-tests/: tests that open windows
 
-These two tests need a display. One drives the real control panel through its widgets;
-the other builds the standalone program and runs it. They run only on a **virtual**
+These three tests need a display. One drives the real control panel through its widgets,
+one drives the one-window GUI the same way, and the third builds the standalone program
+and runs it. They run only on a **virtual**
 display (Xvfb). [`../info.rkt`](../info.rkt) lists this folder in `test-omit-paths`, so
 a plain `raco test racket/` skips it, and
 [`tests/run-tests.sh`](../../tests/run-tests.sh) runs it separately under `xvfb-run`.
@@ -16,7 +17,7 @@ env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a -s "-screen 0 1920x1200x24" \
 
 This is the command `tests/run-tests.sh` uses. Unsetting `WAYLAND_DISPLAY` and forcing
 GTK's X11 backend matter: when `WAYLAND_DISPLAY` is set, GTK ignores Xvfb and opens the
-windows **on your real screen**. Both tests refuse to start if `WAYLAND_DISPLAY` is set.
+windows **on your real screen**. The tests refuse to start if `WAYLAND_DISPLAY` is set.
 (How this was found is in `docs/anomalies_and_quirks.md` and in PROGRESS.md, iteration
 16.)
 
@@ -27,11 +28,33 @@ optionally `bwrap` (bubblewrap).
 
 | File | What it checks | Time |
 | --- | --- | --- |
+| `one-window-test.rkt` | The one-window GUI ([`../gui/one-window.rkt`](../gui/one-window.rkt)): the layout, Run 7's whole trace against its golden (with the window resized mid-run), hiding and showing panes, self-watching off and on, and a screenshot's pixels | about 10 s, 1103 checks |
 | `control-panel-test.rkt` | The control panel ([`../gui/gui.rkt`](../gui/gui.rkt)), driven through its own widgets | about 9 s with its first 105 checks; it has had 211 since the Demos checks were added |
 | `dist-test.rkt` | The standalone program built by [`make-dist.sh`](../../make-dist.sh) | about 10 s (it includes a 70 MB build in a temporary directory) |
 
 Times are from [`PROGRESS.md`](../../ralph_loops/loop0001/PROGRESS.md) (iterations 16
 and 17).
+
+### one-window-test.rkt
+
+It calls `(setup-one-window #:size '(1920 1040))`, as `racket racket/one-window.rkt` does
+with the screen's size, then:
+
+- checks `pane-rects` by itself (every shown pane inside the area, none overlapping, at
+  three sizes and five sets of panes) and the window as built: one frame on the screen,
+  every graphics window a pane of it, the EEG hidden, each pane at its own size through
+  the original's resize protocol;
+- turns on the trace (`trace-gui-runs!` from [`../headless.rkt`](../headless.rkt): the
+  trace's wrappers around the GUI's own windows), types `abc abd xyz 3852097033`, presses
+  Enter and Go with the slider at Fast, resizes the window twice during the run, and
+  compares the whole trace with `tests/golden/abc-abd-xyz_3852097033.jsonl` (every line
+  but the start and end lines), and the end state with the golden's;
+- grabs the screen with `python3` and PIL (skipped if missing) into
+  `$METACAT_SCREENSHOT_DIR/racket-one-window-run7.png` (default: the temporary directory)
+  and checks, pane by pane, that the pane's background and drawings are on the screen
+  where the pane is;
+- hides and shows the Workspace and shows the EEG from the Windows menu, and turns
+  self-watching off and on (the three Themes panes follow), checking the layout each time.
 
 ### control-panel-test.rkt
 

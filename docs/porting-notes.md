@@ -1663,3 +1663,26 @@ date (the sections are left as written, except where marked):
   that `check-battery` adds per battery.
 - **The crash run** (item 10: "after the same 1062 trace lines"): golden-test.rkt checks
   an identical prefix of more than 1000 lines, not the exact count.
+
+## One window (loop0003 item 10)
+- **Hooks, not copies.** The one-window GUI (racket/gui/one-window.rkt) reuses gui.rkt
+  and gui.rktl through two hooks that are off in the multi-window GUI:
+  `screen-host%`'s optional `pane-parent` init field (`make-pane-host-maker`): the canvas
+  is created in that panel instead of a frame of its own; `set-geometry!`, `raise` and
+  the frame's min sizes do nothing, show and hide act on the canvas; and
+  `set-control-panel-frame-maker!`, which make-control-panel (gui.rktl) asks for its
+  frame. `setup-one-window` is setup.rktl's `setup` with these two set, without
+  `arrange-windows!`; gui.rkt now also exports `make-engine-thread`.
+- **Letterboxing** is the host's: a pane of a window with `none` scrolling keeps the
+  window's first (w+2):(h+2) ratio (the ratio make-resizable gave SWL's aspect bounds),
+  and `paint` clears the canvas in the viewport's background, then renders the display
+  list through `set-initial-matrix` at the offset (render-items sets the origin itself).
+  Mouse presses subtract the offset.
+- **The resize queue.** In one window, all panes change size at once, and the
+  original's listener keeps only the last pending resize, so a pane's `canvas-resized`
+  waits while `thread-msg-waiting?` on `*resize-message-queue*`: the refresh timer
+  retries every 50 ms, so the panes take their sizes one per listener pause (250 ms).
+- **Tracing a GUI run.** headless.rkt's `trace-gui-runs!` installs the trace's
+  wrappers and recorders around whatever windows are installed (the GUI's) and writes to
+  a port, without its headless windows or `break`. A GUI run's trace then matches its
+  golden's lines between `start` and `end`, which only run-problem writes.

@@ -22,9 +22,9 @@ Themes, the Vertical Themes, the Episodic Memory and the Temporal Trace.*
 | --- | --- | --- | --- |
 | SGL on racket/draw | `sgl.rkt`, `fonts.rkt`, `colors.rkt` | racket/draw | The interpreter, a Tk-canvas emulation (`viewport%`), fonts and colours |
 | The views | `views.rkt`, `engine-route.rkt`, `constants.rktl`, `general-graphics.rktl` and the `*-graphics.rktl` panels | racket/draw | The original's windows, drawn into display lists. Works offscreen, without a display |
-| The GUI | `gui.rkt`, `gui.rktl`, `setup.rktl` | racket/gui | The control panel, on-screen frames, the engine thread |
+| The GUI | `gui.rkt`, `gui.rktl`, `setup.rktl`, `one-window.rkt` | racket/gui | The control panel, on-screen frames (or panes of one frame), the engine thread |
 
-Only `gui.rkt` requires `racket/gui`. The engine ([`../engine.rkt`](../engine.rkt))
+Only `gui.rkt` and `one-window.rkt` require `racket/gui`. The engine ([`../engine.rkt`](../engine.rkt))
 requires none of these files. [`../tests/no-gui-test.rkt`](../tests/no-gui-test.rkt)
 walks the compiled imports to check both rules.
 
@@ -48,7 +48,8 @@ walks the compiled imports to check both rules.
 | `memory-graphics.rktl` | memory-graphics.ss | The Episodic Memory window. Clicking answers shows their descriptions and compares two of them. |
 | `commentary-graphics.rktl` | commentary-graphics.ss | The Commentary window (a scrollable text window). |
 | `eeg-graphics.rktl` | eeg-graphics.ss (window) | The EEG window (Workspace activity and temperature over time). The EEG object itself is in the engine. |
-| `gui.rkt` | (port) | The racket/gui module: `screen-host%`, the refresh timer, the engine thread, `create-mcat-logo`, `arrange-windows!`. It includes `gui.rktl` and `setup.rktl`. |
+| `gui.rkt` | (port) | The racket/gui module: `screen-host%` (a frame, or in pane mode a canvas in a parent panel, letterboxed at its window's aspect ratio), the refresh timer, the engine thread, `create-mcat-logo`, `arrange-windows!`. It includes `gui.rktl` and `setup.rktl`. |
+| `one-window.rkt` | (port, loop0003) | The one-window GUI (`racket racket/one-window.rkt`): `setup-one-window` is setup.rktl's `setup` with the windows as panes (`make-pane-host-maker`) and the control panel built in the same frame (`set-control-panel-frame-maker!`) and moved into a strip. `pane-rects` lays the panes out as the Python Qt GUI does. |
 | `gui.rktl` | gui.ss | The control panel: command-line parser, buttons, speed slider, menus, dialogs, help window, window controllers. |
 | `setup.rktl` | setup.ss's `setup`, `enable-resizing` | Creates every window, the control panel and the engine thread; makes windows resizable; starts the refresh timer. |
 

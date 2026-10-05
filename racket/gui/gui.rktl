@@ -452,9 +452,12 @@
     ;; port: letrec (left to right, like letrec*), since racket/gui creates menu items in menu order, so
     ;; an item's action may name an item created after it
     (letrec ((control-panel
-	     (new control-panel-frame% (label "Metacat Control Panel")
-	       (style '(no-resize-border)) (border 15) (spacing 5)
-	       (alignment '(center top))))
+	     ;; port: or the one window's frame (racket/gui/one-window.rkt)
+	     (if control-panel-frame-maker
+	       (control-panel-frame-maker)
+	       (new control-panel-frame% (label "Metacat Control Panel")
+		 (style '(no-resize-border)) (border 15) (spacing 5)
+		 (alignment '(center top)))))
 	   (menu-bar (new g:menu-bar% (parent control-panel)))
 	   (info-label
 	     (new g:message% (parent control-panel)

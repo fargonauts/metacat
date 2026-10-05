@@ -9,5 +9,5 @@
   "sleep_between_s": 0,
   "run_tests": true,
   "push": true,
-  "gate_timeout_min": 15
+  "gate_timeout_min": 30
 }

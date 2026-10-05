@@ -34,7 +34,8 @@
          "utilities.rkt"
          "engine.rkt")
 
-(provide run-problem partial-trace golden-runs golden-file-name install-headless-windows!)
+(provide run-problem partial-trace golden-runs golden-file-name install-headless-windows!
+         trace-gui-runs!)
 
 ;;;---------------------------------------------------------------------------
 ;;; JSON output (oracle trace.ss, json-*)
@@ -482,6 +483,18 @@
   (printf "Temperature: ~a~%" *temperature*)
   (printf "Answers: ~a~%" (if (null? answers) "none" answers))
   reason)
+
+;; A run driven by a GUI (racket/gui-tests/one-window-test.rkt): the
+;; trace's wrappers, and its recorders around the GUI's own Commentary and
+;; Trace windows, write the events after the start event to trace-port (#f
+;; stops writing).  Unlike run-problem, this installs no headless windows
+;; and keeps the GUI's break and quiet-break: the run is the GUI's own.
+(define (trace-gui-runs! trace-port)
+  (install-trace!)
+  (install-recorders!)
+  (set! last-themes #f)
+  (set! answers '())
+  (set! out trace-port))
 
 ;;;---------------------------------------------------------------------------
 ;;; tests/problems.txt (chez_scheme/oracle/make-golden.ss's reading of it)

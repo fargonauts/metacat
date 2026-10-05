@@ -79,7 +79,17 @@ file. [`gui/README.md`](gui/README.md) explains the graphics.
 ```bash
 racket racket/main.rkt          # the control panel and every window
 racket racket/main.rkt 1.5      # the same, windows scaled by 1.5
+racket racket/one-window.rkt    # the same GUI in one window: menus, control strip, panes
 ```
+
+`racket/one-window.rkt` ([`gui/one-window.rkt`](gui/one-window.rkt)) puts the control
+panel and every graphics window into one frame of the screen's size, laid out as the Python
+Qt GUI lays them out: Temperature, Workspace, Coderack, Vertical Themes and Commentary on
+top; Slipnet, Top and Bottom Themes and Episodic Memory in the middle; the Temporal Trace
+(and the EEG, when shown) at the bottom. The panes follow the window's size; the Windows
+menu hides and shows them. There are no splitters.
+
+![Run 7 at its answer in the one-window GUI](../docs/screenshots/racket-one-window-run7.png)
 
 Type a problem in the control panel's command line and press Enter: `abc abd xyz` asks
 what `xyz` changes to, `abc abd xyz 7` uses seed 7, and `abc abd xyz wyz` asks Metacat

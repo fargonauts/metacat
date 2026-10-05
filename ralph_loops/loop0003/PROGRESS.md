@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 10/12 SOLVED
+- **Current**: 11/12 SOLVED
 
 ---
 
@@ -866,3 +866,106 @@ Item **09 Packaging and docs**: SOLVED.
   `go-button-action` → `init-new-problem`), Enter sets up the problem and parks it in
   input mode with Go enabled, and Go runs it, as `drive_qt_layout.py` does. This wording
   predates loop0003, and I left it alone.
+
+---
+
+## Iteration 13 — 2026-10-05 04:33:00
+Item **10 (Optional) A single window for the Racket port too**: SOLVED.
+
+### Completed
+- **Tests and order, honestly:** I wrote a first draft of the code (the pane mode and
+  `one-window.rkt`) before `racket/gui-tests/one-window-test.rkt`, so the test did not
+  come strictly first. Without the new code, the test fails: with gui.rkt, gui.rktl and
+  headless.rkt reverted to HEAD and one-window.rkt removed, it stops at once
+  (`only-in: identifier 'trace-gui-runs!' not included`). Its first run against the draft
+  gave **10 failures in 917 checks**, which found four bugs. Each failed before its fix:
+  - a custom `place-children` gets one entry per child, hidden ones included (an
+    exception at setup);
+  - showing or hiding a pane didn't lay the panel out again: "the Coderack moved left"
+    and "EEG has room: (4 98 46 8)" failed. The fix is `container-flow-modified`;
+  - `reparent` showed the hidden self-watching warning. I saw it in the screenshot and
+    wrote the check before the fix;
+  - the Temperature's letterbox margin was unpainted (white). Also seen in the
+    screenshot.
+- **`racket/gui/gui.rkt`** (the multi-window GUI behaves as before):
+  - `screen-host%` has an optional `pane-parent`, set through `make-pane-host-maker`. The
+    canvas goes into that panel instead of a frame, with no min sizes. Show and hide act
+    on the canvas and re-lay the panel out. `set-geometry!` and `raise` do nothing;
+  - a window with `none` scrolling is letterboxed at its (w+2):(h+2) ratio, at the top
+    centre of its pane. `paint` fills the margins in the viewport's background, and
+    presses subtract the offset;
+  - a pane's resize waits while the original listener's queue holds a resize, because
+    the listener keeps only the last of simultaneous resizes;
+  - `settled?` and `get-offset` are for the tests. `make-engine-thread` is exported, and
+    `set-control-panel-frame-maker!` is a hook that `make-control-panel` (gui.rktl, a
+    5-line change) asks for its frame.
+- **`racket/gui/one-window.rkt`**: `setup-one-window` is setup.rktl's `setup` with
+  the windows as panes and the control panel built in the same frame, without
+  `arrange-windows!`. Its widgets are then moved into a strip: problem and command line;
+  slider and Step/Go/Stop/Reset; breakpoint and warning. `layout-panel%` places the panes
+  by `pane-rects`, which is the Qt layout of `docs/qt-gui-plan.md` 2.1–2.2:
+  - rows of 60/31/9 % of the height, 18 % when the EEG is shown;
+  - fixed-aspect widths from the row height, the Temperature at max(60, 6 %), and the
+    Commentary and Memory taking the rest (at least 200 px);
+  - the Themes stacked in one column, and empty rows closed up.
+
+  There are no splitters (racket/gui has none) and no saved layout. The Windows menu
+  hides and shows panes.
+- **`racket/one-window.rkt`**: the entry point, `racket racket/one-window.rkt [SCALE]`.
+  It uses `lazy-require`, as main.rkt does, and is added to `no-gui-test.rkt`'s headless
+  modules.
+- **`racket/headless.rkt`**: `trace-gui-runs!` installs the trace's wrappers and
+  recorders around the GUI's own windows and writes to a port. It adds no headless
+  windows and no `break`.
+- **Results** (`one-window-test.rkt`, 1103 checks, about 10 s on Xvfb):
+  - Run 7 is typed into the strip and run with Go at Fast, and the window is resized
+    twice during the run. Its trace equals the golden `abc-abd-xyz_3852097033.jsonl`
+    **line for line** (all 2,667 events between the start and end lines), and the run ends
+    at the golden's (2170, rng). The run took 2.0 s;
+  - `pane-rects` checked at 3 sizes × 5 pane sets: every pane inside the area, none
+    overlapping;
+  - the built window has one shown frame, every window is a pane of it, and the EEG
+    starts hidden. Each pane takes its own size through the original's protocol, and
+    each panel redraws at that size;
+  - hiding and showing the Workspace and showing the EEG lay the panes out again;
+  - self-watching off hides the three Themes panes and shows the warning; on undoes both;
+  - the screen grab (python3 + PIL, skipped if missing) has, for each pane, its
+    background and its drawings where the pane is. The Bottom Themes draws only in
+    justify runs, so it is checked for its background only.
+- **Screenshot, inspected:** Run 7 at `wyz` in one 1920×1040 frame. The picture matches
+  the multi-window screenshots: crossed bridges, both rules, the Coderack, Temperature 15,
+  the Slipnet, the Themes, the Memory's two answers, the Commentary and the Trace's icons.
+  Committed as `docs/screenshots/racket-one-window-run7.png`, with a section and a table
+  row in `docs/screenshots/README.md`.
+- **Docs:**
+  - `docs/divergences.md`: "Racket: one window";
+  - `docs/anomalies_and_quirks.md`: the racket/gui entry (place-children, re-placing,
+    reparent);
+  - `docs/porting-notes.md`: "One window (loop0003 item 10)";
+  - `racket/README.md` (command and screenshot), `racket/gui/README.md` (rows),
+    `racket/gui-tests/README.md` (row and section);
+  - the top-level README's quick-start row, and CLAUDE.md's command list.
+- `racket/gui-tests/*.rkt` all pass on Xvfb: 1317 checks with control-panel-test and
+  dist-test, in 72 s.
+- Gate: `timeout 1800 python3 ralph_loops/loop0003/gate.py`: **GATE PASSED**. The Python
+  suite was green, and so was the Racket suite (racket/ changed: `raco test racket/`, the
+  gui-tests under xvfb-run, and the Chez checks).
+
+### Blockers
+- None.
+
+### Next
+- Item 11 (final audit). Remember that `racket/` changed in this item, so the audit must
+  run `tests/run-tests.sh` too. The audit note from iteration 12 still stands: the
+  README's "Enter starts the run" wording.
+- The Racket one-window GUI could later get draggable pane borders (a hand-made splitter
+  on `layout-panel%`) and a saved layout, as the Qt GUI has.
+
+## Iteration 13, fix 2: the gate "hang" was the time limit, not a deadlock
+- Re-ran `python3 ralph_loops/loop0003/gate.py` with timestamps: **GATE PASSED in 17 min 52 s**.
+  The Python suite took 10 min 38 s (1618 passed). Because racket/ changed, the gate also
+  ran tests/run-tests.sh: raco make 2 s, `raco test racket/` 5 min 53 s, gui-tests 31 s,
+  Chez checks 47 s. No test hangs. The failing runs were killed at 15 min while
+  `racket/tests/rule-diff-test.rkt` was running, which this run reached at 13 min.
+- Cause: knobs.json had `gate_timeout_min` at 15, below the gate's real length whenever
+  racket/ changes. Fix: put it back to 30, the driver's default. No test was changed.

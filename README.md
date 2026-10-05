@@ -61,7 +61,7 @@ was a VirtualBox image.
 |---|---|---|
 | Needs | Racket 8.x CS with `racket/gui` (`sudo apt install racket`) | Python 3.12, standard library + tkinter |
 | GUI | `racket racket/main.rkt` | `cd python && python3 -m metacat.gui` |
-| One-window GUI | | `cd python && python3 -m metacat.qt` (needs PySide6) |
+| One-window GUI | `racket racket/one-window.rkt` | `cd python && python3 -m metacat.qt` (needs PySide6) |
 | Headless | `racket racket/cli.rkt abc abd xyz --seed 3852097033` | `cd python && python3 -m metacat abc abd xyz --seed 3852097033` |
 | Install | `bash make-dist.sh` builds a standalone program in `build/metacat/` | `pip install -e python` installs `metacat` and `metacat-gui`; `pip install -e 'python[qt]'` adds PySide6 and `metacat-qt` |
 | More | [`racket/README.md`](racket/README.md) | [`python/README.md`](python/README.md) |

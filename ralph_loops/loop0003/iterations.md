@@ -138,7 +138,7 @@
     Tests: install into a fresh venv with the qt extra and open and close the window
     headlessly; without the extra, the engine and the tkinter GUI still install and run.
 
-- [ ] **10 (Optional) A single window for the Racket port too.** In `racket/gui/`, add a
+- [x] **10 (Optional) A single window for the Racket port too.** In `racket/gui/`, add a
     single-frame layout that hosts the existing views as panes in one `frame%`. Use new
     files and a new entry point, leaving the current multi-window GUI as it is. Tests,
     following the patterns in `racket/gui-tests/`:

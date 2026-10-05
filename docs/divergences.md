@@ -87,6 +87,35 @@ Each entry: what differs, where, why, and how the oracle/tests account for it.
   Xvfb. Its full, stepped, stopped and resumed, breakpointed and reset runs all end at
   the golden's codelet count and generator state.
 
+## Racket: one window (loop0003 item 10)
+- **What:** `racket racket/one-window.rkt` (racket/gui/one-window.rkt) is a second GUI,
+  next to the multi-window one (`racket/main.rkt`, unchanged). The control panel and the
+  eleven graphics windows are in one frame, the screen's size less 40 pixels:
+  - the menu bar is the control panel's (Help, Demos, Windows, Options, Memory); its widgets
+    are moved into a strip under it (problem and command line; speed slider and Step, Go,
+    Stop, Reset; breakpoint and self-watching messages);
+  - the windows are panes in the Qt GUI's arrangement (docs/qt-gui-plan.md 2.1-2.2):
+    rows of 60 %, 31 % and 9 % of the height (18 % when the EEG is shown), each pane of
+    fixed aspect ratio as wide as its ratio gives at the row's height, the Temperature
+    max(60, 6 % of the width), the Commentary and the Memory the rest;
+  - a window that doesn't scroll is letterboxed at the top centre of its pane at its
+    window's (w+2):(h+2) ratio, the margins in its background colour; the scrolling ones
+    (Commentary, Memory, Trace, EEG) fill their panes. Every pane reaches its size through
+    the original's resize handler and listener, one pane at a time (a pane waits until the
+    listener's queue is empty, since the listener keeps only the last of simultaneous
+    resizes);
+  - racket/gui has no splitters, so the panes can't be dragged to other sizes, and no
+    layout is saved. The Windows menu hides and shows panes, and the others close up;
+  - the Logo window (Windows > Show Logo) is still a separate small window.
+- **Why:** loop0003's goal is one window for everything; the Python Qt GUI is the full
+  version (fixed splitters, saved layout), and this is the optional Racket counterpart
+  (iterations.md item 10).
+- **Tests:** racket/gui-tests/one-window-test.rkt: Run 7 typed into the strip and run with
+  Go, with the window resized during the run, writes exactly its golden trace (2,667
+  events between the start and end lines) and ends at 2170 codelets with the golden's
+  generator state. It also checks the layout, the hidden and shown panes, self-watching
+  off and on, and a screenshot's pixels pane by pane.
+
 ## Entry points: a command line, a headless CLI and a standalone program (items 11, 15–16)
 - **What:** the original was used from the Chez/SWL REPL: `(setup)` opened the windows,
   and `(run ...)`/`(mcat ...)` or the control panel ran problems. The port has no REPL.

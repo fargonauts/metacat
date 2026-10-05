@@ -61,7 +61,7 @@
 
 (define engine-modules
   '("compat.rkt" "utilities.rkt" "engine-lang.rkt" "engine.rkt"
-    "headless.rkt" "cli.rkt" "main.rkt" "metacat.rkt"))
+    "headless.rkt" "cli.rkt" "main.rkt" "metacat.rkt" "one-window.rkt"))
 (define view-modules
   '("gui/sgl.rkt" "gui/fonts.rkt" "gui/colors.rkt" "gui/engine-route.rkt"
     "gui/views.rkt"))

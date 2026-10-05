@@ -58,7 +58,9 @@
          set-step-interval-action help-action
          *mcat-logo* screen-host% engine-busy? engine-idle-evt
          set-file-dialog! arrange-windows! window-frames
-         start-gui-refresh! stop-gui-refresh!)
+         start-gui-refresh! stop-gui-refresh!
+         ;; for the one-window GUI (one-window.rkt)
+         make-engine-thread make-pane-host-maker set-control-panel-frame-maker!)
 
 
 ;;-----------------------------------------------------------------------------
@@ -129,7 +131,7 @@
   (class g:canvas%
     (init-field vp host)
     (super-new)
-    (define/override (on-paint) (send vp render (send this get-dc)))
+    (define/override (on-paint) (send host paint (send this get-dc)))
     (define/override (on-size w h) (send host canvas-resized))
     (define/override (on-scroll e) (send host user-scrolled))
     (define/override (on-event e)
@@ -143,9 +145,16 @@
 
 (define screen-host%
   (class object%
-    (init-field scrolling destroy-action)
+    ;; port (one window): with a pane-parent (one-window.rkt), the host is a
+    ;; pane of the one window: its canvas is a child of pane-parent, there
+    ;; is no frame, and a window of fixed aspect ratio is letterboxed in it
+    (init-field scrolling destroy-action [pane-parent #f])
     (super-new)
-    (define frame (new host-frame% (label "") (host this)))
+    (define frame (and (not pane-parent) (new host-frame% (label "") (host this))))
+    (define title "")
+    (define aspect #f)        ; pane: (w+2)/(h+2) of the first size, or #f
+    (define offset-x 0)       ; pane: where the viewport sits in the canvas
+    (define offset-y 0)
     (define canvas #f)
     (define viewport #f)
     (define visible? #f)
@@ -160,26 +169,35 @@
     (define/public (show-viewport vp)
       (set! viewport vp)
       (set! canvas
-        (new view-canvas% (parent frame) (vp vp) (host this)
+        (new view-canvas% (parent (or frame pane-parent)) (vp vp) (host this)
              (style (append '(no-autoclear)
                             (if h-style? '(hscroll) '())
                             (if v-style? '(vscroll) '())))))
       (when (or h-style? v-style?)
         (send canvas init-manual-scrollbars (and h-style? 1) (and v-style? 1) 1 1 0 0)
         (send canvas show-scrollbars #f #f))
-      (send canvas min-client-width (send vp get-width))
-      (send canvas min-client-height (send vp get-height))
+      (if frame
+        (begin
+          (send canvas min-client-width (send vp get-width))
+          (send canvas min-client-height (send vp get-height)))
+        (begin
+          (send canvas show #f)
+          (when (memq scrolling '(both none))
+            (set! aspect (/ (+ (send vp get-width) 2) (+ (send vp get-height) 2))))))
       (send vp set-changed-callback! (lambda () (set! dirty? #t)))
       (set! hosts (cons this hosts)))
     (define/public (get-viewport) viewport)
-    (define/public (set-title! t) (send frame set-label t))
-    (define/public (get-title) (send frame get-label))
+    (define/public (pane?) (not frame))
+    (define/public (set-title! t) (if frame (send frame set-label t) (set! title t)))
+    (define/public (get-title) (if frame (send frame get-label) title))
     (define/public (set-geometry! g)
-      (let ((m (regexp-match #rx"^(?:([0-9]+)x([0-9]+))?(?:([+-][0-9]+)([+-][0-9]+))?$" g)))
+      (let ((m (and frame (regexp-match #rx"^(?:([0-9]+)x([0-9]+))?(?:([+-][0-9]+)([+-][0-9]+))?$" g))))
         (when (and m (list-ref m 3))
           (send frame move (string->number (list-ref m 3)) (string->number (list-ref m 4))))))
     (define/public (get-geometry)
-      (format "~ax~a+~a+~a" (get-width) (get-height) (send frame get-x) (send frame get-y)))
+      (if frame
+        (format "~ax~a+~a+~a" (get-width) (get-height) (send frame get-x) (send frame get-y))
+        (format "~ax~a+0+0" (get-width) (get-height))))
     (define/public (get-width)
       (+ 2 (if canvas (let-values (((w h) (send canvas get-client-size))) w) 0)))
     (define/public (get-height)
@@ -196,11 +214,15 @@
         ;; the canvas's minimum size counts the scrollbars shown when it is set
         (send canvas min-client-width (send viewport get-width))
         (send canvas min-client-height (send viewport get-height)))
-      (send frame reflow-container)
+      (if frame
+        (send frame reflow-container)
+        ;; a pane's size is the one window's layout's, not the viewport's
+        (begin (send canvas min-client-width 0) (send canvas min-client-height 0)))
       (set! resizable? (and w h)))
     (define/public (set-min-size! w h)
-      (send canvas min-client-width w)
-      (send canvas min-client-height h))
+      (when frame
+        (send canvas min-client-width w)
+        (send canvas min-client-height h)))
     (define/public (set-aspect-ratio-bounds! a b) (void))
     (define/public (scroll-needs)
       (let* ((r (send viewport get-scroll-region))
@@ -213,19 +235,62 @@
       (let-values (((rw rh h? v?) (scroll-needs)))
         (and (if (eq? orientation 'horizontal) h? v?) the-scrollbar)))
     (define/public (set-vertical-view! fraction) (void))
-    (define/public (raise) (when visible? (send frame show #t)))
+    (define/public (raise) (when (and visible? frame) (send frame show #t)))
     (define/public (lower) (void))
     (define/public (destroy) (hide-window))
-    (define/public (show-window) (set! visible? #t) (send frame show #t))
-    (define/public (hide-window) (set! visible? #f) (send frame show #f))
+    (define/public (show-window) (set! visible? #t) (show-or-hide #t))
+    (define/public (hide-window) (set! visible? #f) (show-or-hide #f))
+    ;; a pane's parent lays its panes out again
+    (define/private (show-or-hide on?)
+      (send (or frame canvas) show on?)
+      (when pane-parent (send pane-parent container-flow-modified)))
     (define/public (close-request) (and (destroy-action this) #t))
     ;; the canvas changed size: Tk's <Configure> on the viewport
     (define/public (canvas-resized)
       (when (and canvas resizable? visible?)
-        (let-values (((w h) (send canvas get-client-size)))
-          (unless (and (= w (send viewport get-width)) (= h (send viewport get-height)))
+        (let-values (((w h) (pane-viewport-size)))
+          (unless (or (and (= w (send viewport get-width)) (= h (send viewport get-height)))
+                      ;; a pane waits for the resize queue to empty: the
+                      ;; original's listener keeps only the last of
+                      ;; simultaneous resizes, and in one window every pane
+                      ;; changes size at once
+                      (and (not frame) (thread-msg-waiting? *resize-message-queue*)))
             (send viewport set-size! w h)
             (send viewport configure (+ w 2) (+ h 2))))))
+    ;; the viewport's size for the canvas's: all of it, or for a pane of
+    ;; fixed aspect ratio the largest (w+2):(h+2) box at the pane's top centre
+    (define/private (pane-viewport-size)
+      (let-values (((cw ch) (send canvas get-client-size)))
+        (if (and aspect (not frame))
+          (let* ((W (+ cw 2)) (H (+ ch 2))
+                 (fit-h (max 3 (min H (round (/ W aspect)))))
+                 (fit-w (max 3 (min W (round (* fit-h aspect)))))
+                 (w (- fit-w 2)) (h (- fit-h 2)))
+            (set! offset-x (max 0 (quotient (- cw w) 2)))
+            (set! offset-y 0)
+            (values w h))
+          (values cw ch))))
+    ;; for tests: the viewport has the size the canvas gives it
+    (define/public (settled?)
+      (or (not (and canvas resizable? visible?))
+          (let-values (((w h) (pane-viewport-size)))
+            (and (= w (send viewport get-width)) (= h (send viewport get-height))))))
+    (define/public (get-offset) (list offset-x offset-y))
+    ;; on-paint: a pane paints its margins in the viewport's background
+    (define/public (paint dc)
+      (if (and (not frame)
+               (let-values (((cw ch) (send canvas get-client-size)))
+                 (or (< (send viewport get-width) cw) (< (send viewport get-height) ch))))
+        (begin
+          (send dc set-background (send viewport get-background-color))
+          (send dc clear)
+          (send dc set-clipping-rect offset-x offset-y
+                (send viewport get-width) (send viewport get-height))
+          (send dc set-initial-matrix (vector 1.0 0.0 0.0 1.0 offset-x offset-y))
+          (send viewport render dc)
+          (send dc set-initial-matrix (vector 1.0 0.0 0.0 1.0 0.0 0.0))
+          (send dc set-clipping-region #f))
+        (send viewport render dc)))
     (define syncing? #f)
     (define/public (user-scrolled)
       ;; GTK reports scroll events while init-manual-scrollbars changes the
@@ -239,7 +304,7 @@
     (define/public (press x y button)
       (with-handlers ((exn:fail? (lambda (e)
                                    (eprintf "mouse handler: ~a\n" (exn-message e)))))
-        (send viewport mouse-press x y button)))
+        (send viewport mouse-press (- x offset-x) (- y offset-y) button)))
     ;; called by the refresh timer, in the GUI thread
     (define/public (tick)
       (when viewport
@@ -270,6 +335,17 @@
 
 (define (make-screen-host scrolling destroy-action)
   (new screen-host% (scrolling scrolling) (destroy-action destroy-action)))
+
+;; port (one window): a maker of hosts that are panes in parent
+(define (make-pane-host-maker parent)
+  (lambda (scrolling destroy-action)
+    (new screen-host% (scrolling scrolling) (destroy-action destroy-action)
+         (pane-parent parent))))
+
+;; port (one window): the control panel's widgets go into this frame
+;; instead of a frame of their own (make-control-panel, gui.rktl)
+(define control-panel-frame-maker #f)
+(define (set-control-panel-frame-maker! f) (set! control-panel-frame-maker f))
 
 ;; repaint changed windows 20 times a second
 (define refresh-timer #f)

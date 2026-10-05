@@ -93,3 +93,15 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 03:46:21] claude session it12_fix1 (cap 1.50 h) -> session_it12_fix1.log
 [2026-10-05 03:47:35] session it12_fix1: ok (exit 0, 15 tool calls)
 [2026-10-05 03:58:00] tests passed: GATE PASSED
+[2026-10-05 03:58:00] committed be79faa: 09 Packaging and docs.
+[2026-10-05 03:58:03] pushed be79faa to origin
+[2026-10-05 03:58:03] === iteration 13: 10 (Optional) A single window for the Racket port too. In `racket/gui/`, add a
+[2026-10-05 03:58:03] claude session it13 (cap 3.00 h) -> session_it13.log
+[2026-10-05 04:32:50] session it13: ok (exit 0, 75 tool calls)
+[2026-10-05 04:47:50] tests FAILED: GATE TIMED OUT after 15 min: a test hung (a deadlock?). Find it: count the finished tests in the pytest progress line, and map the count onto `pytest --collect-only -q`.
+[2026-10-05 04:47:50] claude session it13_fix1 (cap 1.50 h) -> session_it13_fix1.log
+[2026-10-05 04:58:48] session it13_fix1: ok (exit 0, 16 tool calls)
+[2026-10-05 05:13:48] tests FAILED: GATE TIMED OUT after 15 min: a test hung (a deadlock?). Find it: count the finished tests in the pytest progress line, and map the count onto `pytest --collect-only -q`.
+[2026-10-05 05:13:48] claude session it13_fix2 (cap 1.50 h) -> session_it13_fix2.log
+[2026-10-05 05:32:20] session it13_fix2: ok (exit 0, 16 tool calls)
+[2026-10-05 05:50:07] tests passed: GATE PASSED
