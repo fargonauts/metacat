@@ -93,6 +93,23 @@ their `i`s and `l`s ("Bond builders", "Answer finders"). Panes that don't scroll
 window's aspect ratio and are redrawn at their pane's size (at 1080p the Workspace's pane is
 790×593, against its own window's 800×600), and the Commentary's paragraphs are wider.
 
+### Justifying an answer in one window (Qt)
+
+![Python port's Qt GUI justifying ijk → abd, 1920×1080](qt-justify-ijk-abd.png)
+
+> *"Aha! I see why this answer makes sense. I think it's a pretty dumb answer."*
+>
+> — Metacat, asked to justify `ijk → abd` for `abc → abd`
+
+**Python port, Qt GUI**, 1920×1080, `abc abd ijk abd` with seed **1**: Metacat is given the
+answer `abd` and asked to justify it. At codelet **1835** (temperature 36) both rules say
+"change letter-category of leftmost letter to `a`, middle letter to `b`, rightmost letter
+to `d`", the Trace ends with Answer abd, and the Memory holds `abc -> abd, ijk -> abd`.
+View → Show all panes is on, so the Bottom Themes and the **EEG** (the black strip at the bottom)
+are visible too. The run ends at the golden's codelet count and random state (1835,
+4230205117). Made with [`python/tests/drive_qt_layout.py`](../../python/tests/drive_qt_layout.py)
+`OUTDIR run --screen 1920x1080` (offscreen, 2026-10-05).
+
 ![Python port's Qt GUI, Run 7, answer wyz, 2560×1440](qt-run7-wyz-1440p.png)
 
 The same at **2560×1440**: the window opens maximised and every pane grows in the same

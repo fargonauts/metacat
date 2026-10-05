@@ -141,6 +141,18 @@ A run in it gives exactly its golden trace. It needs PySide6 (`pip install -e
 
 *Run 7 at its answer `wyz` in the Qt GUI, at 1920×1080 (grabbed offscreen).*
 
+> *"The answer "wyz" occurs to me. I think this answer is great!"*
+>
+> — Metacat, Run 7
+
+![The Qt GUI justifying ijk → abd, with every pane shown](../docs/screenshots/qt-justify-ijk-abd.png)
+
+> *"Aha! I see why this answer makes sense. I think it's a pretty dumb answer."*
+>
+> — Metacat, asked to justify `ijk → abd` for `abc → abd`
+
+*Asked to justify the literal-minded answer `abd` (seed 1, codelet 1835), Metacat builds rules that turn each letter of `ijk` into `a`, `b` and `d`, sees why they work, and isn't impressed. Every pane is shown here, including the Bottom Themes and the EEG (bottom), which justify runs bring into play.*
+
 ![abc → abd; ijk → ? with a user clamp](../docs/screenshots/python-ijk-clamp.png)
 
 *`abc abd ijk`, seed 1, after the answer `ijd`. A pattern was clamped by hand from the

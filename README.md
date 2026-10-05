@@ -77,10 +77,22 @@ remembered:
 
 ```bash
 pip install -e 'python[qt]'
-metacat-qt                     # then type abc abd xyz 3852097033 and press Enter, then Go
+metacat-qt                     # Run 7 is already in the box: press Enter, then Go
 ```
 
 ![The Python port's Qt GUI after answering wyz to Run 7: every panel in one 1920×1080 window](docs/screenshots/qt-run7-wyz.png)
+
+> *"The answer "wyz" occurs to me. I think this answer is great!"*
+>
+> — Metacat, Run 7
+
+![The Qt GUI justifying ijk → abd, with every pane shown](docs/screenshots/qt-justify-ijk-abd.png)
+
+> *"Aha! I see why this answer makes sense. I think it's a pretty dumb answer."*
+>
+> — Metacat, asked to justify `ijk → abd` for `abc → abd`
+
+*Asked to justify the literal-minded answer `abd` (seed 1, codelet 1835), Metacat builds rules that turn each letter of `ijk` into `a`, `b` and `d`, sees why they work, and isn't impressed. Every pane is shown here, including the Bottom Themes and the EEG (bottom), which justify runs bring into play.*
 
 **Using the GUI.** Type a problem into the control panel's box and press **Enter**. Enter
 sets the problem up and waits; **Go** starts the run. Then:
