@@ -82,3 +82,6 @@ M docs/anomalies_and_quirks.md
 [2026-10-05 02:19:20] claude session it11 (cap 3.00 h) -> session_it11.log
 [2026-10-05 02:57:19] session it11: ok (exit 0, 70 tool calls)
 [2026-10-05 03:07:44] tests passed: GATE PASSED
+[2026-10-05 03:07:44] committed 90add2e: 08 Layout polish.
+[2026-10-05 03:07:46] pushed 90add2e to origin
+[2026-10-05 03:07:46] paused by knobs.json; polling every 60 s

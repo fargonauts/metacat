@@ -51,6 +51,43 @@ def on_gui_thread():
     return app is not None and QThread.currentThread() is app.thread()
 
 
+_collector = None
+
+
+def collect_on_gui_thread(interval_ms=100):
+    """Python's cyclic garbage collector on the GUI thread only (call it on the
+    GUI thread; again does nothing).
+
+    The automatic collector runs on whichever thread happens to allocate: the
+    engine or the resize listener, in the middle of a canvas command, holding
+    PAINT_GATE.  What it frees there includes Qt objects that Python owns and
+    that sit in reference cycles: a discarded host's pane (a top-level widget:
+    ~QWidget closes its QWindow, which waits for the GUI thread to flush the
+    window system events) and its canvas's scene (Qt timers stopped from the
+    wrong thread fire later on a freed object).  The first deadlocked, as the
+    GUI thread waited for the gate or joined the worker; the second crashed.
+    So the automatic collector is turned off, and a timer on the GUI thread
+    collects whenever the automatic one would have (gc.get_threshold)."""
+    global _collector
+    if _collector is not None:
+        return
+    import gc
+    gc.disable()
+    _collector = QTimer()
+    _collector.setInterval(interval_ms)
+    _collector.timeout.connect(_collect)
+    _collector.start()
+
+
+def _collect():
+    import gc
+    counts, thresholds = gc.get_count(), gc.get_threshold()
+    for generation in (2, 1, 0):
+        if thresholds[generation] and counts[generation] >= thresholds[generation]:
+            gc.collect(generation)
+            return
+
+
 class PaneView(QGraphicsView):
     """the viewport's canvas widget: the scene at one pixel per unit, from
     its top-left corner"""
@@ -397,8 +434,10 @@ def qt_host_maker():
 def install():
     """the Qt GUI's part of setup.ss's setup before the windows are made (GUI
     thread): fonts.ss's faces and hidden canvas in Qt (metacat/qt/fonts.py),
-    the scrollbar sizes, and Qt hosts for make-graphics-window"""
+    the scrollbar sizes, and Qt hosts for make-graphics-window; and the garbage
+    collector on the GUI thread (collect_on_gui_thread)"""
     from metacat.qt import fonts
+    collect_on_gui_thread()
     fonts.install()
     install_scrollbar_sizes()
     ghosts.set_window_host_maker(qt_host_maker())

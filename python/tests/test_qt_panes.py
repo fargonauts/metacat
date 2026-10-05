@@ -553,6 +553,42 @@ def test_fonts_measure_from_several_threads_at_once(qapp):
     assert errors == [] and set(map(tuple, results)) == {tuple(expected)}
 
 
+def test_the_garbage_collector_runs_on_the_gui_thread_only(qapp):
+    """The test above hung after the other Qt tests: the automatic garbage
+    collector ran in a worker measuring text, holding PAINT_GATE, and freed an
+    earlier test's host and pane (they refer to each other); ~QWidget waited
+    there for the GUI thread, which was joining the worker.  Now a worker
+    making cycles enough to start the automatic collector many times starts
+    none: the GUI thread's timer collects instead."""
+    import gc
+    import time
+    from metacat.qt import hosts
+    hosts.install()
+    collections = []
+
+    def note(phase, _info):
+        if phase == "start":
+            collections.append(threading.current_thread().name)
+
+    def make_cycles():
+        for _ in range(100000):
+            cycle = []
+            cycle.append(cycle)
+    gc.callbacks.append(note)
+    try:
+        worker = threading.Thread(target=make_cycles, name="cycle-maker")
+        worker.start()
+        worker.join(30)
+        assert not worker.is_alive() and collections == []
+        deadline = time.monotonic() + 10
+        while not collections and time.monotonic() < deadline:
+            qapp.processEvents()
+            time.sleep(0.01)
+    finally:
+        gc.callbacks.remove(note)
+    assert collections and set(collections) == {threading.main_thread().name}
+
+
 def tell_size(font, text):
     from metacat.objects import tell
     return tell(font, "get-pixel-size", text)

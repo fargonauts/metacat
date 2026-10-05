@@ -3,7 +3,7 @@
 ## Ralph Loop 0003 Status
 - **Started**: (not started)
 - **Target**: 12 items
-- **Current**: 8/12 SOLVED
+- **Current**: 9/12 SOLVED
 
 ---
 
@@ -777,3 +777,22 @@ Item **08 Layout polish**: SOLVED.
   good ones, in `OUT/window-run-*.png`. Mention `--settings` and `$METACAT_QT_SETTINGS`.
 - The panes are still blank for the first seconds after start (one panel per 250 ms
   listener pause).
+
+## Owner's note — 2026-10-05 03:20 (between iterations, loop paused)
+- **Item 06 is DONE.** Its work (session 7's report above) was committed in be3c001,
+  after a gate that passed by luck at 01:32. The deadlock was intermittent and still in
+  the code.
+- **Deadlock fixed (root cause found by a separate debugging agent in a git worktree).**
+  Python's automatic cyclic garbage collector ran on a test's worker thread and freed a
+  Qt top-level widget there. Destroying it waits for the GUI thread, which was waiting for
+  the worker. The fix is `metacat.qt.hosts.collect_on_gui_thread()`: automatic GC off,
+  collections from a `QTimer` on the GUI thread. It comes with a regression test
+  (`test_the_garbage_collector_runs_on_the_gui_thread_only`). Details are in
+  `docs/anomalies_and_quirks.md`. **Rule for later items:** a Python-owned Qt object must
+  never be freed off the GUI thread. Keep `collect_on_gui_thread()` installed, and
+  never call `gc.collect()` from a worker thread.
+- **Housekeeping:** commit be3c001 had picked up the debugging agent's worktree as an
+  empty gitlink (`.claude/worktrees/…`). It is removed, and `.claude/worktrees/` is now
+  in `.gitignore`.
+
+---

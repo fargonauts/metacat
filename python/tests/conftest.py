@@ -35,13 +35,17 @@ def pytest_collection_modifyitems(session, config, items):
 @pytest.fixture(scope="session")
 def qapp():
     """The QApplication of the session, offscreen: never a window on the real
-    screen.  At the end, every window is closed and the application quits."""
+    screen.  The garbage collector runs on its thread only, as in the program
+    (hosts.collect_on_gui_thread).  At the end, every window is closed and the
+    application quits."""
     import os
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     os.environ.pop("WAYLAND_DISPLAY", None)
     pytest.importorskip("PySide6.QtWidgets")
     from PySide6.QtWidgets import QApplication
+    from metacat.qt.hosts import collect_on_gui_thread
     app = QApplication.instance() or QApplication(["metacat-tests"])
+    collect_on_gui_thread()
     yield app
     app.closeAllWindows()
     app.processEvents()

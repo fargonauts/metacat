@@ -1114,6 +1114,35 @@ Kinds: 🐛 bug in the original · 🌀 anomaly (behaviour nobody can explain ye
 - **Status:** fixed: a host sends a configure when its pane changed size since the last
   one, even if it came back to the same size.
 
+### Python's cyclic garbage collector freed a Qt widget on a worker thread: a deadlock (Qt GUI bug, fixed)
+- **Seen:** loop0003, 2026-10-04/05. Iteration 7 and iteration 9 with its fix sessions
+  chased it. A separate debugging agent found the cause in its own worktree.
+- **What:** `tests/test_qt_panes.py::test_fonts_measure_from_several_threads_at_once` hung
+  intermittently (about 1 run in 2 or 3), and only after the other Qt tests:
+  - Python's *automatic* cyclic garbage collector ran at an eval breaker on one of the
+    test's font-measuring worker threads, while that thread held the canvas's
+    `PAINT_GATE` lock and the GIL.
+  - It freed garbage left by earlier tests: `QtHost` ↔ `Pane` reference cycles (hosts
+    that were never placed), whose parentless, shown `Pane` has a native `QWindow`.
+  - Destroying it (`QWidget::~QWidget` → `QWindow::close` →
+    `QWindowSystemInterface::flushWindowSystemEvents`) waits for the GUI thread. The GUI
+    thread was in `t.join()` waiting for the workers, so neither could continue.
+  - The menu tests created no garbage. They only moved a full collection into the
+    measuring loop.
+  - A narrower fix (handing the pane to the GUI thread from `__del__`) exposed the next
+    off-thread deletion: a `QGraphicsScene` freed on a worker, then a SIGSEGV when its
+    timer fired.
+- **Evidence:** `ralph_loops/loop0003/hang-it07-faulthandler.log` (Python stacks); gdb's C
+  stacks (`delete_garbage` ← `gc_collect_main` ← `_Py_HandlePending` under
+  `QWidget::~QWidget`); `test_the_garbage_collector_runs_on_the_gui_thread_only` fails
+  every time without the fix (128+ collections on a worker).
+- **Status:** fixed. `metacat.qt.hosts.collect_on_gui_thread()`, called from
+  `hosts.install()` and the tests' `qapp` fixture, turns off the automatic collector and
+  runs `gc.collect(generation)` from a 100 ms `QTimer` on the GUI thread whenever the
+  automatic thresholds would have triggered. The real app could have deadlocked the same
+  way whenever a canvas command on the engine thread triggered a collection. Caveat: an
+  explicit `gc.collect()` on a worker still runs there; no production code calls one.
+
 ## 🔗 Hidden couplings
 
 ### The graphics and rules.ss tell strings from symbols

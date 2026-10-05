@@ -521,7 +521,11 @@ listener. It never joins them and never takes a lock that is held across a wait.
 display-list lock is held only for one operation, and never while waiting. A worker blocks
 only on the GUI thread, which always runs its event loop. At quit, a flag makes any
 pending blocking query return at once, and the engine thread is a daemon. Item 05 tests 50
-rapid Go/Stop toggles.
+rapid Go/Stop toggles. Python's automatic garbage collector runs on whichever thread
+allocates, even inside a canvas command, and Qt objects in reference cycles (a discarded
+host's top-level pane, its scene) must not be destroyed there: ~QWidget waits for the GUI
+thread. So the Qt GUI turns it off and collects on a GUI-thread timer instead
+(`hosts.collect_on_gui_thread`, called by `hosts.install`; item 06's deadlock).
 
 **Display pauses.** The engine's flashes and pauses (`p_flash_pause` and the others) sleep
 in the engine thread. A flash shorter than the 50 ms refresh may not show, as in the Racket
